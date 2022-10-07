@@ -19,10 +19,3 @@ set_target_properties(${APPLICATION_NAME}
 
 message(STATUS "Example Added: ${APPLICATION_NAME}")
 # end /* Add CUDA executables */
-
-# Add GIT SHA-1 definition
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
-include(GetGitRevisionDescription)
-get_git_head_revision(GIT_REFSPEC GIT_SHA1)
-
-set_property(SOURCE bc.cu PROPERTY COMPILE_DEFINITIONS GIT_SHA1="${GIT_SHA1}")

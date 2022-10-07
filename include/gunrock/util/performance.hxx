@@ -6,6 +6,8 @@
 #include <fstream>
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/util/compiler.hxx>
+#include <gunrock/io/git.hxx>
+
 namespace gunrock {
 namespace util {
 namespace stats {
@@ -86,8 +88,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
                            std::vector<int>& sources,
                            std::vector<std::string>& tags,
                            int argc,
-                           char** argv,
-                           std::string git_commit) {
+                           char** argv) {
   float avg_run_time;
   float stdev_run_times;
   float min_run_time;
@@ -201,8 +202,8 @@ void get_performance_stats(std::vector<int>& edges_visited,
   jsn.push_back(nlohmann::json::object_t::value_type("time", time_s));
   jsn.push_back(
       nlohmann::json::object_t::value_type("command_line", command_line_call));
-  jsn.push_back(
-      nlohmann::json::object_t::value_type("git_commit_sha", git_commit));
+  jsn.push_back(nlohmann::json::object_t::value_type(
+      "git_commit_sha", gunrock::io::git_commit_sha1()));
   jsn.push_back(nlohmann::json::object_t::value_type(
       "schema", gunrock::util::stats::schema_version));
   jsn.push_back(nlohmann::json::object_t::value_type(

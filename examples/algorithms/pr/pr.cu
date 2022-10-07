@@ -109,7 +109,7 @@ void test_pr(int num_arguments, char** argument_array) {
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
         search_depth_vect, run_times, "pr", params.filename, "market",
         params.json_dir, params.json_file, src_placeholder, tag_vect,
-        num_arguments, argument_array, GIT_SHA1);
+        num_arguments, argument_array);
   }
 }
 

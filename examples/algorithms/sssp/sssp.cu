@@ -138,7 +138,7 @@ void test_sssp(int num_arguments, char** argument_array) {
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
         search_depth_vect, run_times, "sssp", params.filename, "market",
         params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
-        argument_array, GIT_SHA1);
+        argument_array);
   }
 }
 

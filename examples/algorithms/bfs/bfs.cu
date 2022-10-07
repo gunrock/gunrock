@@ -1,9 +1,7 @@
 #include <gunrock/algorithms/bfs.hxx>
 #include "bfs_cpu.hxx"  // Reference implementation
-#include <sys/utsname.h>
 #include <gunrock/util/performance.hxx>
 #include <gunrock/io/parameters.hxx>
-#include <random>
 
 using namespace gunrock;
 using namespace memory;
@@ -137,9 +135,10 @@ void test_bfs(int num_arguments, char** argument_array) {
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
         search_depth_vect, run_times, "bfs", params.filename, "market",
         params.json_dir, params.json_file, source_vect, tag_vect,
-        num_arguments, argument_array, GIT_SHA1);
+        num_arguments, argument_array);
   }
 }
+
 
 int main(int argc, char** argv) {
   test_bfs(argc, argv);

@@ -84,6 +84,11 @@ get_target_property(ESSENTIALS_ARCHITECTURES
     CUDA_ARCHITECTURES
 )
 
+# Add GIT SHA-1 definition
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
@@ -91,6 +96,7 @@ target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
+    GIT_SHA1="${GIT_SHA1}"
 )
 
 message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
