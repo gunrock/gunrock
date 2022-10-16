@@ -1,4 +1,9 @@
+#ifdef _WIN32
+#include <gunrock/util/sysinfo.hxx>
+#else
 #include <sys/utsname.h>
+#endif
+
 #include "nlohmann/json.hpp"
 #include <time.h>
 #include <regex>
