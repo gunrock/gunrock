@@ -148,17 +148,19 @@ void get_performance_stats(std::vector<int>& edges_visited,
 
   // Get time info
   time_t rawtime;
-  struct tm * timeinfo;
+  struct tm* timeinfo;
   char buffer[80];
 
-  time (&rawtime);
+  time(&rawtime);
   timeinfo = localtime(&rawtime);
 
-  strftime(buffer,sizeof(buffer),"%a %b %d %H:%M:%S %Y",timeinfo);
+  strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Y", timeinfo);
   time_s = buffer;
 
   auto now = std::chrono::system_clock::now();
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()) %
+            1000;
   std::string time_ms = std::to_string(ms.count());
 
   // Get command line call
@@ -226,7 +228,8 @@ void get_performance_stats(std::vector<int>& edges_visited,
     std::string time_str_filename = time_s.substr(0, time_s.size() - 4) +
                                     time_ms + '_' +
                                     time_s.substr(time_s.length() - 4);
-    std::string fn = std::filesystem::path(filename).filename().generic_string();
+    std::string fn =
+        std::filesystem::path(filename).filename().generic_string();
     int last = fn.find_last_of(".");
     fn = fn.substr(0, last);
     time_str_filename =
