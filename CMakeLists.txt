@@ -39,6 +39,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -83,6 +84,11 @@ get_target_property(ESSENTIALS_ARCHITECTURES
     CUDA_ARCHITECTURES
 )
 
+# Add GIT SHA-1 definition
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
@@ -90,6 +96,7 @@ target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
+    GIT_SHA1="${GIT_SHA1}"
 )
 
 message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
@@ -115,6 +122,7 @@ target_include_directories(essentials
   INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+  INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
 
 ####################################################

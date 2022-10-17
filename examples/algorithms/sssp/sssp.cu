@@ -1,15 +1,12 @@
 #include <gunrock/algorithms/sssp.hxx>
 #include "sssp_cpu.hxx"  // Reference implementation
+#include <gunrock/util/performance.hxx>
+#include <gunrock/io/parameters.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
 void test_sssp(int num_arguments, char** argument_array) {
-  if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
-    exit(1);
-  }
-
   // --
   // Define types
 
@@ -23,17 +20,16 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  csr_t csr;
-  std::string filename = argument_array[1];
+  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+                                        "Single Source Shortest Path");
 
-  if (util::is_market(filename)) {
-    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(mm.load(filename));
-  } else if (util::is_binary_csr(filename)) {
-    csr.read_binary(filename);
+  csr_t csr;
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+
+  if (params.binary) {
+    csr.read_binary(params.filename);
   } else {
-    std::cerr << "Unknown file format: " << filename << std::endl;
-    exit(1);
+    csr.from_coo(mm.load(params.filename));
   }
 
   // --
@@ -50,11 +46,24 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
+
   srand(time(NULL));
 
   vertex_t n_vertices = G.get_number_of_vertices();
-  vertex_t single_source = 0;  // rand() % n_vertices;
-  std::cout << "Single Source = " << single_source << std::endl;
+
+  thrust::device_vector<weight_t> distances(n_vertices);
+  thrust::device_vector<vertex_t> predecessors(n_vertices);
+  thrust::device_vector<int> edges_visited(1);
+  thrust::device_vector<int> vertices_visited(1);
+  int search_depth = 0;
+
+  // Parse sources
+  std::vector<int> source_vect;
+  gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
+                                        n_vertices, params.num_runs);
+  // Parse tags
+  std::vector<std::string> tag_vect;
+  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
 
   // --
   // GPU Run
@@ -69,39 +78,68 @@ void test_sssp(int num_arguments, char** argument_array) {
   //     allocate<vertex_t>(n_vertices * sizeof(vertex_t)),
   //     deleter_t<vertex_t>());
 
-  thrust::device_vector<weight_t> distances(n_vertices);
-  thrust::device_vector<vertex_t> predecessors(n_vertices);
+  std::vector<float> run_times;
+  for (int i = 0; i < source_vect.size(); i++) {
+    // Record run times without collecting metrics (due to overhead)
+    run_times.push_back(gunrock::sssp::run(
+        G, source_vect[i], false, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(),
+        vertices_visited.data().get(), &search_depth));
+  }
 
-  float gpu_elapsed = 0.0f;
-  int num_runs = 5;
-
-  for (auto i = 0; i < num_runs; i++)
-    gpu_elapsed += gunrock::sssp::run(G, single_source, distances.data().get(),
-                                      predecessors.data().get());
-
-  gpu_elapsed /= num_runs;
+  print::head(distances, 40, "GPU distances");
+  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+            << " (ms)" << std::endl;
 
   // --
   // CPU Run
 
-  thrust::host_vector<weight_t> h_distances(n_vertices);
-  thrust::host_vector<vertex_t> h_predecessors(n_vertices);
+  if (params.validate) {
+    thrust::host_vector<weight_t> h_distances(n_vertices);
+    thrust::host_vector<vertex_t> h_predecessors(n_vertices);
 
-  float cpu_elapsed = sssp_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
-      csr, single_source, h_distances.data(), h_predecessors.data());
+    float cpu_elapsed = sssp_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
+        csr, source_vect.back(), h_distances.data(), h_predecessors.data());
 
-  int n_errors =
-      util::compare(distances.data().get(), h_distances.data(), n_vertices);
+    int n_errors =
+        util::compare(distances.data().get(), h_distances.data(), n_vertices);
+
+    print::head(h_distances, 40, "CPU Distances");
+
+    std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+    std::cout << "Number of errors : " << n_errors << std::endl;
+  }
 
   // --
-  // Log + Validate
+  // Run performance evaluation
 
-  print::head(distances, 40, "GPU distances");
-  print::head(h_distances, 40, "CPU Distances");
+  if (params.collect_metrics) {
+    std::vector<int> edges_visited_vect;
+    std::vector<int> search_depth_vect;
+    std::vector<int> nodes_visited_vect;
 
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
-  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-  std::cout << "Number of errors : " << n_errors << std::endl;
+    vertex_t n_edges = G.get_number_of_edges();
+
+    for (int i = 0; i < source_vect.size(); i++) {
+      float metrics_run_time = gunrock::sssp::run(
+          G, source_vect[i], params.collect_metrics, distances.data().get(),
+          predecessors.data().get(), edges_visited.data().get(),
+          vertices_visited.data().get(), &search_depth);
+
+      thrust::host_vector<int> h_edges_visited = edges_visited;
+      thrust::host_vector<int> h_vertices_visited = vertices_visited;
+
+      edges_visited_vect.push_back(h_edges_visited[0]);
+      nodes_visited_vect.push_back(h_vertices_visited[0]);
+      search_depth_vect.push_back(search_depth);
+    }
+
+    gunrock::util::stats::get_performance_stats(
+        edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
+        search_depth_vect, run_times, "sssp", params.filename, "market",
+        params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
+        argument_array);
+  }
 }
 
 int main(int argc, char** argv) {
