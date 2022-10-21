@@ -106,6 +106,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto iteration = this->iteration;
 
+    thrust::device_vector<edge_t> _edges_visited_per_iteration(1, 0);
+    auto edges_visited_per_iteration = _edges_visited_per_iteration.data().get();
+
+    thrust::device_vector<vertex_t> unique_ids(G.get_number_of_vertices(), 0);
+    auto col_ids = unique_ids.data().get();
+
     auto search = [distances, single_source, iteration, edges_visited] __host__
                   __device__(vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
@@ -132,7 +138,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     auto search_with_metrics =
-        [distances, single_source, iteration, edges_visited] __host__
+        [distances, single_source, iteration, edges_visited, 
+        edges_visited_per_iteration, col_ids] __host__
         __device__(vertex_t const& source,    // ... source
                    vertex_t const& neighbor,  // neighbor
                    edge_t const& edge,        // edge
@@ -143,7 +150,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
 
+      col_ids[neighbor] = 1;
       math::atomic::add(&edges_visited[0], 1);
+      math::atomic::add(&edges_visited_per_iteration[0], 1);
 
       // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
       //   return false;
@@ -172,6 +181,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     if (collect_metrics) {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, search_with_metrics, context);
+      // operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(E, context);
+      auto total_unique_ids = thrust::reduce(unique_ids.begin(), unique_ids.end());
+      thrust::host_vector<edge_t> h_evpi = _edges_visited_per_iteration;
+      std::cout << iteration << "," << h_evpi[0] << "," << total_unique_ids << std::endl;
       *search_depth = iteration;
     } else {
       operators::advance::execute<operators::load_balance_t::block_mapped>(

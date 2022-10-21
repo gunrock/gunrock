@@ -203,6 +203,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, shortest_path_with_metrics, context);
 
+      // operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(E, context);
+
       // Execute filter operator on the provided lambda
       operators::filter::execute<operators::filter_algorithm_t::bypass>(
           G, E, remove_completed_paths_with_metrics, context);

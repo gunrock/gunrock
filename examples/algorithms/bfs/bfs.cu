@@ -7,6 +7,8 @@
 using namespace gunrock;
 using namespace memory;
 
+#include <random>
+
 void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Define types
@@ -55,10 +57,15 @@ void test_bfs(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
-
-  vertex_t single_source = 0;
-
   vertex_t n_vertices = G.get_number_of_vertices();
+
+  std::random_device rd; // obtain a random number from hardware
+  auto current_state = rd();
+  std::mt19937 gen(current_state); // seed the generator
+  std::uniform_int_distribution<> distr(0, n_vertices); // define the range
+      
+  vertex_t single_source = distr(gen);
+
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
   thrust::device_vector<int> edges_visited(1);
@@ -74,9 +81,9 @@ void test_bfs(int num_arguments, char** argument_array) {
         predecessors.data().get(), edges_visited.data().get(), &search_depth));
   }
 
-  print::head(distances, 40, "GPU distances");
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
-            << " (ms)" << std::endl;
+  // print::head(distances, 40, "GPU distances");
+  // std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+  //           << " (ms)" << std::endl;
 
   // --
   // CPU Run
@@ -104,7 +111,7 @@ void test_bfs(int num_arguments, char** argument_array) {
     vertex_t n_edges = G.get_number_of_edges();
 
     // For BFS - the number of nodes visited is just 2 * edges_visited
-    gunrock::util::stats::get_performance_stats(
+    gunrock::util::stats::get_performance_stats(current_state,
         h_edges_visited[0], (2 * h_edges_visited[0]), n_edges, n_vertices,
         search_depth, run_times, "bfs", params.filename, "market",
         params.json_dir, params.json_file);
