@@ -75,10 +75,6 @@ void hits_bench(nvbench::state& state) {
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr.from_coo(mm.load(filename));
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   auto G = graph::build::from_csr<memory_space_t::device,
                                   graph::view_t::csr>(
       csr.number_of_rows,               // rows
@@ -87,19 +83,17 @@ void hits_bench(nvbench::state& state) {
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
       csr.nonzero_values.data().get(),  // values
-      row_indices.data().get(),         // row_indices
-      column_offsets.data().get()       // column_offsets
   );
 
   // --
   // Params and memory allocation
-  hits::param_c param{20};
-  hits::result_c result{G};
+  gunrock::hits::result_c<decltype(G)> result;
+  unsigned int max_iter = 20;
 
   // --
   // Run HITS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::hits::run(G, param, result);
+    gunrock::hits::run(G, max_iter, result);
   });
 }
 

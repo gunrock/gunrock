@@ -1,7 +1,8 @@
 #include <gunrock/algorithms/bfs.hxx>
-#include "bfs_cpu.hxx"  // Reference implementation
 #include <gunrock/util/performance.hxx>
 #include <gunrock/io/parameters.hxx>
+
+#include "bfs_cpu.hxx"  // Reference implementation
 
 using namespace gunrock;
 using namespace memory;
@@ -32,9 +33,9 @@ void test_bfs(int num_arguments, char** argument_array) {
     csr.from_coo(mm.load(params.filename));
   }
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
+  // Data for CSC format.
+  // thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
+  // thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
 
   // --
   // Build graph + metadata
@@ -47,9 +48,9 @@ void test_bfs(int num_arguments, char** argument_array) {
           csr.number_of_nonzeros,           // nonzeros
           csr.row_offsets.data().get(),     // row_offsets
           csr.column_indices.data().get(),  // column_indices
-          csr.nonzero_values.data().get(),  // values
-          row_indices.data().get(),         // row_indices
-          column_offsets.data().get()       // column_offsets
+          csr.nonzero_values.data().get()   // values
+          // row_indices.data().get(),         // row_indices
+          // column_offsets.data().get()       // column_offsets
       );
 
   // --
@@ -134,11 +135,10 @@ void test_bfs(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
         search_depth_vect, run_times, "bfs", params.filename, "market",
-        params.json_dir, params.json_file, source_vect, tag_vect,
-        num_arguments, argument_array);
+        params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
+        argument_array);
   }
 }
-
 
 int main(int argc, char** argv) {
   test_bfs(argc, argv);
