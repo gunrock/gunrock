@@ -61,10 +61,6 @@ struct result_c {
     print::head(hub_vertex, 20, "Hub Vertices");
     print::head(hub, 20, "Hub");
   }
-
-  // For internal use
-  thrust::device_vector<weight_t> get_auth() { return this->auth; }
-  thrust::device_vector<weight_t> get_hub() { return this->hub; }
 };  // end of result_c
 
 template <typename graph_t, typename param_type>
@@ -96,28 +92,25 @@ struct problem_t : gunrock::problem_t<graph_t> {
       : gunrock::problem_t<graph_t>(G, _context), param(_param) {}
 
   void init() override {
+    n_vertices = this->get_graph().get_number_of_vertices();
+    auth_curr.resize(vertex_num);
+    auth_next.resize(vertex_num);
+    hub_curr.resize(vertex_num);
+    hub_next.resize(vertex_num);
+
     auth_curr_p = auth_curr.data().get();
     hub_curr_p = hub_curr.data().get();
     auth_next_p = auth_next.data().get();
     hub_next_p = hub_next.data().get();
   }
   void reset() override {
-    vertex_num = this->get_graph().get_number_of_vertices();
     auto policy = this->context->get_context(0)->execution_policy();
 
-    auth_curr.resize(vertex_num);
     thrust::fill(policy, auth_curr.begin(), auth_curr.end(), 0);
-    auth_next.resize(vertex_num);
     thrust::fill(policy, auth_next.begin(), auth_next.end(), 0);
-    hub_curr.resize(vertex_num);
     thrust::fill(policy, hub_curr.begin(), hub_curr.end(), 0);
-    hub_next.resize(vertex_num);
     thrust::fill(policy, hub_next.begin(), hub_next.end(), 0);
   }
-
-  thrust::device_vector<weight_t> get_auth() { return this->auth_curr; }
-  thrust::device_vector<weight_t> get_hub() { return this->hub_curr; }
-
 };  // end of problem_c
 
 template <typename problem_t>
