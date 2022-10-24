@@ -72,9 +72,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   param_type param;
 
-  int iterator = 0;
-  vertex_t vertex_num = 0;
-
   thrust::device_vector<weight_t> auth_curr;
   thrust::device_vector<weight_t> hub_curr;
   thrust::device_vector<weight_t> auth_next;
@@ -92,11 +89,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
       : gunrock::problem_t<graph_t>(G, _context), param(_param) {}
 
   void init() override {
-    n_vertices = this->get_graph().get_number_of_vertices();
-    auth_curr.resize(vertex_num);
-    auth_next.resize(vertex_num);
-    hub_curr.resize(vertex_num);
-    hub_next.resize(vertex_num);
+    vertex_t n_vertices = this->get_graph().get_number_of_vertices();
+    auth_curr.resize(n_vertices);
+    auth_next.resize(n_vertices);
+    hub_curr.resize(n_vertices);
+    hub_next.resize(n_vertices);
 
     auth_curr_p = auth_curr.data().get();
     hub_curr_p = hub_curr.data().get();
