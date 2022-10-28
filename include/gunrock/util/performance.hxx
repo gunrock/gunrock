@@ -21,7 +21,7 @@ using vertex_t = int;
 using edge_t = int;
 
 // Date JSON schema was last updated
-std::string schema_version = "2022-10-03";
+std::string schema_version = "2022-10-28";
 
 class system_info_t {
  private:
@@ -108,6 +108,9 @@ void get_performance_stats(std::vector<int>& edges_visited,
   nlohmann::json jsn;
   std::string json_dir_file;
   std::string command_line_call;
+  std::vector<int> filtered_edges_visited, filtered_nodes_visited,
+      filtered_search_depths, filtered_sources;
+  std::vector<float> filtered_run_times;
 
   // Get average run time
   avg_run_time =
@@ -119,25 +122,51 @@ void get_performance_stats(std::vector<int>& edges_visited,
   stdev_run_times =
       std::sqrt(sq_sum / run_times.size() - avg_run_time * avg_run_time);
 
+  for (int i = 0; i < run_times.size(); i++) {
+    if (abs(avg_run_time - run_times[i]) < (2 * stdev_run_times)) {
+      filtered_edges_visited.push_back(edges_visited[i]);
+      filtered_nodes_visited.push_back(nodes_visited[i]);
+      filtered_search_depths.push_back(search_depths[i]);
+      filtered_sources.push_back(sources[i]);
+      filtered_run_times.push_back(run_times[i]);
+    }
+  }
+
+  if (filtered_run_times.size() != run_times.size()) {
+    avg_run_time =
+        std::reduce(filtered_run_times.begin(), filtered_run_times.end(), 0.0) /
+        filtered_run_times.size();
+
+    // Get run time standard deviation
+    sq_sum =
+        std::inner_product(filtered_run_times.begin(), filtered_run_times.end(),
+                           filtered_run_times.begin(), 0.0);
+    stdev_run_times = std::sqrt(sq_sum / filtered_run_times.size() -
+                                avg_run_time * avg_run_time);
+  }
+
   // Get min and max run times
-  min_run_time = *std::min_element(run_times.begin(), run_times.end());
-  max_run_time = *std::max_element(run_times.begin(), run_times.end());
+  min_run_time =
+      *std::min_element(filtered_run_times.begin(), filtered_run_times.end());
+  max_run_time =
+      *std::max_element(filtered_run_times.begin(), filtered_run_times.end());
 
   // Get average search depth
-  avg_search_depth =
-      std::reduce(search_depths.begin(), search_depths.end(), 0.0) /
-      search_depths.size();
+  avg_search_depth = std::reduce(filtered_search_depths.begin(),
+                                 filtered_search_depths.end(), 0.0) /
+                     filtered_search_depths.size();
 
   // Get min and max search depths
-  min_search_depth =
-      *std::min_element(search_depths.begin(), search_depths.end());
-  max_search_depth =
-      *std::max_element(search_depths.begin(), search_depths.end());
+  min_search_depth = *std::min_element(filtered_search_depths.begin(),
+                                       filtered_search_depths.end());
+  max_search_depth = *std::max_element(filtered_search_depths.begin(),
+                                       filtered_search_depths.end());
 
   // Get MTEPS
-  std::vector<float> mteps(edges_visited.size());
-  std::transform(edges_visited.begin(), edges_visited.end(), run_times.begin(),
-                 mteps.begin(), std::divides<float>());
+  std::vector<float> mteps(filtered_edges_visited.size());
+  std::transform(filtered_edges_visited.begin(), filtered_edges_visited.end(),
+                 filtered_run_times.begin(), mteps.begin(),
+                 std::divides<float>());
   std::transform(mteps.begin(), mteps.end(), mteps.begin(),
                  [](auto& c) { return c / 1000; });
 
@@ -176,16 +205,26 @@ void get_performance_stats(std::vector<int>& edges_visited,
   jsn.push_back(nlohmann::json::object_t::value_type("graph_type", graph_type));
   jsn.push_back(
       nlohmann::json::object_t::value_type("edges_visited", edges_visited));
+  jsn.push_back(nlohmann::json::object_t::value_type("filtered_edges_visited",
+                                                     filtered_edges_visited));
   jsn.push_back(
       nlohmann::json::object_t::value_type("nodes_visited", nodes_visited));
+  jsn.push_back(nlohmann::json::object_t::value_type("filtered_nodes_visited",
+                                                     filtered_nodes_visited));
   jsn.push_back(nlohmann::json::object_t::value_type("num_edges", edges));
   jsn.push_back(nlohmann::json::object_t::value_type("num_vertices", vertices));
   jsn.push_back(nlohmann::json::object_t::value_type("srcs", sources));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("filtered_srcs", filtered_sources));
   jsn.push_back(nlohmann::json::object_t::value_type("tags", tags));
   jsn.push_back(
       nlohmann::json::object_t::value_type("process_times", run_times));
+  jsn.push_back(nlohmann::json::object_t::value_type("filtered_process_times",
+                                                     filtered_run_times));
   jsn.push_back(
       nlohmann::json::object_t::value_type("search_depths", search_depths));
+  jsn.push_back(nlohmann::json::object_t::value_type("filtered_search_depths",
+                                                     filtered_search_depths));
   jsn.push_back(nlohmann::json::object_t::value_type("avg_search_depth",
                                                      avg_search_depth));
   jsn.push_back(nlohmann::json::object_t::value_type("min_search_depth",
@@ -201,6 +240,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
       nlohmann::json::object_t::value_type("min_process_time", min_run_time));
   jsn.push_back(
       nlohmann::json::object_t::value_type("max_process_time", max_run_time));
+  jsn.push_back(nlohmann::json::object_t::value_type("mteps", mteps));
   jsn.push_back(nlohmann::json::object_t::value_type("avg_mteps", avg_mteps));
   jsn.push_back(nlohmann::json::object_t::value_type("min_mteps", min_mteps));
   jsn.push_back(nlohmann::json::object_t::value_type("max_mteps", max_mteps));
