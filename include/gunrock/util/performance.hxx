@@ -120,7 +120,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
   float sq_sum = std::inner_product(run_times.begin(), run_times.end(),
                                     run_times.begin(), 0.0);
   stdev_run_times =
-      std::sqrt(sq_sum / run_times.size() - avg_run_time * avg_run_time);
+      std::sqrt(sq_sum / (run_times.size() - 1) - avg_run_time * avg_run_time);
 
   for (int i = 0; i < run_times.size(); i++) {
     if (abs(avg_run_time - run_times[i]) <= (2 * stdev_run_times)) {
