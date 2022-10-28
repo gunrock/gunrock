@@ -123,7 +123,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
       std::sqrt(sq_sum / run_times.size() - avg_run_time * avg_run_time);
 
   for (int i = 0; i < run_times.size(); i++) {
-    if (abs(avg_run_time - run_times[i]) < (2 * stdev_run_times)) {
+    if (abs(avg_run_time - run_times[i]) <= (2 * stdev_run_times)) {
       filtered_edges_visited.push_back(edges_visited[i]);
       filtered_nodes_visited.push_back(nodes_visited[i]);
       filtered_search_depths.push_back(search_depths[i]);
