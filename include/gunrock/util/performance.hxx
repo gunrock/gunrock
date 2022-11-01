@@ -127,8 +127,10 @@ void get_performance_stats(std::vector<int>& edges_visited,
       filtered_edges_visited.push_back(edges_visited[i]);
       filtered_nodes_visited.push_back(nodes_visited[i]);
       filtered_search_depths.push_back(search_depths[i]);
-      filtered_sources.push_back(sources[i]);
       filtered_run_times.push_back(run_times[i]);
+      if (sources.size() > i) {
+        filtered_sources.push_back(sources[i]);
+      }
     }
   }
 
