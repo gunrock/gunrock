@@ -4,7 +4,7 @@
 | [**Examples**](https://github.com/gunrock/gunrock/tree/main/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://github.com/gunrock/gunrock/wiki) | [**GitHub Actions**](https://github.com/gunrock/gunrock/actions) |
 |--------------|----------------------|-------------------|-------------------|
 
-**Gunrock**[<sup>[1]</sup>](#footnotes) is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
+**Gunrock**[^1] is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
 
 | Branch    | Purpose                                                                                                                            | Version        | Status     |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------|----------------|------------|
@@ -14,7 +14,7 @@
 | `dev`     | Previous development branch for `gunrock/gunrock`. All changes now merged in `master`.                                             | $\leq$ `1.x.x` | Deprecated |
 
 ## Quick Start Guide
-Before building Gunrock make sure you have **CUDA Toolkit**[<sup>[2]</sup>](#footnotes) installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have **CUDA Toolkit**[^2] installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
 
 ```shell
 git clone https://github.com/gunrock/gunrock.git
@@ -117,6 +117,5 @@ Thank you for citing our work.
 
 Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/gunrock/blob/main/LICENSE).
 
-## Footnotes
-1. This repository has been moved from https://github.com/gunrock/essentials and the previous history is preserved with tags and under `master` branch. Read more about gunrock and essentials in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
-2. Recommended **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.
+[^1]: This repository has been moved from https://github.com/gunrock/essentials and the previous history is preserved with tags and under `master` branch. Read more about gunrock and essentials in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
+[^2]: Recommended **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.
