@@ -2,7 +2,6 @@
  * @file spgemm.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Sparse-Matrix-Matrix multiplication.
- * @version 0.1
  * @date 2022-01-04
  *
  * @copyright Copyright (c) 2022

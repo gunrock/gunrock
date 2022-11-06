@@ -2,7 +2,6 @@
  * @file spmm.cu
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Sparse matrix-matrix multiplication
- * @version 0.1
  * @date 2022-01-20
  *
  * @copyright Copyright (c) 2022
@@ -40,8 +39,8 @@ struct matrix_t {
   __host__ __device__ constexpr matrix_t(const matrix_t& other)
       : height(other.height), width(other.width), data(other.data) {}
 
-  __host__ __device__ __forceinline__ constexpr std::size_t size() const
-      noexcept {
+  __host__ __device__ __forceinline__ constexpr std::size_t size()
+      const noexcept {
     return height * width;
   }
 

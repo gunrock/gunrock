@@ -2,7 +2,6 @@
  * @file thread_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Advance operator where a vertex/edge is mapped to a thread.
- * @version 0.1
  * @date 2020-10-20
  *
  * @copyright Copyright (c) 2020

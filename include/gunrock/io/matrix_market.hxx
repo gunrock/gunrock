@@ -2,7 +2,6 @@
  * @file matrix_market.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-09
  *
  * @copyright Copyright (c) 2020

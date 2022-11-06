@@ -3,7 +3,6 @@
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Helper functions for Advance operators.
  * @todo These can be potentially moved under frontier's API.
- * @version 0.1
  * @date 2021-01-12
  *
  * @copyright Copyright (c) 2021

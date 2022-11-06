@@ -2,7 +2,6 @@
  * @file sample.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-12-23
  *
  * @copyright Copyright (c) 2021

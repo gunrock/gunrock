@@ -3,7 +3,6 @@
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief A batch operator is an operator that can be used to execute a
  * function/application in bactches with different inputs using C++ threads.
- * @version 0.1
  * @date 2021-05-04
  *
  * @copyright Copyright (c) 2021

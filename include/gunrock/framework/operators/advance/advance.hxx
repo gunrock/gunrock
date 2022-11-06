@@ -2,7 +2,6 @@
  * @file advance.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-07
  *
  * @copyright Copyright (c) 2020
@@ -19,7 +18,7 @@
 
 #include <gunrock/framework/operators/advance/helpers.hxx>
 #include <gunrock/framework/operators/advance/merge_path.hxx>
-#include <gunrock/framework/operators/advance/merge_path_v2.hxx>
+// #include <gunrock/framework/operators/advance/merge_path_v2.hxx>
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/bucketing.hxx>
@@ -108,9 +107,9 @@ void execute(graph_t& G,
     if (lb == load_balance_t::merge_path) {
       merge_path::execute<direction, input_type, output_type>(
           G, op, input, output, segments, *context0);
-    } else if (lb == load_balance_t::merge_path_v2) {
-      merge_path_v2::execute<direction, input_type, output_type>(
-          G, op, *input, *output, segments, *context0);
+      // } else if (lb == load_balance_t::merge_path_v2) {
+      //   merge_path_v2::execute<direction, input_type, output_type>(
+      //       G, op, *input, *output, segments, *context0);
     } else if (lb == load_balance_t::thread_mapped) {
       thread_mapped::execute<direction, input_type, output_type>(
           G, op, *input, *output, segments, *context0);

@@ -2,7 +2,6 @@
  * @file sssp.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Single-Source Shortest Path algorithm.
- * @version 0.1
  * @date 2020-10-05
  *
  * @copyright Copyright (c) 2020
@@ -230,7 +229,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
-          bool collect_metrics,                              // Parameter
+          bool collect_metrics,                          // Parameter
           typename graph_t::weight_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
           int* edges_visited,                            // Output

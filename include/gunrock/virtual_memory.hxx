@@ -2,7 +2,6 @@
  * @file virtual_memory.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-02-23
  *
  * @copyright Copyright (c) 2021

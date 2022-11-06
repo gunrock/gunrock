@@ -2,7 +2,6 @@
  * @file color.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Graph Coloring algorithm.
- * @version 0.1
  * @date 2020-11-24
  *
  * @copyright Copyright (c) 2020
@@ -62,7 +61,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
-    generate::random::uniform_distribution(randoms, float(0.0f), float(n_vertices));
+    generate::random::uniform_distribution(randoms, float(0.0f),
+                                           float(n_vertices));
   }
 };
 
@@ -106,7 +106,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Exit early if the vertex has no neighbors.
       if (num_neighbors == 0) {
         colors[vertex] = color;
-        return false; // remove (colored)
+        return false;  // remove (colored)
       }
 
       bool colormax = true;

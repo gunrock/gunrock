@@ -2,7 +2,6 @@
  * @file vector_frontier.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Vector-based frontier implementation.
- * @version 0.1
  * @date 2021-03-12
  *
  * @copyright Copyright (c) 2021
@@ -174,8 +173,8 @@ class vector_frontier_t {
    * @param stream
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
-    thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(), this->end(),
-                 value);
+    thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),
+                 this->end(), value);
   }
 
   /**
@@ -198,8 +197,8 @@ class vector_frontier_t {
     // Set the new number of elements.
     this->set_number_of_elements(size);
 
-    thrust::sequence(thrust::cuda::par_nosync.on(stream), this->begin(), this->end(),
-                     initial_value);
+    thrust::sequence(thrust::cuda::par_nosync.on(stream), this->begin(),
+                     this->end(), initial_value);
   }
 
   /**

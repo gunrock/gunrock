@@ -2,7 +2,6 @@
  * @file convert.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-12-04
  *
  * @copyright Copyright (c) 2020
@@ -16,22 +15,14 @@ namespace graph {
 namespace convert {
 
 template <memory_space_t space, typename index_t, typename offset_t>
-void offsets_to_indices(const index_t* offsets,
+void offsets_to_indices(const offset_t* offsets,
                         offset_t const& size_of_offsets,
-                        offset_t* indices,
-                        index_t const& size_of_indices,
-                        gcuda::stream_t stream = 0) {
-  //   using execution_policy_t =
-  //       std::conditional_t<space == memory_space_t::device,
-  //                          decltype(thrust::cuda::par_nosync.on(
-  //                              stream)),  // XXX: does this
-  //                                         // work on stream 0?
-  //                          decltype(thrust::host)>;
-  //   execution_policy_t exec;
-
-  auto exec = (space == memory_space_t::device)
-                  ? thrust::cuda::par_nosync.on(stream)
-                  : thrust::seq;
+                        index_t* indices,
+                        index_t const& size_of_indices) {
+  using execution_policy_t =
+      std::conditional_t<space == memory_space_t::device,
+                         decltype(thrust::device), decltype(thrust::host)>;
+  execution_policy_t exec;
   // convert compressed offsets into uncompressed indices
   thrust::fill(exec, indices + 0, indices + size_of_indices, offset_t(0));
 

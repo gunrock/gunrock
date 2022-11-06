@@ -2,7 +2,6 @@
  * @file bfs.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Breadth-First Search algorithm.
- * @version 0.1
  * @date 2020-11-23
  *
  * @copyright Copyright (c) 2020

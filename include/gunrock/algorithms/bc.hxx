@@ -2,7 +2,6 @@
  * @file bc.hxx
  * @author Ben Johnson (bkj.322@gmail.com)
  * @brief Betweeness Centrality
- * @version 0.1
  * @date 2021-04
  *
  * @copyright Copyright (c) 2021
@@ -304,8 +303,8 @@ float run(graph_t& G,
   thrust::fill_n(thrust::device, d_bc_values, n_vertices, (weight_t)0);
 
   auto f = [&](std::size_t job_idx) -> float {
-    return bc::run(G, (vertex_t)job_idx, collect_metrics, bc_values, edges_visited,
-                   search_depth);
+    return bc::run(G, (vertex_t)job_idx, collect_metrics, bc_values,
+                   edges_visited, search_depth);
   };
 
   std::size_t n_jobs = n_vertices;
