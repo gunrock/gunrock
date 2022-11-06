@@ -34,14 +34,16 @@ void test_pr(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
+  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
   auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
       csr.number_of_rows,               // rows
       csr.number_of_columns,            // columns
       csr.number_of_nonzeros,           // nonzeros
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );  // supports row_indices and column_offsets (default = nullptr)
+      csr.nonzero_values.data().get(),  // values
+      row_indices.data().get()          // row_indices
+  );  // supports column_offsets (default = nullptr)
 
   // --
   // Params and memory allocation
@@ -85,7 +87,7 @@ void test_pr(int num_arguments, char** argument_array) {
     std::vector<int> edges_visited_vect;
     std::vector<int> nodes_visited_vect;
     std::vector<int> search_depth_vect;
-    
+
     vertex_t n_edges = G.get_number_of_edges();
 
     for (int i = 0; i < params.num_runs; i++) {
