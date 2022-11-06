@@ -12,7 +12,6 @@
 
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/container/vector.hxx>
-#include <gunrock/algorithms/sort/radix_sort.hxx>
 #include <thrust/sequence.h>
 
 namespace gunrock {

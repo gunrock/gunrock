@@ -117,7 +117,9 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
        i += gcuda::block::size::x()     // increment by blockDim.x
   ) {
     // Binary search to find which vertex id to work on.
-    int id = search::binary::rightmost(degrees, i, length);
+    // int id = search::binary::rightmost(degrees, i, length);
+    auto it = thrust::upper_bound(thrust::seq, degrees, degrees + length, i);
+    vertex_t id = thrust::distance(degrees, it) - 1;
 
     // If the id is greater than the width of the block or the input size, we
     // exit.
