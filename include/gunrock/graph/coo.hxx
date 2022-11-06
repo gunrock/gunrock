@@ -5,6 +5,7 @@
 #include <iterator>
 
 #include <gunrock/memory.hxx>
+#include <gunrock/util/load_store.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
