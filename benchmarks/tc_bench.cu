@@ -3,6 +3,8 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/tc.hxx>
 
+#include "benchmarks.hxx"
+
 using namespace gunrock;
 using namespace memory;
 
@@ -119,24 +121,10 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without TC options to pass to NVBench.
-    char* args[argc];
-    int j = 0;
-    int num_tc_arguments = 0;
-    for (int i = 0; i < argc; i++) {
-      if (strcmp(argv[i], "--market") == 0 || strcmp(argv[i], "-m") == 0) {
-        num_tc_arguments += 2;
-        i++;
-        continue;
-      }
-      if (strcmp(argv[i], "--reduce") == 0 || strcmp(argv[i], "-r") == 0) {
-        num_tc_arguments += 1;
-        continue;
-      }
-      args[j] = argv[i];
-      j++;
-    }
+    // Remove all gunrock parameters and pass to nvbench.
+    auto args = filtered_argv(argc, argv, "--market", "-m", "--reduce", "-r",
+                              filename_, "true", "false");
     NVBENCH_BENCH(tc_bench);
-    NVBENCH_MAIN_BODY(argc - num_tc_arguments, args);
+    NVBENCH_MAIN_BODY(args.size(), args.data());
   }
 }

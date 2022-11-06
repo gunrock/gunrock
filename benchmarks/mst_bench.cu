@@ -3,6 +3,8 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/mst.hxx>
 
+#include "benchmarks.hxx"
+
 using namespace gunrock;
 using namespace memory;
 
@@ -78,7 +80,7 @@ void mst_bench(nvbench::state& state) {
       csr.number_of_nonzeros,           // nonzeros
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()  // values
+      csr.nonzero_values.data().get()   // values
   );
 
   // --
@@ -101,19 +103,9 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without matrix filename to pass to NVBench.
-    char* args[argc - 2];
-    int j = 0;
-    for (int i = 0; i < argc; i++) {
-      if (strcmp(argv[i], "--market") == 0 || strcmp(argv[i], "-m") == 0) {
-        i++;
-        continue;
-      }
-      args[j] = argv[i];
-      j++;
-    }
-
+    // Remove all gunrock parameters and pass to nvbench.
+    auto args = filtered_argv(argc, argv, "--market", "-m", filename);
     NVBENCH_BENCH(mst_bench);
-    NVBENCH_MAIN_BODY(argc - 2, args);
+    NVBENCH_MAIN_BODY(args.size(), args.data());
   }
 }

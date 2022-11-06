@@ -3,6 +3,8 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/bfs.hxx>
 
+#include "benchmarks.hxx"
+
 using namespace gunrock;
 using namespace memory;
 
@@ -102,7 +104,8 @@ void bfs_bench(nvbench::state& state) {
   // Run BFS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
     gunrock::bfs::run(G, single_source, false, distances.data().get(),
-        predecessors.data().get(), edges_visited.data().get(), &search_depth);
+                      predecessors.data().get(), edges_visited.data().get(),
+                      &search_depth);
   });
 }
 
@@ -115,19 +118,9 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without matrix filename to pass to NVBench.
-    char* args[argc - 2];
-    int j = 0;
-    for (int i = 0; i < argc; i++) {
-      if (strcmp(argv[i], "--market") == 0 || strcmp(argv[i], "-m") == 0) {
-        i++;
-        continue;
-      }
-      args[j] = argv[i];
-      j++;
-    }
-
+    // Remove all gunrock parameters and pass to nvbench.
+    auto args = filtered_argv(argc, argv, "--market", "-m", filename);
     NVBENCH_BENCH(bfs_bench);
-    NVBENCH_MAIN_BODY(argc - 2, args);
+    NVBENCH_MAIN_BODY(args.size(), args.data());
   }
 }
