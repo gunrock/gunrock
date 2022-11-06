@@ -174,7 +174,7 @@ class vector_frontier_t {
    * @param stream
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
-    thrust::fill(thrust::cuda::par.on(stream), this->begin(), this->end(),
+    thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(), this->end(),
                  value);
   }
 
@@ -198,7 +198,7 @@ class vector_frontier_t {
     // Set the new number of elements.
     this->set_number_of_elements(size);
 
-    thrust::sequence(thrust::cuda::par.on(stream), this->begin(), this->end(),
+    thrust::sequence(thrust::cuda::par_nosync.on(stream), this->begin(), this->end(),
                      initial_value);
   }
 

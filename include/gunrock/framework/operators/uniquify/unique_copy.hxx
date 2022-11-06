@@ -27,12 +27,12 @@ void execute(frontier_t* input,
   if (output->get_capacity() < input->get_number_of_elements())
     output->reserve(input->get_number_of_elements());
 
-  auto new_end = thrust::unique_copy(
-      thrust::cuda::par.on(context.stream()),  // execution policy
-      input->begin(),                          // input iterator: begin
-      input->end(),                            // input iterator: end
-      output->begin()                          // output iterator: begin
-  );
+  auto new_end =
+      thrust::unique_copy(context.execution_policy(),  // execution policy
+                          input->begin(),              // input iterator: begin
+                          input->end(),                // input iterator: end
+                          output->begin()              // output iterator: begin
+      );
 
   auto new_size = thrust::distance(input->begin(), new_end);
   output->set_number_of_elements(new_size);

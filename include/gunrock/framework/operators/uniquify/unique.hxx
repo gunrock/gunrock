@@ -23,10 +23,9 @@ template <typename frontier_t>
 void execute(frontier_t* input,
              frontier_t* output,
              gcuda::standard_context_t& context) {
-  auto new_end = thrust::unique(
-      thrust::cuda::par.on(context.stream()),  // execution policy
-      input->begin(),                          // input iterator: begin
-      input->end()                             // input iterator: end
+  auto new_end = thrust::unique(context.execution_policy(),  // execution policy
+                                input->begin(),  // input iterator: begin
+                                input->end()     // input iterator: end
   );
 
   auto new_size = thrust::distance(input->begin(), new_end);

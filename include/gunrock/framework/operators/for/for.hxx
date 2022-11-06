@@ -32,7 +32,7 @@ execute(frontier_t& f, func_t op, gcuda::multi_context_t& context) {
   using type_t = typename frontier_t::type_t;
   auto single_context = context.get_context(0);
   /// TODO: use get and set frontier elements instead.
-  thrust::for_each(thrust::cuda::par.on(single_context->stream()),
+  thrust::for_each(single_context->execution_policy(),
                    f.begin(),  // Begin: 0
                    f.end(),    // End: # of V/E
                    [=] __device__(type_t const& x) {
@@ -76,7 +76,7 @@ execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
   switch (type) {
     case parallel_for_each_t::weight:
       thrust::for_each(
-          thrust::cuda::par.on(single_context->stream()),
+          single_context->execution_policy(),
           thrust::make_counting_iterator<index_t>(0),     // Begin: 0
           thrust::make_counting_iterator<index_t>(size),  // End: # of V/E
           [=] __device__(index_t const& x) {
@@ -86,7 +86,7 @@ execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
       break;
     default:
       thrust::for_each(
-          thrust::cuda::par.on(single_context->stream()),
+          single_context->execution_policy(),
           thrust::make_counting_iterator<index_t>(0),     // Begin: 0
           thrust::make_counting_iterator<index_t>(size),  // End: # of V/E
           [=] __device__(index_t const& x) { op(x); }     // Unary Operator
