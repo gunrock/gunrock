@@ -39,7 +39,7 @@ void test_hits(int num_arguments, char** argument_array) {
       csr.nonzero_values.data().get()   // values
   );
 
-  hits::result_c<decltype(G)> result;
+  hits::result_c<vertex_t, weight_t> result;
   unsigned int max_iter = 20;
 
   auto time = gunrock::hits::run(G, max_iter, result);

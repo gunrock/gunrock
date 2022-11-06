@@ -76,10 +76,6 @@ void bfs_bench(nvbench::state& state) {
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr.from_coo(mm.load(filename));
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   // --
   // Build graph + metadata
   auto G = graph::build::from_csr<memory_space_t::device,
@@ -89,9 +85,7 @@ void bfs_bench(nvbench::state& state) {
       csr.number_of_nonzeros,           // nonzeros
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get(),  // values
-      row_indices.data().get(),         // row_indices
-      column_offsets.data().get()       // column_offsets
+      csr.nonzero_values.data().get()   // values
   );
 
   // --
@@ -101,12 +95,14 @@ void bfs_bench(nvbench::state& state) {
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
+  thrust::device_vector<int> edges_visited(1);
+  int search_depth = 0;
 
   // --
   // Run BFS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::bfs::run(G, single_source, distances.data().get(),
-                      predecessors.data().get());
+    gunrock::bfs::run(G, single_source, false, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(), &search_depth);
   });
 }
 

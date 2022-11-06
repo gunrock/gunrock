@@ -86,10 +86,6 @@ void tc_bench(nvbench::state& state) {
   }
   csr.from_coo(mmatrix);
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   auto G = graph::build::from_csr<memory_space_t::device,
                                   graph::view_t::csr>(
       csr.number_of_rows,               // rows

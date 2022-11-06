@@ -75,19 +75,18 @@ void hits_bench(nvbench::state& state) {
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr.from_coo(mm.load(filename));
 
-  auto G = graph::build::from_csr<memory_space_t::device,
-                                  graph::view_t::csr>(
+  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
       csr.number_of_rows,               // rows
       csr.number_of_columns,            // columns
       csr.number_of_nonzeros,           // nonzeros
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get(),  // values
+      csr.nonzero_values.data().get()   // values
   );
 
   // --
   // Params and memory allocation
-  gunrock::hits::result_c<decltype(G)> result;
+  gunrock::hits::result_c<vertex_t, weight_t> result;
   unsigned int max_iter = 20;
 
   // --

@@ -28,11 +28,8 @@ struct param_t {
       : max_iterations(_max_iterations) {}
 };  // end of param_t
 
-template <typename graph_t>
+template <typename vertex_t, typename weight_t>
 struct result_c {
-  using vertex_t = typename graph_t::vertex_type;
-  using weight_t = typename graph_t::weight_type;
-
   int max_pages;
 
   thrust::device_vector<weight_t> auth;

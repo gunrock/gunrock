@@ -29,6 +29,10 @@ project(essentials
   LANGUAGES CXX C CUDA
 )
 
+# Apparently defines NDEBUG, such that asserts() are disabled.
+# That is what we want for performance.
+set(CMAKE_BUILD_TYPE Release)
+
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */

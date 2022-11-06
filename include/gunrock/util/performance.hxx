@@ -62,9 +62,9 @@ void get_gpu_info(nlohmann::json* jsn) {
   gpuinfo["total_global_mem"] = std::to_string(
       gunrock::gcuda::properties::total_global_memory(device_properties));
   gpuinfo["major"] =
-      std::to_string(gunrock::gcuda::properties::major(device_properties));
+      std::to_string(gunrock::gcuda::properties::sm_major(device_properties));
   gpuinfo["minor"] =
-      std::to_string(gunrock::gcuda::properties::minor(device_properties));
+      std::to_string(gunrock::gcuda::properties::sm_minor(device_properties));
   gpuinfo["clock_rate"] =
       std::to_string(gunrock::gcuda::properties::clock_rate(device_properties));
   gpuinfo["multi_processor_count"] = std::to_string(
