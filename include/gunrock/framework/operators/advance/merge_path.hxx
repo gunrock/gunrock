@@ -37,6 +37,7 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              gcuda::standard_context_t& context) {
+#if 0
   if constexpr (direction == advance_direction_t::optimized) {
     error::throw_if_exception(cudaErrorUnknown,
                               "Direction-optimized not yet implemented.");
@@ -54,10 +55,12 @@ void execute(graph_t& G,
     }
   }
 
+  using view_t = std::conditional_t<direction == advance_direction_t::forward,
+                                    typename graph_t::graph_csr_view_t,
+                                    typename graph_t::graph_csc_view_t>;
+#endif
+
   using type_t = typename frontier_t::type_t;
-  // using view_t = std::conditional_t<direction ==
-  // advance_direction_t::forward, typename graph_t::graph_csr_view_t, typename
-  // graph_t::graph_csc_view_t>;
 
   auto size_of_output = compute_output_offsets(
       G, input, segments, context,
