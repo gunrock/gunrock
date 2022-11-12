@@ -9,6 +9,7 @@
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
+#include <gunrock/formats/formats.hxx>
 
 #include <thrust/binary_search.h>
 #include <thrust/execution_policy.h>
@@ -20,6 +21,11 @@ namespace graph {
 struct empty_csr_t {};
 
 using namespace memory;
+using vertex_t = int;
+using edge_t = int;
+using weight_t = float;
+using csr_t =
+    gunrock::format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
 // XXX: The ideal thing to do here is to inherit
 // base class with virtual keyword specifier, therefore
