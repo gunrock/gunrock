@@ -15,7 +15,7 @@
 
 // #include "formats/format.cuh"
 // #include "formats/csc.cuh"
-// #include "formats/coo.cuh"
+#include "formats/coo.cuh"
 // #include "formats/csr.cuh"
 // #include "formats/coocsr.cuh"
 
@@ -27,7 +27,7 @@
 // #include "memory/memory.cuh"
 
 // #include "framework/problem.cuh"
-#include "framework/operators/for.cuh"
+//#include "framework/operators/for.cuh"
 
 // #include "utils/type_limits.cuh"
 
@@ -35,10 +35,10 @@
 // #include "cuda/context.cuh"
 // #include "cuda/device_properties.cuh"
 
-#include "containers/array.cuh"
+//#include "containers/array.cuh"
 
 // #include "io/matrix_market.cuh"
-#include "io/smtx.cuh"
+//#include "io/smtx.cuh"
 // #include "io/mtxbin.cuh"
 
-#include "algorithms/tc.cuh"
+//#include "algorithms/tc.cuh"
