@@ -194,7 +194,7 @@ class graph_t : public graph_view_t... {
             typename std::enable_if<(_space == memory_space_t::host)>::type* =
                 nullptr>
   __host__ void set(view_class& view) {
-    input_view_t::set(view);
+    input_view_t::template set<_space>(view);
   }
 
   template <class input_view_t = default_view_t,
@@ -206,7 +206,7 @@ class graph_t : public graph_view_t... {
             typename std::enable_if<(_space == memory_space_t::device)>::type* =
                 nullptr>
   __device__ void set(view_class& view) {
-    input_view_t::set(view);
+    input_view_t::template set<_space>(view);
   }
 
   template <class input_view_t = default_view_t, typename... args_t>
