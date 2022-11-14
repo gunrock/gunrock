@@ -23,26 +23,24 @@ void test_coo(int num_arguments, char** argument_array) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
 
-  using csr_t = format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csr_t = format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
   csr_t csr;
-  using coo_t = format::coo_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using coo_t = format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
   coo_t coo;
   csr.from_coo(mm.load(filename));
 
-  coo.row_indices = thrust::device_vector<vertex_t>(csr.number_of_nonzeros);
-  coo.column_indices = thrust::device_vector<vertex_t>(csr.number_of_nonzeros);
-  coo.nonzero_values = thrust::device_vector<vertex_t>(csr.number_of_nonzeros);
-
-  thrust::copy(thrust::device, csr.column_indices.begin(), csr.column_indices.end(), coo.column_indices.begin());
-  thrust::copy(thrust::device, csr.nonzero_values.begin(), csr.nonzero_values.end(), coo.nonzero_values.begin());
+  coo.row_indices = thrust::host_vector<vertex_t>(csr.number_of_nonzeros);
+  coo.column_indices = csr.column_indices;
+  coo.nonzero_values = csr.nonzero_values;
 
   coo.number_of_columns = csr.number_of_columns;
   coo.number_of_rows = csr.number_of_rows;
   coo.number_of_nonzeros = csr.number_of_nonzeros;
+  
   // --
   // Build graph
-
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::coo>(csr, coo);
+  auto G = graph::build::from_csr<memory_space_t::host, graph::view_t::coo>(
+      csr, coo);
 
   // >>
   std::cout << "G.get_number_of_vertices()\t: " << G.get_number_of_vertices()

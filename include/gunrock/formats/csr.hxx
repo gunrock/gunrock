@@ -93,29 +93,13 @@ struct csr_t {
     // index_t* Aj;
     // value_t* Ax;
 
-    if (space == memory_space_t::device) {
-      assert(space == memory_space_t::device);
-      // If returning csr_t on device, allocate temporary host vectors, build on
-      // host and move to device.
-      Ap.resize(number_of_rows + 1);
-      Aj.resize(number_of_nonzeros);
-      Ax.resize(number_of_nonzeros);
+    Ap.resize(number_of_rows + 1);
+    Aj.resize(number_of_nonzeros);
+    Ax.resize(number_of_nonzeros);
 
-      // Ap = _Ap.data();
-      // Aj = _Aj.data();
-      // Ax = _Ax.data();
-
-    } else {
-      assert(space == memory_space_t::host);
-      // If returning csr_t on host, use it's internal memory to build from COO.
-      row_offsets.resize(number_of_rows + 1);
-      column_indices.resize(number_of_nonzeros);
-      nonzero_values.resize(number_of_nonzeros);
-
-      // Ap = raw_pointer_cast(row_offsets.data());
-      // Aj = raw_pointer_cast(column_indices.data());
-      // Ax = raw_pointer_cast(nonzero_values.data());
-    }
+    // Ap = _Ap.data();
+    // Aj = _Aj.data();
+    // Ax = _Ax.data();
 
     // compute number of non-zero entries per row of A.
     for (offset_t n = 0; n < number_of_nonzeros; ++n) {
@@ -148,12 +132,9 @@ struct csr_t {
       last = temp;
     }
 
-    // If returning a device csr_t, move coverted data to device.
-    if (space == memory_space_t::device) {
-      row_offsets = Ap;
-      column_indices = Aj;
-      nonzero_values = Ax;
-    }
+    row_offsets = Ap;
+    column_indices = Aj;
+    nonzero_values = Ax;
 
     return *this;  // CSR representation (with possible duplicates)
   }
