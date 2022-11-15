@@ -185,30 +185,6 @@ class graph_t : public graph_view_t... {
    * column_indices, values), csc = (column_offsets, row_indices, values), coo =
    * (row_indices, column_indices, values).
    */
-  template <class input_view_t = default_view_t,
-            memory_space_t _space,
-            typename _edge_t,
-            typename _vertex_t,
-            typename _weight_t,
-            class view_class,
-            typename std::enable_if<(_space == memory_space_t::host)>::type* =
-                nullptr>
-  __host__ void set(view_class& view) {
-    input_view_t::template set<_space>(view);
-  }
-
-  template <class input_view_t = default_view_t,
-            memory_space_t _space,
-            typename _edge_t,
-            typename _vertex_t,
-            typename _weight_t,
-            class view_class,
-            typename std::enable_if<(_space == memory_space_t::device)>::type* =
-                nullptr>
-  __device__ void set(view_class& view) {
-    input_view_t::template set<_space>(view);
-  }
-
   template <class input_view_t = default_view_t, typename... args_t>
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,

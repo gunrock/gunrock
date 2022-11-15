@@ -127,31 +127,6 @@ class graph_coo_t {
     values = raw_pointer_cast<weight_type>(_values);
   }
 
-  template <
-      memory_space_t space,
-      typename std::enable_if<(space == memory_space_t::host)>::type* = nullptr>
-  __host__ void set(format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
-    this->number_of_vertices = coo.number_of_rows;
-    this->number_of_edges = coo.number_of_nonzeros;
-    // Set raw pointers
-    row_indices = raw_pointer_cast<edge_type>(coo.row_indices.data());
-    column_indices = raw_pointer_cast<vertex_type>(coo.column_indices.data());
-    values = raw_pointer_cast<weight_type>(coo.nonzero_values.data());
-  }
-
-  template <memory_space_t space,
-            typename std::enable_if<(space == memory_space_t::device)>::type* =
-                nullptr>
-  __device__ void set(format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
-    this->number_of_vertices = coo.number_of_rows;
-    this->number_of_edges = coo.number_of_nonzeros;
-    // Set raw pointers
-    row_indices = raw_pointer_cast<edge_type>(coo.row_idices.data().get());
-    column_indices =
-        raw_pointer_cast<vertex_type>(coo.column_indices.data().get());
-    values = raw_pointer_cast<weight_type>(coo.nonzero_values.data().get());
-  }
-
  private:
   // Underlying data storage
   vertex_type number_of_vertices;

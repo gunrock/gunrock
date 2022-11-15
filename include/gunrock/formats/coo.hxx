@@ -2,6 +2,7 @@
 
 #include <gunrock/memory.hxx>
 #include <gunrock/container/vector.hxx>
+#include <gunrock/graph/conversions/convert.hxx>
 
 namespace gunrock {
 namespace format {
@@ -45,6 +46,45 @@ struct coo_t {
         nonzero_values(nnz) {}
 
   ~coo_t() {}
+
+  /**
+   * @brief Convert a Coordinate Sparse Format into Compressed Sparse Row
+   * Format.
+   *
+   * @tparam index_t
+   * @tparam offset_t
+   * @tparam value_t
+   * @param coo
+   * @return csr_t<space, index_t, offset_t, value_t>&
+   */
+  coo_t<space, index_t, index_t, value_t> from_csr(
+      const csr_t<memory_space_t::host, index_t, index_t, value_t>& csr) {
+    number_of_rows = csr.number_of_rows;
+    number_of_columns = csr.number_of_columns;
+    number_of_nonzeros = csr.number_of_nonzeros;
+
+    // Allocate space for vectors
+    vector_t<index_t, memory_space_t::host> Ai;
+    vector_t<index_t, memory_space_t::host> Aj;
+    vector_t<value_t, memory_space_t::host> Ax;
+
+    Ai.resize(number_of_nonzeros);
+    Aj.resize(number_of_nonzeros);
+    Ax.resize(number_of_nonzeros);
+
+    Aj = csr.column_indices;
+    Ax = csr.nonzero_values;
+
+    gunrock::graph::convert::offsets_to_indices<memory_space_t::host>(
+        csr.row_offsets.data(), csr.number_of_rows + 1,
+        Ai.data(), number_of_nonzeros);
+
+    row_indices = Ai;
+    column_indices = Aj;
+    nonzero_values = Ax;
+
+    return *this;  // CSR representation (with possible duplicates)
+  }
 
 };  // struct coo_t
 

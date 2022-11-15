@@ -33,6 +33,14 @@ template <memory_space_t space,
 auto from_csr(format::csr_t<space, vertex_t, edge_t, weight_t>& csr, format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
   return detail::from_csr<space, build_views>(csr, coo);
 }
+template <memory_space_t space,
+          view_t build_views,
+          typename edge_t,
+          typename vertex_t,
+          typename weight_t>
+auto from_coo(format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
+  return detail::from_coo<space, build_views>(coo);
+}
 
 }  // namespace build
 }  // namespace graph
