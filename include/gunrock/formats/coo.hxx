@@ -48,15 +48,16 @@ struct coo_t {
   ~coo_t() {}
 
   /**
-   * @brief Convert a Coordinate Sparse Format into Compressed Sparse Row
+   * @brief Convert CSR format into COO  
    * Format.
    *
    * @tparam index_t
-   * @tparam offset_t
+   * @tparam index_t
    * @tparam value_t
-   * @param coo
-   * @return csr_t<space, index_t, offset_t, value_t>&
+   * @param csr
+   * @return coo_t<space, index_t, index_t, value_t>&
    */
+  // TODO: fix index_t -> offset_t
   coo_t<space, index_t, index_t, value_t> from_csr(
       const csr_t<memory_space_t::host, index_t, index_t, value_t>& csr) {
     number_of_rows = csr.number_of_rows;
@@ -83,7 +84,7 @@ struct coo_t {
     column_indices = Aj;
     nonzero_values = Ax;
 
-    return *this;  // CSR representation (with possible duplicates)
+    return *this;  // COO representation 
   }
 
 };  // struct coo_t

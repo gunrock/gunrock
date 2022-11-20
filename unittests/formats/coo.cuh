@@ -29,19 +29,18 @@ void test_coo(int num_arguments, char** argument_array) {
   coo_t coo;
   csr.from_coo(mm.load(filename));
   coo.from_csr(csr);
-  
-  //coo.row_indices = thrust::host_vector<vertex_t>(csr.number_of_nonzeros);
-  //coo.column_indices = csr.column_indices;
-  //coo.nonzero_values = csr.nonzero_values;
 
-  //coo.number_of_columns = csr.number_of_columns;
-  //coo.number_of_rows = csr.number_of_rows;
-  //coo.number_of_nonzeros = csr.number_of_nonzeros;
-  
+  // coo.row_indices = thrust::host_vector<vertex_t>(csr.number_of_nonzeros);
+  // coo.column_indices = csr.column_indices;
+  // coo.nonzero_values = csr.nonzero_values;
+
+  // coo.number_of_columns = csr.number_of_columns;
+  // coo.number_of_rows = csr.number_of_rows;
+  // coo.number_of_nonzeros = csr.number_of_nonzeros;
+
   // --
   // Build graph
-  auto G = graph::build::from_coo<memory_space_t::host, graph::view_t::coo>(
-      coo);
+  auto G = graph::build::build<memory_space_t::host>(coo);
 
   // >>
   std::cout << "G.get_number_of_vertices()\t: " << G.get_number_of_vertices()
