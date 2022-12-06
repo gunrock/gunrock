@@ -5,9 +5,9 @@ name: Windows
 on:
   # Triggers the workflow on push or pull request events but only for the master and dev branch
   push:
-    branches: [ main, dev ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, develop ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
       - name: Configure cmake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-        run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=ON #-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} 
+        run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=ON -D ESSENTIALS_BUILD_BENCHMARKS=ON #-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} 
       
       # See issue: https://github.com/NVIDIA/thrust/issues/1328
       # And... https://github.com/gunrock/essentials/issues/92
@@ -49,7 +49,4 @@ jobs:
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build # --verbose # --target sssp
-        
-        # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
-        # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        run: cmake --build ${{github.workspace}}/build

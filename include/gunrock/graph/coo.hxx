@@ -5,6 +5,7 @@
 #include <iterator>
 
 #include <gunrock/memory.hxx>
+#include <gunrock/util/load_store.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
@@ -47,27 +48,25 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ vertex_type
   get_source_vertex(const edge_type& e) const {
-    return row_indices[e];
+    return thread::load(&row_indices[e]);
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_destination_vertex(const edge_type& e) const {
-    return column_indices[e];
+  get_destination_vertex(edge_type const& e) const {
+    return thread::load(&column_indices[e]);
   }
 
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const {
-    auto row_indices = get_row_indices();
-
+    auto ptr_row_indices = row_indices;
     // Returns `it` such that everything to the left is < `v`
     // This will be the offset of `v`
     auto it = thrust::lower_bound(
-        thrust::seq,  // ??? Is this right policy?
-        thrust::counting_iterator<edge_t>(0),
+        thrust::seq, thrust::counting_iterator<edge_t>(0),
         thrust::counting_iterator<edge_t>(this->number_of_edges), v,
-        [row_indices] __host__ __device__(const vertex_type& pivot,
-                                          const vertex_type& key) {
-          return row_indices[pivot] < key;
+        [ptr_row_indices] __host__ __device__(const vertex_type& pivot,
+                                              const vertex_type& key) {
+          return ptr_row_indices[pivot] < key;
         });
 
     return (*it);

@@ -2,7 +2,6 @@
  * @file unittests.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief All unit tests includes for the gunrock library.
- * @version 0.1
  * @date 2021-12-24
  *
  * @copyright Copyright (c) 2021

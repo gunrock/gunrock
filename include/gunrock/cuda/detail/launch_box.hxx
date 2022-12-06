@@ -2,7 +2,6 @@
  * @file launch_box.hxx
  * @author Cameron Shinn (ctshinn@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-12-16
  *
  * @copyright Copyright (c) 2021

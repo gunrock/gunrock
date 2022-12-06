@@ -12,6 +12,7 @@
 
 #include <thrust/binary_search.h>
 #include <thrust/execution_policy.h>
+#include <thrust/swap.h>
 
 namespace gunrock {
 namespace graph {
@@ -124,8 +125,8 @@ class graph_csr_t {
       return 0;
     }
     if (source_neighbors_count > destination_neighbors_count) {
-      std::swap(intersection_source, intersection_destination);
-      std::swap(source_neighbors_count, destination_neighbors_count);
+      thrust::swap(intersection_source, intersection_destination);
+      thrust::swap(source_neighbors_count, destination_neighbors_count);
     }
 
     auto source_offset = offsets[intersection_source];

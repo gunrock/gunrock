@@ -2,7 +2,6 @@
  * @file array.cuh
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Unit test for array container.
- * @version 0.1
  * @date 2021-12-24
  *
  * @copyright Copyright (c) 2021

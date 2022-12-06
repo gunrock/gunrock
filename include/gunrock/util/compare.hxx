@@ -2,7 +2,6 @@
  * @file compare.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-12-31
  *
  * @copyright Copyright (c) 2021
