@@ -376,7 +376,7 @@ void build_degree_histogram(graph_type const& G,
   auto length = sizeof(vertex_t) * 8 + 1;
 
   // Initialize histogram array to 0s.
-  thrust::fill(thrust::cuda::par_nosync.on(stream),
+  thrust::fill(thrust::hip::par.on(stream),
                histogram + 0,       // iterator begin()
                histogram + length,  // iterator end()
                0                    // fill value
@@ -395,7 +395,7 @@ void build_degree_histogram(graph_type const& G,
   // For each (count from 0...#_of_Vertices), and perform
   // the operation called build_histogram. Ignore output, as
   // we are interested in what goes in the pointer histogram.
-  thrust::for_each(thrust::cuda::par_nosync.on(stream),
+  thrust::for_each(thrust::hip::par.on(stream),
                    thrust::make_counting_iterator<vertex_t>(0),  // Begin: 0
                    thrust::make_counting_iterator<vertex_t>(
                        G.get_number_of_vertices()),  // End: # of Vertices

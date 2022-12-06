@@ -19,8 +19,8 @@
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
 
-#include <cub/block/block_load.cuh>
-#include <cub/block/block_scan.cuh>
+#include <hipcub/block/block_load.hpp>
+#include <hipcub/block/block_scan.hpp>
 
 namespace gunrock {
 namespace operators {

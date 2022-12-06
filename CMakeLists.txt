@@ -26,7 +26,7 @@ set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.
 
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
-  LANGUAGES CXX C CUDA
+  LANGUAGES CXX C HIP
 )
 
 # Apparently defines NDEBUG, such that asserts() are disabled.
@@ -39,7 +39,7 @@ set(PROJECT_DEPS_DIR externals)
 
 # begin /* Include cmake modules */
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+#include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
@@ -68,24 +68,43 @@ add_library(essentials INTERFACE)
 ####################################################
 ############### SET TARGET PROPERTIES ##############
 ####################################################
+#[[
+#set_target_properties(essentials 
+#  PROPERTIES
+#    CXX_STANDARD 17
+#    CXX_STANDARD_REQUIRED ON
+#    CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
+#    CUDA_STANDARD 17
+#    CUDA_STANDARD_REQUIRED ON
+#    CUDA_EXTENSIONS OFF
+#    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+#    CUDA_SEPARABLE_COMPILATION ON
+#    CUDA_ARCHITECTURES 75 # Set required architecture.
+#    # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
+#)]]
+
 set_target_properties(essentials 
   PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
-    CUDA_STANDARD 17
-    CUDA_STANDARD_REQUIRED ON
-    CUDA_EXTENSIONS OFF
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_ARCHITECTURES 75 # Set required architecture.
+    HIP_STANDARD 17
+    HIP_STANDARD_REQUIRED ON
+    
+    HIP_EXTENSIONS OFF
+    #CUDA_RESOLVE_DEVICE_SYMBOLS ON
+    #CUDA_SEPARABLE_COMPILATION ON
+    HIP_ARCHITECTURES 75 #gfx900 # Set required architecture.
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
+
+
+
 
 # Use for later.
 get_target_property(ESSENTIALS_ARCHITECTURES 
   essentials 
-    CUDA_ARCHITECTURES
+    HIP_ARCHITECTURES
 )
 
 # Add GIT SHA-1 definition
@@ -133,9 +152,9 @@ target_include_directories(essentials
 ############ TARGET LINK LIBRARIES #################
 ####################################################
 target_link_libraries(essentials
-  INTERFACE curand
-  INTERFACE cuda
-  INTERFACE cusparse
+  INTERFACE hiprand
+  INTERFACE hip
+  INTERFACE hipsparse
 )
 
 ####################################################
@@ -154,6 +173,7 @@ set(CXX_FLAGS
     /W4
   >
   $<$<CXX_COMPILER_ID:GNU>:
+     -std=c++1z
     -Wall 
     # -Wextra
     -Wno-unused-result
@@ -165,6 +185,29 @@ set(CXX_FLAGS
     # -vvv
   >
 )
+
+
+
+set(HIP_FLAGS
+  -ferror-limit=100
+  #--expt-extended-lambda 
+  #--expt-relaxed-constexpr
+  #--use_fast_math
+  -DHIP_FAST_MATH
+  --offload-arch=gfx90a
+  #--ptxas-options -v
+  #--generate-line-info
+  
+  $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
+   --verbose
+   --debug # Host debug
+  # --device-debug # Device debug
+)
+
+
+
+
+
 
 set(CUDA_FLAGS
   --expt-extended-lambda 
@@ -186,7 +229,7 @@ set(CMAKE_CUDA_FLAGS_RELEASE "--optimize 3")
 ####################################################
 target_compile_options(essentials INTERFACE 
   $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
-  $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS}>
+  $<$<COMPILE_LANGUAGE:HIP>:${HIP_FLAGS}>
 )
 
 ####################################################
@@ -212,7 +255,7 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   enable_testing()
-  add_subdirectory(unittests)
+  #add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
 
 ####################################################

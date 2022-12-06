@@ -12,7 +12,8 @@
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/util/compiler.hxx>
 #include <gunrock/io/git.hxx>
-
+#include <algorithm>
+//#include <execution>
 namespace gunrock {
 namespace util {
 namespace stats {

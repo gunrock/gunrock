@@ -15,7 +15,7 @@
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/util/type_traits.hxx>
 
-#include <gunrock/framework/operators/filter/compact.hxx>
+//#include <gunrock/framework/operators/filter/compact.hxx>
 #include <gunrock/framework/operators/filter/predicated.hxx>
 #include <gunrock/framework/operators/filter/bypass.hxx>
 #include <gunrock/framework/operators/filter/remove.hxx>
@@ -78,9 +78,10 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto single_context = context.get_context(0);
 
-    if constexpr (alg_type == filter_algorithm_t::compact) {
-      compact::execute(G, op, input, output, *single_context);
-    } else if (alg_type == filter_algorithm_t::predicated) {
+//    if constexpr (alg_type == filter_algorithm_t::compact) {
+  //    compact::execute(G, op, input, output, *single_context);
+  //  } else 
+    if (alg_type == filter_algorithm_t::predicated) {
       predicated::execute(G, op, input, output, *single_context);
     } else if (alg_type == filter_algorithm_t::bypass) {
       bypass::execute(G, op, input, output, *single_context);
