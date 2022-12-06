@@ -143,7 +143,7 @@ class boolmap_frontier_t {
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
     if (value != 0 || value != 1)
-      error::throw_if_exception(cudaErrorUnknown,
+      error::throw_if_exception(hipErrorUnknown,
                                 "Boolmap only supports 1 or 0 as fill value.");
 
     thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),

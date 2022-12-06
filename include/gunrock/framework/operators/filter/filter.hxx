@@ -87,10 +87,10 @@ void execute(graph_t& G,
     } else if (alg_type == filter_algorithm_t::remove) {
       remove::execute(G, op, input, output, *single_context);
     } else {
-      error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
+      error::throw_if_exception(hipErrorUnknown, "Filter type not supported.");
     }
   } else {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "`context.size() != 1` not supported");
   }
 }

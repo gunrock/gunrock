@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /**
  * @file context.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
@@ -44,7 +45,7 @@ struct context_t {
   virtual gcuda::stream_t stream() = 0;
   virtual mgpu::standard_context_t* mgpu() = 0;
 
-  // cudaStreamSynchronize or cudaDeviceSynchronize for stream 0.
+  // hipStreamSynchronize or hipDeviceSynchronize for stream 0.
   virtual void synchronize() = 0;
   virtual gcuda::event_t event() = 0;
   virtual util::timer_t& timer() = 0;
@@ -73,14 +74,14 @@ class standard_context_t : public context_t {
   template <int dummy_arg = 0>
   void init() {
     gcuda::function_attributes_t attr;
-    error::error_t status = cudaFuncGetAttributes(&attr, dummy_k<0>);
+    error::error_t status = hipFuncGetAttributes(&attr, dummy_k<0>);
     error::throw_if_exception(status);
     _ptx_version = gcuda::make_compute_capability(attr.ptxVersion);
 
-    cudaSetDevice(_ordinal);
-    cudaStreamCreateWithFlags(&_stream, cudaStreamNonBlocking);
-    cudaEventCreateWithFlags(&_event, cudaEventDisableTiming);
-    cudaGetDeviceProperties(&_props, _ordinal);
+    hipSetDevice(_ordinal);
+    hipStreamCreateWithFlags(&_stream, hipStreamNonBlocking);
+    hipEventCreateWithFlags(&_event, hipEventDisableTiming);
+    hipGetDeviceProperties(&_props, _ordinal);
 
     _mgpu_context = new mgpu::standard_context_t(false, _stream);
   }
@@ -91,12 +92,12 @@ class standard_context_t : public context_t {
     init();
   }
 
-  standard_context_t(cudaStream_t stream, gcuda::device_id_t device = 0)
+  standard_context_t(hipStream_t stream, gcuda::device_id_t device = 0)
       : context_t(), _ordinal(device), _mgpu_context(nullptr), _stream(stream) {
     init();
   }
 
-  ~standard_context_t() { cudaEventDestroy(_event); }
+  ~standard_context_t() { hipEventDestroy(_event); }
 
   virtual const gcuda::device_properties_t& props() const override {
     return _props;
@@ -116,7 +117,7 @@ class standard_context_t : public context_t {
 
   virtual void synchronize() override {
     error::error_t status =
-        _stream ? cudaStreamSynchronize(_stream) : cudaDeviceSynchronize();
+        _stream ? hipStreamSynchronize(_stream) : hipDeviceSynchronize();
     error::throw_if_exception(status);
   }
 
@@ -149,7 +150,7 @@ class multi_context_t {
 
   // Multiple devices with a user-provided stream
   multi_context_t(thrust::host_vector<gcuda::device_id_t> _devices,
-                  cudaStream_t _stream)
+                  hipStream_t _stream)
       : devices(_devices) {
     for (auto& device : devices) {
       standard_context_t* device_context =
@@ -167,7 +168,7 @@ class multi_context_t {
   }
 
   // Single device with a user-provided stream
-  multi_context_t(gcuda::device_id_t _device, cudaStream_t _stream)
+  multi_context_t(gcuda::device_id_t _device, hipStream_t _stream)
       : devices(1, _device) {
     for (auto& device : devices) {
       standard_context_t* device_context =
@@ -188,19 +189,19 @@ class multi_context_t {
     int num_gpus = size();
     for (int i = 0; i < num_gpus; i++) {
       auto ctx = get_context(i);
-      cudaSetDevice(ctx->ordinal());
+      hipSetDevice(ctx->ordinal());
 
       for (int j = 0; j < num_gpus; j++) {
         if (i == j)
           continue;
 
         auto ctx_peer = get_context(j);
-        cudaDeviceEnablePeerAccess(ctx_peer->ordinal(), 0);
+        hipDeviceEnablePeerAccess(ctx_peer->ordinal(), 0);
       }
     }
 
     auto ctx0 = get_context(0);
-    cudaSetDevice(ctx0->ordinal());
+    hipSetDevice(ctx0->ordinal());
   }
 };  // class multi_context_t
 

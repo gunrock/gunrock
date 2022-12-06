@@ -298,7 +298,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
     void* argument_ptrs[non_zero_num_params];
     detail::for_each_argument_address(argument_ptrs,
                                       ::std::forward<args_t>(args)...);
-    cudaLaunchCooperativeKernel<func_t>(
+    hipLaunchCooperativeKernel<func_t>(
         &f, params_t::grid_dimensions, params_t::block_dimensions,
         argument_ptrs, params_t::shared_memory_bytes, context.stream());
   }
@@ -346,11 +346,11 @@ inline float occupancy(func_t kernel) {
   int max_active_blocks;
   int block_size = launch_box_t::block_dimensions_t::size();
   int device;
-  cudaDeviceProp props;
+  hipDeviceProp_t props;
 
-  cudaGetDevice(&device);
-  cudaGetDeviceProperties(&props, device);
-  error::error_t status = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+  hipGetDevice(&device);
+  hipGetDeviceProperties(&props, device);
+  error::error_t status = hipOccupancyMaxActiveBlocksPerMultiprocessor(
       &max_active_blocks, kernel, block_size, (size_t)0);
   error::throw_if_exception(status);
   float occupancy = (max_active_blocks * block_size / props.warpSize) /

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /**
  * @file launch_kernels.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)

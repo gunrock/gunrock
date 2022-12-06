@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /**
  * @file block_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
@@ -48,7 +49,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   using type_t = frontier_t;
 
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
-  using block_scan_t = cub::BlockScan<edge_t, THREADS_PER_BLOCK>;
+  using block_scan_t = hipcub::BlockScan<edge_t, THREADS_PER_BLOCK>;
 
   auto global_idx = gcuda::thread::global::id::x();
   auto local_idx = gcuda::thread::local::id::x();
