@@ -1,0 +1,18 @@
+.tight-table td {
+    white-space: normal !important;
+}
+
+.sig.sig-object.cpp {
+    background: #f2f2f2 !important;
+    color: #555555 !important;
+    border-top: 3px solid #777777 !important;
+}
+
+.sig.sig-object.cpp .k .pre { color: #AA22FF; font-weight: bold; font-style: normal } /* Keyword */
+.kt { color: #00A000; font-weight: bold } /* Keyword.Type */
+.p { color: #666666 } /* Operator */
+.sig.sig-object.cpp .n .pre { color: #444444; }
+.sig.sig-object.cpp .sig-name.descname .n .pre { color: #0000FF; } 
+.sig.sig-object.cpp .sig-prename.descclassname .n .pre {  color: #0000FF;}
+
+
