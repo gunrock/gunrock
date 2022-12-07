@@ -35,10 +35,6 @@ void test_bfs(int num_arguments, char** argument_array) {
     csr.from_coo(mm.load(params.filename));
   }
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   // --
   // Build graph + metadata
 
@@ -50,9 +46,7 @@ void test_bfs(int num_arguments, char** argument_array) {
           csr.number_of_nonzeros,           // nonzeros
           csr.row_offsets.data().get(),     // row_offsets
           csr.column_indices.data().get(),  // column_indices
-          csr.nonzero_values.data().get(),  // values
-          row_indices.data().get(),         // row_indices
-          column_offsets.data().get()       // column_offsets
+          csr.nonzero_values.data().get()  // values
       );
 
   // --
