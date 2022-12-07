@@ -20,7 +20,6 @@
  *
  * need to support iterators for dense::array.
  *
- * @version 0.1
  * @date 2020-10-05
  *
  * @copyright Copyright (c) 2020
@@ -122,8 +121,8 @@ struct array {
    * @brief Return a const pointer of array on host or device-side
    * @return const_pointer_t
    */
-  __host__ __device__ __forceinline__ constexpr const_pointer_t data() const
-      noexcept {
+  __host__ __device__ __forceinline__ constexpr const_pointer_t data()
+      const noexcept {
     return array_type::pointer(elements);
   }
 
@@ -131,13 +130,13 @@ struct array {
    * @brief
    * @return size_type
    */
-  __host__ __device__ __forceinline__ constexpr size_type size() const
-      noexcept {
+  __host__ __device__ __forceinline__ constexpr size_type size()
+      const noexcept {
     return NumElements;
   }
 
-  __host__ __device__ __forceinline__ constexpr size_type max_size() const
-      noexcept {
+  __host__ __device__ __forceinline__ constexpr size_type max_size()
+      const noexcept {
     return NumElements;
   }
 

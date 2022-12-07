@@ -2,7 +2,6 @@
  * @file mst.hxx
  * @author Annie Robison (amrobison@ucdavis.edu)
  * @brief Minimum Spanning Tree algorithm.
- * @version 0.1
  * @date 2022-03-17
  *
  * @copyright Copyright (c) 2022

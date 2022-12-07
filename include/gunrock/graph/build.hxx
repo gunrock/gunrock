@@ -2,7 +2,6 @@
  * @file build.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-07
  *
  * @copyright Copyright (c) 2020
@@ -47,7 +46,7 @@ auto from_csr(format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
       csr.number_of_nonzeros,           // nonzeros
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()  // values
+      csr.nonzero_values.data().get()   // values
   );
 }
 

@@ -2,7 +2,6 @@
  * @file geo.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-02-12
  *
  * @copyright Copyright (c) 2021

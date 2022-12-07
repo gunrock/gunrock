@@ -46,11 +46,24 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
+
   srand(time(NULL));
 
   vertex_t n_vertices = G.get_number_of_vertices();
-  vertex_t single_source = 0;  // rand() % n_vertices;
-  std::cout << "Single Source = " << single_source << std::endl;
+
+  thrust::device_vector<weight_t> distances(n_vertices);
+  thrust::device_vector<vertex_t> predecessors(n_vertices);
+  thrust::device_vector<int> edges_visited(1);
+  thrust::device_vector<int> vertices_visited(1);
+  int search_depth = 0;
+
+  // Parse sources
+  std::vector<int> source_vect;
+  gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
+                                        n_vertices, params.num_runs);
+  // Parse tags
+  std::vector<std::string> tag_vect;
+  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
 
   // --
   // GPU Run
@@ -65,16 +78,11 @@ void test_sssp(int num_arguments, char** argument_array) {
   //     allocate<vertex_t>(n_vertices * sizeof(vertex_t)),
   //     deleter_t<vertex_t>());
 
-  thrust::device_vector<weight_t> distances(n_vertices);
-  thrust::device_vector<vertex_t> predecessors(n_vertices);
-  thrust::device_vector<int> edges_visited(1);
-  thrust::device_vector<int> vertices_visited(1);
-  int search_depth = 0;
-
   std::vector<float> run_times;
-  for (int i = 0; i < params.num_runs; i++) {
+  for (int i = 0; i < source_vect.size(); i++) {
+    // Record run times without collecting metrics (due to overhead)
     run_times.push_back(gunrock::sssp::run(
-        G, single_source, params.collect_metrics, distances.data().get(),
+        G, source_vect[i], false, distances.data().get(),
         predecessors.data().get(), edges_visited.data().get(),
         vertices_visited.data().get(), &search_depth));
   }
@@ -91,7 +99,7 @@ void test_sssp(int num_arguments, char** argument_array) {
     thrust::host_vector<vertex_t> h_predecessors(n_vertices);
 
     float cpu_elapsed = sssp_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
-        csr, single_source, h_distances.data(), h_predecessors.data());
+        csr, source_vect.back(), h_distances.data(), h_predecessors.data());
 
     int n_errors =
         util::compare(distances.data().get(), h_distances.data(), n_vertices);
@@ -106,15 +114,31 @@ void test_sssp(int num_arguments, char** argument_array) {
   // Run performance evaluation
 
   if (params.collect_metrics) {
+    std::vector<int> edges_visited_vect;
+    std::vector<int> search_depth_vect;
+    std::vector<int> nodes_visited_vect;
+
     vertex_t n_edges = G.get_number_of_edges();
 
-    // For BFS - the number of nodes visited is just 2 * edges_visited
-    thrust::host_vector<int> h_edges_visited = edges_visited;
-    thrust::host_vector<int> h_vertices_visited = vertices_visited;
+    for (int i = 0; i < source_vect.size(); i++) {
+      float metrics_run_time = gunrock::sssp::run(
+          G, source_vect[i], params.collect_metrics, distances.data().get(),
+          predecessors.data().get(), edges_visited.data().get(),
+          vertices_visited.data().get(), &search_depth);
+
+      thrust::host_vector<int> h_edges_visited = edges_visited;
+      thrust::host_vector<int> h_vertices_visited = vertices_visited;
+
+      edges_visited_vect.push_back(h_edges_visited[0]);
+      nodes_visited_vect.push_back(h_vertices_visited[0]);
+      search_depth_vect.push_back(search_depth);
+    }
+
     gunrock::util::stats::get_performance_stats(
-        h_edges_visited[0], h_vertices_visited[0], n_edges, n_vertices,
-        search_depth, run_times, "sssp", params.filename, "market",
-        params.json_dir, params.json_file);
+        edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
+        search_depth_vect, run_times, "sssp", params.filename, "market",
+        params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
+        argument_array);
   }
 }
 

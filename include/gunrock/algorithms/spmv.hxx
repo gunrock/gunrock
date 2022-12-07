@@ -3,7 +3,6 @@
  * @author Daniel Loran (dcloran@ucdavis.edu)
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Sparse-Matrix Vector Multiplication.
- * @version 0.1
  * @date 2021-11-05
  *
  * @copyright Copyright (c) 2021

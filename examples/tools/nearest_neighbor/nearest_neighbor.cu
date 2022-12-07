@@ -2,7 +2,6 @@
  * @file points.hxx
  * @author Agnieszka Lupinska (lupinska.agnieszka@gmail.com)
  * @brief Class for generating points for nearest neighbor.
- * @version 0.1
  * @date 2019-11-01
  *
  * @copyright Copyright (c) 2022

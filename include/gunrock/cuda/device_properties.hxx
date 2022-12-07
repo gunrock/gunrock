@@ -2,7 +2,6 @@
  * @file device_properties.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-05
  *
  * @copyright Copyright (c) 2020
@@ -237,11 +236,11 @@ inline std::string gpu_name(device_properties_t& prop) {
   return prop.name;
 }
 
-inline constexpr unsigned major(device_properties_t& prop) {
+inline constexpr unsigned sm_major(device_properties_t& prop) {
   return prop.major;
 }
 
-inline constexpr unsigned minor(device_properties_t& prop) {
+inline constexpr unsigned sm_minor(device_properties_t& prop) {
   return prop.minor;
 }
 
