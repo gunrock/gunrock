@@ -155,6 +155,7 @@ target_link_libraries(essentials
   INTERFACE hiprand
   INTERFACE hip
   INTERFACE hipsparse
+  -lstdc++fs
 )
 
 ####################################################
@@ -173,7 +174,7 @@ set(CXX_FLAGS
     /W4
   >
   $<$<CXX_COMPILER_ID:GNU>:
-     -std=c++1z
+     #-std=c++23
     -Wall 
     # -Wextra
     -Wno-unused-result
@@ -181,6 +182,7 @@ set(CXX_FLAGS
     -Wno-strict-aliasing
     -Wno-unused-function
     -Wno-format-security
+    -D __HIP_PLATFORM_AMD__
     # -Werror
     # -vvv
   >
@@ -189,6 +191,8 @@ set(CXX_FLAGS
 
 
 set(HIP_FLAGS
+  #-std=c++17
+  -D __HIP_PLATFORM_AMD__
   -ferror-limit=100
   #--expt-extended-lambda 
   #--expt-relaxed-constexpr

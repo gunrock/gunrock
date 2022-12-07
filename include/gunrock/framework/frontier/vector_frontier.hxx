@@ -62,7 +62,8 @@ class vector_frontier_t {
 
   // Copy Constructor
   __device__ __host__ vector_frontier_t(const vector_frontier_t& rhs) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
+//#ifdef __CUDA_ARCH__
     raw_ptr = rhs.raw_ptr;
 #else
     p_storage = rhs.p_storage;

@@ -20,7 +20,8 @@ template <
     hipcub::CacheLoadModifier MODIFIER = hipcub::CacheLoadModifier::LOAD_DEFAULT,
     typename type_t>
 __device__ __host__ __forceinline__ type_t load(type_t* ptr) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
+//#ifdef __CUDA_ARCH__
   return hipcub::ThreadLoad<MODIFIER>(ptr);
 #else
   return *ptr;
@@ -34,7 +35,8 @@ template <
     hipcub::CacheStoreModifier MODIFIER = hipcub::CacheStoreModifier::STORE_DEFAULT,
     typename type_t>
 __device__ __host__ __forceinline__ void store(type_t* ptr, const type_t& val) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
+//#ifdef __CUDA_ARCH__
   hipcub::ThreadStore<MODIFIER>(ptr, val);
 #else
   *ptr = val;
