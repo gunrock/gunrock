@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#define ANALYTICS 1
+
 #include <gunrock/algorithms/algorithms.hxx>
 
 namespace gunrock {
@@ -105,6 +107,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto iteration = this->iteration;
 
+  #if ANALYTICS
+    thrust::device_vector<edge_t> _edges_visited_per_iteration(1, 0);
+    auto edges_visited_per_iteration = _edges_visited_per_iteration.data().get();
+  #endif
+    thrust::device_vector<int> unique_ids(G.get_number_of_vertices(), -1);
+    auto col_ids = unique_ids.data().get();
+
     auto search = [distances, single_source, iteration, edges_visited] __host__
                   __device__(vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
@@ -131,13 +140,32 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     auto search_with_metrics =
-        [distances, single_source, iteration, edges_visited] __host__
-        __device__(vertex_t const& source,    // ... source
-                   vertex_t const& neighbor,  // neighbor
-                   edge_t const& edge,        // edge
-                   weight_t const& weight     // weight (tuple).
-                   ) -> bool {
+        [=] __host__ __device__(
+          vertex_t const& source,    // ... source
+          vertex_t const& neighbor,  // neighbor
+          edge_t const& edge,        // edge
+          weight_t const& weight     // weight (tuple).
+        ) -> bool {
+      // If the neighbor is not visited, update the distance. Returning false
+      // here means that the neighbor is not added to the output frontier, and
+      // instead an invalid vertex is added in its place. These invalides (-1 in
+      // most cases) can be removed using a filter operator or uniquify.
       math::atomic::add(&edges_visited[0], 1);
+
+      col_ids[neighbor] = neighbor;
+    #if ANALYTICS
+      math::atomic::add(&edges_visited_per_iteration[0], 1);
+    #endif
+
+      // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
+      //   return false;
+      // else
+      //   return (math::atomic::cas(
+      //               &distances[neighbor],
+      //               std::numeric_limits<vertex_t>::max(), iteration + 1) ==
+      //               std::numeric_limits<vertex_t>::max());
+
+      // Simpler logic for the above.
       auto old_distance =
           math::atomic::min(&distances[neighbor], iteration + 1);
       return (iteration + 1 < old_distance);
@@ -156,6 +184,20 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     if (collect_metrics) {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, search_with_metrics, context);
+    #ifdef ANALYTICS
+      // operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(E, context);
+      auto total_unique_ids = thrust::transform_reduce(unique_ids.begin(), unique_ids.end(), [] __host__ __device__(int const& i) 
+      { return (i == -1) ? 0 : 1; }, 0, thrust::plus<weight_t>());
+      thrust::host_vector<edge_t> h_evpi = _edges_visited_per_iteration;
+      std::cout << iteration << "," << h_evpi[0] << "," << total_unique_ids << std::endl;
+    #else
+      thrust::sort(unique_ids.begin(), unique_ids.end());
+      auto new_end = thrust::remove_if(unique_ids.begin(), unique_ids.end(), 
+        [] __host__ __device__(int const& i) { return i == -1; });
+      thrust::copy(unique_ids.begin(), new_end,
+               std::ostream_iterator<int>(std::cout, ","));
+      std::cout << std::endl;
+    #endif
       *search_depth = iteration;
     } else {
       operators::advance::execute<operators::load_balance_t::block_mapped>(

@@ -79,7 +79,8 @@ void get_gpu_info(nlohmann::json* jsn) {
   jsn->push_back(nlohmann::json::object_t::value_type("gpuinfo", gpuinfo));
 }
 
-void get_performance_stats(std::vector<int>& edges_visited,
+void get_performance_stats(std::size_t seed,
+                           std::vector<int>& edges_visited,
                            std::vector<int>& nodes_visited,
                            edge_t edges,
                            vertex_t vertices,
@@ -204,7 +205,8 @@ void get_performance_stats(std::vector<int>& edges_visited,
   // Write values to JSON object
   jsn.push_back(nlohmann::json::object_t::value_type("engine", "Essentials"));
   jsn.push_back(nlohmann::json::object_t::value_type("primitive", primitive));
-  jsn.push_back(nlohmann::json::object_t::value_type("graph_type", graph_type));
+  jsn.push_back(nlohmann::json::object_t::value_type("graph-type", graph_type));
+  jsn.push_back(nlohmann::json::object_t::value_type("seed", seed));
   jsn.push_back(
       nlohmann::json::object_t::value_type("edges_visited", edges_visited));
   jsn.push_back(nlohmann::json::object_t::value_type("filtered_edges_visited",

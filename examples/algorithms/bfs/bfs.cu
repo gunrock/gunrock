@@ -7,6 +7,8 @@
 using namespace gunrock;
 using namespace memory;
 
+#include <random>
+
 void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Define types
@@ -33,10 +35,6 @@ void test_bfs(int num_arguments, char** argument_array) {
     csr.from_coo(mm.load(params.filename));
   }
 
-  // Data for CSC format.
-  // thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  // thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   // --
   // Build graph + metadata
 
@@ -48,15 +46,19 @@ void test_bfs(int num_arguments, char** argument_array) {
           csr.number_of_nonzeros,           // nonzeros
           csr.row_offsets.data().get(),     // row_offsets
           csr.column_indices.data().get(),  // column_indices
-          csr.nonzero_values.data().get()   // values
-          // row_indices.data().get(),         // row_indices
-          // column_offsets.data().get()       // column_offsets
+          csr.nonzero_values.data().get()  // values
       );
 
   // --
   // Params and memory allocation
-
   vertex_t n_vertices = G.get_number_of_vertices();
+  std::random_device rd; // obtain a random number from hardware
+  auto current_state = rd();
+  std::mt19937 gen(current_state); // seed the generator
+  std::uniform_int_distribution<> distr(0, n_vertices); // define the range
+      
+  vertex_t single_source = distr(gen);
+
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
   thrust::device_vector<int> edges_visited(1);
@@ -81,12 +83,6 @@ void test_bfs(int num_arguments, char** argument_array) {
         G, source_vect[i], false, distances.data().get(),
         predecessors.data().get(), edges_visited.data().get(), &search_depth));
   }
-
-  // Print info for last run
-  std::cout << "Source : " << source_vect.back() << "\n";
-  print::head(distances, 40, "GPU distances");
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
-            << " (ms)" << std::endl;
 
   // --
   // CPU Run
@@ -132,7 +128,7 @@ void test_bfs(int num_arguments, char** argument_array) {
     std::transform(edges_visited_vect.begin(), edges_visited_vect.end(),
                    nodes_visited_vect.begin(), [](auto& c) { return 2 * c; });
 
-    gunrock::util::stats::get_performance_stats(
+    gunrock::util::stats::get_performance_stats(current_state,
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
         search_depth_vect, run_times, "bfs", params.filename, "market",
         params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
