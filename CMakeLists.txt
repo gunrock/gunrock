@@ -148,6 +148,7 @@ target_include_directories(essentials
   INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
 
+find_package(Threads)
 ####################################################
 ############ TARGET LINK LIBRARIES #################
 ####################################################
@@ -156,6 +157,7 @@ target_link_libraries(essentials
   INTERFACE hip
   INTERFACE hipsparse
   -lstdc++fs
+  ${CMAKE_THREAD_LIBS_INIT}
 )
 
 ####################################################
