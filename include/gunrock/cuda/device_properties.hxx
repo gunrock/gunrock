@@ -53,9 +53,9 @@ constexpr compute_capability_t make_compute_capability(unsigned combined) {
  * @brief Fetch compute capability from SM_TARGET macro.
  * \return compute_capabilty_t
  */
-constexpr compute_capability_t fetch_compute_capability() {
-  return make_compute_capability(SM_TARGET);
-}
+//constexpr compute_capability_t fetch_compute_capability() {
+//  return make_compute_capability(SM_TARGET);
+//}
 
 /**
  * @namespace properties

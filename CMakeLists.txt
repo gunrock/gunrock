@@ -94,7 +94,7 @@ set_target_properties(essentials
     HIP_EXTENSIONS OFF
     #CUDA_RESOLVE_DEVICE_SYMBOLS ON
     #CUDA_SEPARABLE_COMPILATION ON
-    HIP_ARCHITECTURES 75 #gfx900 # Set required architecture.
+    HIP_ARCHITECTURES gfx90a # Set required architecture.
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
