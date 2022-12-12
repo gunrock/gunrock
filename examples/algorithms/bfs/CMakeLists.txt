@@ -13,8 +13,6 @@ target_sources(${APPLICATION_NAME} PRIVATE ${SOURCE_LIST})
 target_link_libraries(${APPLICATION_NAME} PRIVATE essentials)
 
 if("$ENV{HIP_PLATFORM}" STREQUAL "nvidia")
-target_sources(${APPLICATION_NAME} PRIVATE ${SOURCE_LIST})
-target_link_libraries(${APPLICATION_NAME} PRIVATE essentials)
 get_target_property(ESSENTIALS_ARCHITECTURES essentials CUDA_ARCHITECTURES)
 set_target_properties(${APPLICATION_NAME} 
     PROPERTIES 
