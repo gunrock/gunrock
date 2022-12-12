@@ -154,6 +154,7 @@ inline constexpr unsigned sm_registers(compute_capability_t capability) {
  * \return unsigned
  * @todo Test if this function can be resolved at compile time
  */
+/*
 template <enum hipFuncCache_t sm3XCacheConfig = hipFuncCachePreferNone>
 inline constexpr unsigned sm_max_shared_memory_bytes(
     compute_capability_t capability) {
@@ -185,7 +186,7 @@ inline constexpr unsigned sm_max_shared_memory_bytes(
                                 :  // SM37
              sm3XConfiguredSmem;   // SM30-SM35
 }
-
+*/
 /**
  * @brief Number of shared memory banks.
  * \return unsigned
@@ -201,6 +202,7 @@ inline constexpr unsigned shared_memory_banks() {
  *                        capability 3.x
  * \return unsigned
  */
+/*
 template <
     enum hipSharedMemConfig sm3XSmemConfig = hipSharedMemBankSizeDefault>
 inline constexpr unsigned shared_memory_bank_stride() {
@@ -211,7 +213,7 @@ inline constexpr unsigned shared_memory_bank_stride() {
          : (sm3XSmemConfig == hipSharedMemBankSizeEightByte) ? 1 << 3
                                                               : 1 << 2;
 }
-
+*/
 inline constexpr unsigned clock_rate(device_properties_t& prop) {
   return prop.clockRate;
 }

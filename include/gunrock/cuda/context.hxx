@@ -130,7 +130,11 @@ class standard_context_t : public context_t {
   virtual gcuda::device_id_t ordinal() { return _ordinal; }
 
   auto execution_policy() {
-    return thrust::hip::par.on(this->stream());
+	#if HIP_BACKEND == 1
+    return thrust::cuda::par.on(this->stream());
+    #else
+	return thrust::hip::par.on(this->stream());
+    #endif
   }
 
 };  // class standard_context_t

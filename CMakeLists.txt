@@ -24,9 +24,28 @@ set(ESSENTIALS_VERSION_PATCH 0)
 
 set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.${ESSENTIALS_VERSION_PATCH}")
 
+
+message(STATUS "HIP Platform: $ENV{HIP_PLATFORM}")
+
+if("$ENV{HIP_PLATFORM}" STREQUAL "nvidia")
+    message(STATUS "HIP PLATFORM IS NVIDIA = " $ENV{HIP_PLATFORM})
+      set(HIP_BACKEND_CUDA 1)
+      set(target_language CUDA)
+        
+else()
+  set(HIP_BACKEND_CUDA 0)
+  set(target_language HIP)
+endif()
+
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+message(STATUS "HIP PLATFORM IS SET TO NVIDIA " )
+endif()
+
+
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
-  LANGUAGES CXX C HIP
+  LANGUAGES CXX C ${target_language}
 )
 
 # Apparently defines NDEBUG, such that asserts() are disabled.
@@ -68,21 +87,21 @@ add_library(essentials INTERFACE)
 ####################################################
 ############### SET TARGET PROPERTIES ##############
 ####################################################
-#[[
-#set_target_properties(essentials 
-#  PROPERTIES
-#    CXX_STANDARD 17
-#    CXX_STANDARD_REQUIRED ON
-#    CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
-#    CUDA_STANDARD 17
-#    CUDA_STANDARD_REQUIRED ON
-#    CUDA_EXTENSIONS OFF
-#    CUDA_RESOLVE_DEVICE_SYMBOLS ON
-#    CUDA_SEPARABLE_COMPILATION ON
-#    CUDA_ARCHITECTURES 75 # Set required architecture.
-#    # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
-#)]]
-
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+set_target_properties(essentials 
+  PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+    CUDA_EXTENSIONS OFF
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_ARCHITECTURES 75 # Set required architecture.
+   #  CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
+     )
+else()
 set_target_properties(essentials 
   PROPERTIES
     CXX_STANDARD 17
@@ -97,15 +116,21 @@ set_target_properties(essentials
     HIP_ARCHITECTURES gfx90a # Set required architecture.
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
-
-
+endif()
 
 
 # Use for later.
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+get_target_property(ESSENTIALS_ARCHITECTURES 
+  essentials 
+    CUDA_ARCHITECTURES
+)
+else()
 get_target_property(ESSENTIALS_ARCHITECTURES 
   essentials 
     HIP_ARCHITECTURES
 )
+endif()
 
 # Add GIT SHA-1 definition
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
@@ -118,11 +143,12 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
+    HIP_BACKEND=${HIP_BACKEND_CUDA}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
     GIT_SHA1="${GIT_SHA1}"
 )
 
-message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
+message(STATUS "Essentials ${target_language} Architecture: ${ESSENTIALS_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
@@ -152,6 +178,16 @@ find_package(Threads)
 ####################################################
 ############ TARGET LINK LIBRARIES #################
 ####################################################
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+target_link_libraries(essentials
+  INTERFACE curand
+  INTERFACE cuda
+  INTERFACE cusparse
+  -lstdc++fs
+  ${CMAKE_THREAD_LIBS_INIT}
+)
+else()
 target_link_libraries(essentials
   INTERFACE hiprand
   INTERFACE hip
@@ -159,6 +195,8 @@ target_link_libraries(essentials
   -lstdc++fs
   ${CMAKE_THREAD_LIBS_INIT}
 )
+endif()
+
 
 ####################################################
 ################# TARGET SOURCES ###################
@@ -171,12 +209,19 @@ target_sources(essentials
 ####################################################
 ############## SET CXX & CUDA FLAGS ################
 ####################################################
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+set(platform_flag __HIP_PLATFORM_NVIDIA__)
+else()
+set(platform_flag __HIP_PLATFORM_AMD__)
+endif()
+
 set(CXX_FLAGS 
   $<$<CXX_COMPILER_ID:MSVC>:
     /W4
   >
   $<$<CXX_COMPILER_ID:GNU>:
-     #-std=c++23
+     #-std=c++17
     -Wall 
     # -Wextra
     -Wno-unused-result
@@ -184,17 +229,16 @@ set(CXX_FLAGS
     -Wno-strict-aliasing
     -Wno-unused-function
     -Wno-format-security
-    -D __HIP_PLATFORM_AMD__
+    -D ${platform_flag}
     # -Werror
     # -vvv
   >
 )
 
 
-
 set(HIP_FLAGS
   #-std=c++17
-  -D __HIP_PLATFORM_AMD__
+  -D ${platform_flag}
   -ferror-limit=100
   #--expt-extended-lambda 
   #--expt-relaxed-constexpr
@@ -211,10 +255,6 @@ set(HIP_FLAGS
 )
 
 
-
-
-
-
 set(CUDA_FLAGS
   --expt-extended-lambda 
   --expt-relaxed-constexpr
@@ -222,7 +262,7 @@ set(CUDA_FLAGS
   --ptxas-options -v
   --generate-line-info
   $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
-  # --verbose
+   --verbose
   # --debug # Host debug
   # --device-debug # Device debug
 )
@@ -233,10 +273,20 @@ set(CMAKE_CUDA_FLAGS_RELEASE "--optimize 3")
 ####################################################
 ############ TARGET COMPILE OPTIONS ################
 ####################################################
+
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+target_compile_options(essentials INTERFACE 
+  $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
+  $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS}>
+)
+else()
 target_compile_options(essentials INTERFACE 
   $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
   $<$<COMPILE_LANGUAGE:HIP>:${HIP_FLAGS}>
 )
+
+endif()
 
 ####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############

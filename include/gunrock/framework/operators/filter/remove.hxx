@@ -26,7 +26,13 @@ void execute(graph_t& G,
 
   // Copy w/ predicate!
   auto new_length = thrust::remove_copy_if(
-      thrust::hip::par.on(context.stream()),  // execution policy
+     // thrust::hip::par.on(context.stream()),  // execution policy
+      #if HIP_BACKEND == 1
+      thrust::cuda::par.on(context.stream()),
+      #else
+      thrust::hip::par.on(context.stream()),
+      #endif
+
       input->begin(),                                 // input iterator: begin
       input->end(),                                   // input iterator: end
       output->begin(),                                // output iterator: begin
