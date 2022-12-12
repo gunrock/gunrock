@@ -15,6 +15,7 @@ on:
   workflow_dispatch:
 
 env:
+  # Customize the CMake build type here (Release, Debug)
   BUILD_TYPE: Release
 
 jobs:
@@ -55,11 +56,11 @@ jobs:
           languages: ${{ matrix.language }}
       
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build -- -j32
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
