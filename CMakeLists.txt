@@ -24,6 +24,26 @@ set(ESSENTIALS_VERSION_PATCH 0)
 
 set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.${ESSENTIALS_VERSION_PATCH}")
 
+# Select "Release" as the default build type.
+# This can be altered by setting -DCMAKE_BUILD_TYPE
+# in the command-line interface to Release or Debug.
+# No reason to set CMAKE_CONFIGURATION_TYPES if it's 
+# not a multiconfig generator. Also no reason mess 
+# with CMAKE_BUILD_TYPE if it's a multiconfig generator.
+# https://stackoverflow.com/a/31548693/5729690
+get_property(isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(isMultiConfig)
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE) 
+else()
+    if(NOT CMAKE_BUILD_TYPE)
+        message(STATUS "Defaulting to Release build type")
+        set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+    endif()
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY HELPSTRING "Choose the type of build")
+    # set the valid options for cmake-gui drop-down list
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release")
+endif()
+
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
   LANGUAGES CXX C CUDA
@@ -37,7 +57,6 @@ set(PROJECT_DEPS_DIR externals)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
 # end /* Include cmake modules */
 
@@ -112,7 +131,7 @@ target_include_directories(essentials
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
-  INTERFACE ${RAPIDJSON_INCLUDE_DIR}
+  # INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
@@ -154,27 +173,27 @@ set(CXX_FLAGS
   >
 )
 
-set(CUDA_FLAGS
+set(CUDA_RELEASE_FLAGS
   --expt-extended-lambda 
   --expt-relaxed-constexpr
   --use_fast_math
-  --ptxas-options -v
-  --generate-line-info
-  $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
-  # --verbose
-  # --debug # Host debug
-  # --device-debug # Device debug
 )
 
-set(CMAKE_CUDA_FLAGS_DEBUG "--optimize 0 --debug --device-debug -g -G")
-set(CMAKE_CUDA_FLAGS_RELEASE "--optimize 3")
+set(CUDA_DEBUG_FLAGS
+  --expt-extended-lambda 
+  --expt-relaxed-constexpr
+  --ptxas-options -v
+  --debug # Host debug
+  --device-debug # Device debug
+)
 
 ####################################################
 ############ TARGET COMPILE OPTIONS ################
 ####################################################
 target_compile_options(essentials INTERFACE 
-  $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
-  $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS}>
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:DEBUG>>:${CXX_FLAGS}>
+  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:DEBUG>>:${CUDA_DEBUG_FLAGS}>
+  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:RELEASE>>:${CUDA_RELEASE_FLAGS}>
 )
 
 ####################################################
