@@ -25,7 +25,10 @@ void test_csc(int num_arguments, char** argument_array) {
 
   using csr_t = format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
   csr_t csr;
+  using csc_t = format::csc_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  csc_t csc;
   csr.from_coo(mm.load(filename));
+  csc.from_csr(csr);
 
   // --
   // Build graph
@@ -33,16 +36,9 @@ void test_csc(int num_arguments, char** argument_array) {
   thrust::host_vector<vertex_t> row_indices(csr.number_of_nonzeros);
   thrust::host_vector<edge_t> column_offsets(csr.number_of_columns + 1);
 
-  auto G = graph::build::from_csr<memory_space_t::host, graph::view_t::csc>(
-      csr.number_of_rows,         // rows
-      csr.number_of_columns,      // columns
-      csr.number_of_nonzeros,     // nonzeros
-      csr.row_offsets.data(),     // row_offsets
-      csr.column_indices.data(),  // column_indices
-      csr.nonzero_values.data(),  // values
-      row_indices.data(),         // row_indices
-      column_offsets.data()       // column_offsets
-  );  // supports row_indices and column_offsets (default = nullptr)
+  auto G =
+      graph::build::build<memory_space_t::host>(
+          csc);  // supports row_indices and column_offsets (default = nullptr)
 
   // >>
   std::cout << "G.get_number_of_vertices() : " << G.get_number_of_vertices()

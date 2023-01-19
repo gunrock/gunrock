@@ -27,8 +27,7 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
   using coo_v_t = empty_coo_t;
   using csc_v_t = empty_csc_t;
 
-  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
-                                    csc_v_t, coo_v_t>;
+  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t>;
   graph_type G;
 
   G.template set<csr_v_t>(csr.number_of_rows, csr.number_of_nonzeros,
@@ -52,8 +51,7 @@ auto builder(format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
 
   using csc_v_t = empty_csc_t;
 
-  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
-                                    csc_v_t, coo_v_t>;
+  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, coo_v_t>;
 
   graph_type G;
 
@@ -78,14 +76,14 @@ auto builder(format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
   //// Enable csc.
   using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
 
-  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
-                                    csc_v_t, csc_v_t>;
+  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csc_v_t>;
 
   graph_type G;
  
   G.template set<csc_v_t>(csc.number_of_rows, csc.number_of_nonzeros,
                           memory::raw_pointer_cast(csc.column_offsets.data()),
-                          memory::raw_pointer_cast(csc.row_indices.data()));
+                          memory::raw_pointer_cast(csc.row_indices.data()),
+                          memory::raw_pointer_cast(csc.nonzero_values.data()));
 return G;
 }
 
@@ -105,7 +103,7 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
   using csc_v_t = empty_csc_t;
 
   using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
-                                    csc_v_t, coo_v_t>;
+                                    coo_v_t>;
 
   graph_type G;
 
@@ -138,7 +136,7 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
   using csc_v_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
 
   using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
-                                    csc_v_t, coo_v_t>;
+                                    csc_v_t>;
 
   graph_type G;
 
@@ -149,7 +147,8 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
   
   G.template set<csc_v_t>(csc.number_of_rows, csc.number_of_nonzeros,
                           memory::raw_pointer_cast(csc.column_offsets.data()),
-                          memory::raw_pointer_cast(csc.row_indices.data()));
+                          memory::raw_pointer_cast(csc.row_indices.data()),
+                          memory::raw_pointer_cast(csc.nonzero_values.data()));
 
   return G;
 }
@@ -169,7 +168,7 @@ auto builder(format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
   //// Enable CSC.
   using csc_v_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
 
-  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
+  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, 
                                     csc_v_t, coo_v_t>;
 
   graph_type G;
@@ -181,7 +180,8 @@ auto builder(format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
 
   G.template set<csc_v_t>(csc.number_of_rows, csc.number_of_nonzeros,
                           memory::raw_pointer_cast(csc.column_offsets.data()),
-                          memory::raw_pointer_cast(csc.row_indices.data()));
+                          memory::raw_pointer_cast(csc.row_indices.data()),
+                          memory::raw_pointer_cast(csc.nonzero_values.data()));
 
   return G;
 }
@@ -220,7 +220,8 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
 
   G.template set<csc_v_t>(csc.number_of_rows, csc.number_of_nonzeros,
                           memory::raw_pointer_cast(csc.column_offsets.data()),
-                          memory::raw_pointer_cast(csc.row_indices.data()));
+                          memory::raw_pointer_cast(csc.row_indices.data()),
+                          memory::raw_pointer_cast(csc.nonzero_values.data()));
 
   return G;
 }

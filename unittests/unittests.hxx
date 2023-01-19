@@ -14,8 +14,8 @@
 // #include "experiments/shared_ptr.cuh"
 
 // #include "formats/format.cuh"
-// #include "formats/csc.cuh"
-#include "formats/coo.cuh"
+#include "formats/csc.cuh"
+// #include "formats/coo.cuh"
 // #include "formats/csr.cuh"
 // #include "formats/coocsr.cuh"
 

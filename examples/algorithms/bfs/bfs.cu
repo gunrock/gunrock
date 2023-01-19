@@ -43,9 +43,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Build graph + metadata
 
-  auto G = graph::build::from_csr<memory_space_t::device,
-                                  //graph::view_t::csr | graph::view_t::coo>(csr, coo);
-                                  graph::view_t::csr>(csr);
+  auto G = graph::build::build<memory_space_t::device, edge_t, vertex_t, weight_t>(csr);
 
   // --
   // Params and memory allocation
