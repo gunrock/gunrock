@@ -31,4 +31,4 @@ jobs:
         committer_name: GitHub Actions
         committer_email: 41898282+github-actions[bot]@users.noreply.github.com
         message: ':octocat: Applied clang-format.'
-        add: '*.hpp *.cpp *.cu *.cuh *.hxx *.cxx'
+        add: '*.cpp *.cu *.cuh *.hxx'
