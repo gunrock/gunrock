@@ -34,8 +34,8 @@ namespace io {
 using namespace memory;
 
 std::string leading_trim(std::string s) {
-    size_t start = s.find_first_not_of(" ");
-    return (start == std::string::npos) ? "" : s.substr(start);
+  size_t start = s.find_first_not_of(" ");
+  return (start == std::string::npos) ? "" : s.substr(start);
 }
 
 /**
@@ -146,8 +146,7 @@ struct smtx_t {
       }
 
       smtx_file.close();
-    }
-    else {
+    } else {
       throw(std::runtime_error("Unable to open file"));
     }
 
@@ -155,15 +154,17 @@ struct smtx_t {
       std::ostringstream ss;
       ss << "Number of rows in " << filename << " ("
          << csr.row_offsets.size() - 1
-         << ") does not match the count in the first line (" << csr.number_of_rows
-         << ")";
+         << ") does not match the count in the first line ("
+         << csr.number_of_rows << ")";
       throw(std::invalid_argument(ss.str()));
     }
 
     if (csr.nonzero_values.size() != csr.number_of_nonzeros) {
       std::ostringstream ss;
-      ss << "Number of non-zeros in " << filename << " (" << csr.nonzero_values.size()
-         << ") does not match the count in the first line (" << csr.number_of_nonzeros << ")";
+      ss << "Number of non-zeros in " << filename << " ("
+         << csr.nonzero_values.size()
+         << ") does not match the count in the first line ("
+         << csr.number_of_nonzeros << ")";
       throw(std::invalid_argument(ss.str()));
     }
 

@@ -24,7 +24,7 @@ struct param_t {
 template <typename vertex_t>
 struct result_t {
   vertex_t* distances;
-  vertex_t* predecessors; /// @todo: implement this.
+  vertex_t* predecessors;  /// @todo: implement this.
   result_t(vertex_t* _distances, vertex_t* _predecessors)
       : distances(_distances), predecessors(_predecessors) {}
 };

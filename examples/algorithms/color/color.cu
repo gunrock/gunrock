@@ -59,8 +59,8 @@ void test_color(int num_arguments, char** argument_array) {
 
   thrust::host_vector<vertex_t> h_colors(n_vertices);
 
-  float cpu_elapsed = 
-     color_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, h_colors.data());
+  float cpu_elapsed =
+      color_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, h_colors.data());
 
   int n_errors = color_cpu::compute_error<csr_t, vertex_t, edge_t, weight_t>(
       csr, colors, h_colors);

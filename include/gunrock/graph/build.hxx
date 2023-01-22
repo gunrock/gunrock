@@ -47,7 +47,7 @@ auto from_csr(format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
       csr.number_of_nonzeros,           // nonzeros
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()  // values
+      csr.nonzero_values.data().get()   // values
   );
 }
 
