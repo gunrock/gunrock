@@ -37,23 +37,36 @@ void test_csc(int num_arguments, char** argument_array) {
   thrust::host_vector<edge_t> column_offsets(csr.number_of_columns + 1);
 
   // Use both CSR and CSC views
-  auto G = graph::build::build<memory_space_t::host>(csc);
+  auto G = graph::build::build<memory_space_t::host>(csr, csc);
 
+  // Test CSR and CSC views
+  using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
   using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
   
+  // CSR number of vertices
+  std::cout << "G.get_number_of_vertices() : "
+            << G.template get_number_of_vertices<csr_v_t>() << std::endl;
   // CSC number of vertices
   std::cout << "G.get_number_of_vertices() : "
             << G.template get_number_of_vertices<csc_v_t>() << std::endl;
+  // CSR number of edges
+  std::cout << "G.get_number_of_edges()    : "
+            << G.template get_number_of_edges<csr_v_t>() << std::endl;
   // CSC number of edges
   std::cout << "G.get_number_of_edges()    : "
             << G.template get_number_of_edges<csc_v_t>() << std::endl;
 
   for (vertex_t i = 0; i < G.get_number_of_edges(); i++) {
+    // Print CSR edge i
+    std::cout << i << " " << G.template get_source_vertex<csr_v_t>(i) << " "
+              << G.template get_destination_vertex<csr_v_t>(i) << std::endl;
     // Print CSC edge i
     std::cout << i << " " << G.template get_source_vertex<csc_v_t>(i) << " "
               << G.template get_destination_vertex<csc_v_t>(i) << std::endl;
   }
 
+  // Print CSR edge index for edge from 6 -> 0
+  std::cout << G.template get_edge<csr_v_t>(6, 0) << std::endl;
   // Print CSC edge index for edge from 6 -> 0
   std::cout << G.template get_edge<csc_v_t>(6, 0) << std::endl;
 }
