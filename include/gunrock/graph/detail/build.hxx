@@ -133,7 +133,7 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
   using coo_v_t = empty_coo_t;
 
   //// Enable CSC.
-  using csc_v_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
+  using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
 
   using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
                                     csc_v_t>;
@@ -163,10 +163,10 @@ auto builder(format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
   using csr_v_t = empty_csr_t;
 
   //// Enable COO.
-  using coo_v_t = format::coo_t<space, vertex_t, edge_t, weight_t>;
+  using coo_v_t = graph::graph_coo_t<vertex_t, edge_t, weight_t>;
 
   //// Enable CSC.
-  using csc_v_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
+  using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
 
   using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, 
                                     csc_v_t, coo_v_t>;
@@ -195,13 +195,13 @@ auto builder(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
              format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
   // Enable the types based on the different views required.
   //// Enable CSR.
-  using csr_v_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
+  using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
 
   //// Enable COO.
-  using coo_v_t = format::coo_t<space, vertex_t, edge_t, weight_t>;
+  using coo_v_t = graph::graph_coo_t<vertex_t, edge_t, weight_t>;
 
   //// Enable CSC.
-  using csc_v_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
+  using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
 
   using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
                                     csc_v_t, coo_v_t>;
