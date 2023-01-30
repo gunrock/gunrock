@@ -3,7 +3,7 @@
 using namespace gunrock;
 using namespace memory;
 
-void test_csc(int num_arguments, char** argument_array) {
+void test_csc_csr(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -73,5 +73,5 @@ void test_csc(int num_arguments, char** argument_array) {
 }
 
 int main(int argc, char** argv) {
-  test_csc(argc, argv);
+  test_csc_csr(argc, argv);
 }
