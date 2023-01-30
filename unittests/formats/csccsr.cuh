@@ -28,6 +28,7 @@ void test_csc(int num_arguments, char** argument_array) {
   using csc_t = format::csc_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
   csc_t csc;
   csr.from_coo(mm.load(filename));
+  // Convert from CSR to CSC
   csc.from_csr(csr);
 
   // --
