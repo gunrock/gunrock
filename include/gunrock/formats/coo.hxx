@@ -69,20 +69,17 @@ struct coo_t {
     vector_t<index_t, memory_space_t::host> Aj;
     vector_t<value_t, memory_space_t::host> Ax;
 
-    Ai.resize(number_of_nonzeros);
-    Aj.resize(number_of_nonzeros);
-    Ax.resize(number_of_nonzeros);
+    row_indices.resize(number_of_nonzeros);
+    column_indices.resize(number_of_nonzeros);
+    nonzero_values.resize(number_of_nonzeros);
 
-    Aj = csr.column_indices;
-    Ax = csr.nonzero_values;
-
+    // Convert offsets to indices
     gunrock::graph::convert::offsets_to_indices<memory_space_t::host>(
-        csr.row_offsets.data(), csr.number_of_rows + 1,
-        Ai.data(), number_of_nonzeros);
+        memory::raw_pointer_cast(csr.row_offsets.data()), csr.number_of_rows + 1,
+        memory::raw_pointer_cast(row_indices.data()), number_of_nonzeros);
 
-    row_indices = Ai;
-    column_indices = Aj;
-    nonzero_values = Ax;
+    column_indices = csr.column_indices;
+    nonzero_values = csr.nonzero_values;
 
     return *this;  // COO representation 
   }

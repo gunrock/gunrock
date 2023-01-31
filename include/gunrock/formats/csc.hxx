@@ -73,12 +73,13 @@ struct csc_t {
     row_indices.resize(number_of_nonzeros);
     nonzero_values.resize(number_of_nonzeros);
 
-    // Convert offsets to indices
+    // Convert row offsets to indices
     gunrock::graph::convert::offsets_to_indices<space>(
         memory::raw_pointer_cast(csr.row_offsets.data()),
         csr.number_of_rows + 1, memory::raw_pointer_cast(row_indices.data()),
         number_of_nonzeros);
 
+    // Convert column indices to offsets
     using execution_policy_t =
         std::conditional_t<space == memory_space_t::device,
                            decltype(thrust::device), decltype(thrust::host)>;
