@@ -64,11 +64,6 @@ struct coo_t {
     number_of_columns = csr.number_of_columns;
     number_of_nonzeros = csr.number_of_nonzeros;
 
-    // Allocate space for vectors
-    vector_t<index_t, memory_space_t::host> Ai;
-    vector_t<index_t, memory_space_t::host> Aj;
-    vector_t<value_t, memory_space_t::host> Ax;
-
     row_indices.resize(number_of_nonzeros);
     column_indices.resize(number_of_nonzeros);
     nonzero_values.resize(number_of_nonzeros);

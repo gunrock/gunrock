@@ -58,7 +58,7 @@ struct csc_t {
    */
   // TODO: fix index_t -> offset_t
   csc_t<space, index_t, index_t, value_t> from_csr(
-      const csr_t<memory_space_t::host, index_t, index_t, value_t>& csr) {
+      const csr_t<space, index_t, index_t, value_t>& csr) {
     number_of_rows = csr.number_of_rows;
     number_of_columns = csr.number_of_columns;
     number_of_nonzeros = csr.number_of_nonzeros;
