@@ -63,44 +63,35 @@ struct csc_t {
     number_of_columns = csr.number_of_columns;
     number_of_nonzeros = csr.number_of_nonzeros;
 
-    // Allocate space for vectors
-    vector_t<index_t, memory_space_t::host> Ai;  // column offsets
-    vector_t<index_t, memory_space_t::host> Aj;  // row indices
-    vector_t<value_t, memory_space_t::host> Ax;  // values
-    vector_t<index_t, memory_space_t::host> temp;
-
-    Ai.resize(csr.number_of_columns + 1);
-    Aj.resize(number_of_nonzeros);
-    Ax.resize(number_of_nonzeros);
+    // Column indices may get reordered below, so we need to make a copy
+    vector_t<index_t, space> temp;
     temp.resize(number_of_nonzeros);
-
-    Ax = csr.nonzero_values;
     temp = csr.column_indices;
 
-    // CSC - column offsets and row indices
-    gunrock::graph::convert::offsets_to_indices<memory_space_t::host>(
-        csr.row_offsets.data(), csr.number_of_rows + 1, Aj.data(),
+    // Resize vectors
+    column_offsets.resize(csr.number_of_columns + 1);
+    row_indices.resize(number_of_nonzeros);
+    nonzero_values.resize(number_of_nonzeros);
+
+    // Convert offsets to indices
+    gunrock::graph::convert::offsets_to_indices<space>(
+        memory::raw_pointer_cast(csr.row_offsets.data()),
+        csr.number_of_rows + 1, memory::raw_pointer_cast(row_indices.data()),
         number_of_nonzeros);
 
     using execution_policy_t =
         std::conditional_t<space == memory_space_t::device,
                            decltype(thrust::device), decltype(thrust::host)>;
     execution_policy_t exec;
-    thrust::sort_by_key(
-        exec, temp.data(),
-        temp.data() + csr.number_of_nonzeros,
-        thrust::make_zip_iterator(
-            thrust::make_tuple(Aj.data(),
-                               Ax.data()))  // values
-    );
+
+    thrust::sort_by_key(exec, temp.begin(), temp.end(),
+                        thrust::make_zip_iterator(thrust::make_tuple(
+                            row_indices.begin(), nonzero_values.begin())));
 
     gunrock::graph::convert::indices_to_offsets<space>(
-        temp.data(), csr.number_of_nonzeros,
-        Ai.data(), csr.number_of_rows + 1);
-
-    column_offsets = Ai;
-    row_indices = Aj;
-    nonzero_values = Ax;
+        memory::raw_pointer_cast(temp.data()), number_of_nonzeros,
+        memory::raw_pointer_cast(column_offsets.data()),
+        csr.number_of_rows + 1);
 
     return *this;  // CSC representation
   }
