@@ -27,10 +27,10 @@ void test_csc_csr(int num_arguments, char** argument_array) {
   csr_t csr;
   using csc_t = format::csc_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
   csc_t csc;
-  
-  gunrock::io::loader<vertex_t,edge_t,weight_t> load_obj;
+
+  gunrock::io::loader<vertex_t, edge_t, weight_t> load_obj;
   load_obj = mm.load(filename);
-   
+
   csr.from_coo(load_obj.coo);
   // Convert from CSR to CSC
   csc.from_csr(csr);
@@ -42,8 +42,9 @@ void test_csc_csr(int num_arguments, char** argument_array) {
   thrust::host_vector<edge_t> column_offsets(csr.number_of_columns + 1);
 
   // Use both CSR and CSC views
-  auto G = graph::build::build<memory_space_t::host>(load_obj.properties, csr, csc);
-  
+  auto G =
+      graph::build::build<memory_space_t::host>(load_obj.properties, csr, csc);
+
   std::cout << "Directed: " << G.is_directed() << "\n";
   std::cout << "Symmetric: " << G.is_symmetric() << "\n";
   std::cout << "Weighted: " << G.is_weighted() << "\n";
@@ -51,7 +52,7 @@ void test_csc_csr(int num_arguments, char** argument_array) {
   // // Test CSR and CSC views
   // using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
   // using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
-  
+
   // // CSR number of vertices
   // std::cout << "G.get_number_of_vertices() : "
   //           << G.template get_number_of_vertices<csr_v_t>() << std::endl;

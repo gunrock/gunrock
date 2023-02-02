@@ -89,7 +89,7 @@ class graph_t : public graph_view_t... {
    * @brief Default constructor for the graph.
    */
   __host__ __device__ graph_t() : properties(), graph_view_t()... {}
-  
+
   /**
    * @brief Construct graph with properties.
    */
