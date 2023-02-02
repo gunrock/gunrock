@@ -13,6 +13,7 @@ namespace graph {
 struct graph_properties_t {
   bool directed{false};
   bool weighted{true};
+  bool symmetric{false};
   graph_properties_t() = default;
 };
 

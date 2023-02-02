@@ -16,7 +16,7 @@
 // #include "formats/format.cuh"
 // #include "formats/csc.cuh"
 #include "formats/csccsr.cuh"
-// #include "formats/coo.cuh"
+// include "formats/coo.cuh"
 // #include "formats/csr.cuh"
 // #include "formats/coocsr.cuh"
 

@@ -20,61 +20,68 @@ template <memory_space_t space,
           typename edge_t,
           typename vertex_t,
           typename weight_t>
-auto build(format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
-  return detail::builder<space>(csr);
+auto build(graph::graph_properties_t properties,
+           format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
+  return detail::builder<space>(properties, csr);
 }
 
 template <memory_space_t space,
           typename edge_t,
           typename vertex_t,
           typename weight_t>
-auto build(format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
-  return detail::builder<space>(coo);
-}
-
-template <memory_space_t space,
-          typename edge_t,
-          typename vertex_t,
-          typename weight_t>
-auto build(format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
-  return detail::builder<space>(csc);
-}
-
-template <memory_space_t space,
-          typename edge_t,
-          typename vertex_t,
-          typename weight_t>
-auto build(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
+auto build(graph::graph_properties_t properties,
            format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
-  return detail::builder<space>(csr, coo);
+  return detail::builder<space>(properties, coo);
 }
 
 template <memory_space_t space,
           typename edge_t,
           typename vertex_t,
           typename weight_t>
-auto build(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
+auto build(graph::graph_properties_t properties,
            format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
-  return detail::builder<space>(csr, csc);
+  return detail::builder<space>(properties, csc);
 }
 
 template <memory_space_t space,
           typename edge_t,
           typename vertex_t,
           typename weight_t>
-auto build(format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
+auto build(graph::graph_properties_t properties,
+           format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
+           format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
+  return detail::builder<space>(properties, csr, coo);
+}
+
+template <memory_space_t space,
+          typename edge_t,
+          typename vertex_t,
+          typename weight_t>
+auto build(graph::graph_properties_t properties,
+           format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
            format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
-  return detail::builder<space>(coo, csc);
+  return detail::builder<space>(properties, csr, csc);
 }
 
 template <memory_space_t space,
           typename edge_t,
           typename vertex_t,
           typename weight_t>
-auto build(format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
+auto build(graph::graph_properties_t properties,
            format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
            format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
-  return detail::builder<space>(csr, coo, csc);
+  return detail::builder<space>(properties, coo, csc);
+}
+
+template <memory_space_t space,
+          typename edge_t,
+          typename vertex_t,
+          typename weight_t>
+auto build(graph::graph_properties_t properties,
+           format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
+           format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
+           format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
+  return detail::builder<space>(properties, csr, coo, csc);
 }
 
 }  // namespace build

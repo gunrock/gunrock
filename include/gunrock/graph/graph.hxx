@@ -89,6 +89,14 @@ class graph_t : public graph_view_t... {
    * @brief Default constructor for the graph.
    */
   __host__ __device__ graph_t() : properties(), graph_view_t()... {}
+  
+  /**
+   * @brief Construct graph with properties.
+   */
+  __host__ __device__ graph_t(graph::graph_properties_t prop)
+      : properties(), graph_view_t()... {
+    properties = prop;
+  }
 
   /**
    * @brief Get the number of vertices in the graph. Callable from both host and
@@ -121,6 +129,22 @@ class graph_t : public graph_view_t... {
    * @return false
    */
   bool is_directed() { return properties.directed; }
+
+  /**
+   * @brief Returns if the constructed graph is symmetric or not.
+   *
+   * @return true
+   * @return false
+   */
+  bool is_symmetric() { return properties.symmetric; }
+
+  /**
+   * @brief Returns if the constructed graph is weighted or not.
+   *
+   * @return true
+   * @return false
+   */
+  bool is_weighted() { return properties.weighted; }
 
   /**
    * @brief Number of valid graph representations inherited. Does not include
