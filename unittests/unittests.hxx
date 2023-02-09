@@ -14,11 +14,13 @@
 // #include "experiments/shared_ptr.cuh"
 
 // #include "formats/format.cuh"
-// #include "formats/csc.cuh"
-#include "formats/csccsr.cuh"
-// include "formats/coo.cuh"
-// #include "formats/csr.cuh"
+// #include "formats/coo.cuh"
+// #include "formats/coocsc.cuh"
+#include "formats/coocsccsr.cuh"
 // #include "formats/coocsr.cuh"
+// #include "formats/csc.cuh"
+// #include "formats/csccsr.cuh"
+// #include "formats/csr.cuh"
 
 // #include "graph/src_vertex.cuh"
 // #include "graph/graph_load.cuh"

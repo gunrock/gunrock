@@ -95,8 +95,8 @@ template <memory_space_t space,
           typename vertex_t,
           typename weight_t>
 auto builder(graph::graph_properties_t properties,
-             format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
-             format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
+             format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
+             format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
   // Enable the types based on the different views required.
   //// Enable CSR.
   using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
@@ -129,8 +129,8 @@ template <memory_space_t space,
           typename vertex_t,
           typename weight_t>
 auto builder(graph::graph_properties_t properties,
-             format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
-             format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
+             format::csc_t<space, vertex_t, edge_t, weight_t>& csc,
+             format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
   // Enable the types based on the different views required.
   //// Enable CSR.
   using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
@@ -197,9 +197,9 @@ template <memory_space_t space,
           typename vertex_t,
           typename weight_t>
 auto builder(graph::graph_properties_t properties,
-             format::csr_t<space, vertex_t, edge_t, weight_t>& csr,
              format::coo_t<space, vertex_t, edge_t, weight_t>& coo,
-             format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
+             format::csc_t<space, vertex_t, edge_t, weight_t>& csc,
+             format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
   // Enable the types based on the different views required.
   //// Enable CSR.
   using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;

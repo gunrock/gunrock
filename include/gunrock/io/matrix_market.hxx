@@ -30,7 +30,7 @@ using namespace memory;
  * coo and the graph properties to be returned).
  */
 template <typename vertex_t, typename edge_t, typename weight_t>
-struct loader {
+struct loader_struct {
   gunrock::graph::graph_properties_t properties;
   format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo;
 };
@@ -107,7 +107,7 @@ struct matrix_market_t {
    */
   auto load(std::string _filename) {
     // Return value
-    loader<vertex_t, edge_t, weight_t> load_obj;
+    loader_struct<vertex_t, edge_t, weight_t> loader;
 
     filename = _filename;
     dataset = util::extract_dataset(util::extract_filename(filename));
@@ -156,7 +156,7 @@ struct matrix_market_t {
       format = matrix_market_format_t::array;
 
     if (mm_is_pattern(code)) {
-      load_obj.properties.weighted = false;
+      loader.properties.weighted = false;
       data = matrix_market_data_t::pattern;
 
       // pattern matrix defines sparsity pattern, but not values
@@ -176,7 +176,7 @@ struct matrix_market_t {
             (weight_t)1.0;  // use value 1.0 for all nonzero entries
       }
     } else if (mm_is_real(code) || mm_is_integer(code)) {
-      load_obj.properties.weighted = true;
+      loader.properties.weighted = true;
       if (mm_is_real(code))
         data = matrix_market_data_t::real;
       else
@@ -206,8 +206,8 @@ struct matrix_market_t {
     }
 
     if (mm_is_symmetric(code)) {  // duplicate off diagonal entries
-      load_obj.properties.symmetric = true;
-      load_obj.properties.directed = false;
+      loader.properties.symmetric = true;
+      loader.properties.directed = false;
       scheme = matrix_market_storage_scheme_t::symmetric;
       vertex_t off_diagonals = 0;
       for (vertex_t i = 0; i < coo.number_of_nonzeros; ++i) {
@@ -250,13 +250,13 @@ struct matrix_market_t {
       coo.number_of_nonzeros = _nonzeros;
     }  // end symmetric case
     else {
-      load_obj.properties.symmetric = false;
-      load_obj.properties.directed = true;
+      loader.properties.symmetric = false;
+      loader.properties.directed = true;
     }
     fclose(file);
 
-    load_obj.coo = coo;
-    return load_obj;
+    loader.coo = coo;
+    return loader;
   }
 };
 

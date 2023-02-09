@@ -97,11 +97,12 @@ class graph_csr_t {
     return {get_source_vertex(e), get_destination_vertex(e)};
   }
 
+  // TODO: this uses 1-based indexing while other views use 0-based indexing
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
-    return (edge_type)search::binary::execute(get_column_indices(), destination,
-                                              get_starting_edge(source),
-                                              get_starting_edge(source + 1) - 1);
+    return (edge_type)search::binary::execute(
+        get_column_indices(), destination, get_starting_edge(source),
+        get_starting_edge(source + 1) - 1);
   }
 
   /**
