@@ -151,23 +151,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
-        if (collect_metrics) {
-          operators::advance::execute<operators::load_balance_t::merge_path,
-                                      operators::advance_direction_t::forward,
-                                      operators::advance_io_type_t::vertices,
-                                      operators::advance_io_type_t::vertices>(
-              G, forward_op, in_frontier, out_frontier, E->scanned_work_domain,
-              context);
+        operators::advance::execute<operators::load_balance_t::merge_path,
+                                    operators::advance_direction_t::forward,
+                                    operators::advance_io_type_t::vertices,
+                                    operators::advance_io_type_t::vertices>(
+            G, forward_op, in_frontier, out_frontier, E->scanned_work_domain,
+            context);
 
+        if (collect_metrics) {
           (*search_depth)++;
           (*edges_visited) += out_frontier->get_number_of_elements();
-        } else {
-          operators::advance::execute<operators::load_balance_t::merge_path,
-                                      operators::advance_direction_t::forward,
-                                      operators::advance_io_type_t::vertices,
-                                      operators::advance_io_type_t::none>(
-              G, forward_op, in_frontier, out_frontier, E->scanned_work_domain,
-              context);
         }
         this->depth++;
         if (is_forward_converged(context))
