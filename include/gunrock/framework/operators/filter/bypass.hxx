@@ -37,7 +37,7 @@ void execute(graph_t& G,
 
   // Filter with bypass
   thrust::transform(
-      thrust::cuda::par.on(context.stream()),          // execution policy
+      context.execution_policy(),                      // execution policy
       thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
       thrust::make_counting_iterator<std::size_t>(end),  // input iterator: last
       output->begin(),                                   // output iterator

@@ -2,7 +2,6 @@
  * @file sm.hxx
  * @author Cameron Shinn (ctshinn@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-12-17
  *
  * @copyright Copyright (c) 2021
@@ -35,7 +34,8 @@ enum sm_flag_t : unsigned {
   sm_72 = 1 << 10,
   sm_75 = 1 << 11,
   sm_80 = 1 << 12,
-  sm_86 = 1 << 13
+  sm_86 = 1 << 13,
+  sm_gfx90a = 1 << 14
 };
 
 /**

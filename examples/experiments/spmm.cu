@@ -2,7 +2,6 @@
  * @file spmm.cu
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Sparse matrix-matrix multiplication
- * @version 0.1
  * @date 2022-01-20
  *
  * @copyright Copyright (c) 2022

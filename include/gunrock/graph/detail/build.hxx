@@ -2,7 +2,6 @@
  * @file build.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-12-04
  *
  * @copyright Copyright (c) 2020
@@ -84,7 +83,7 @@ auto from_csr(vertex_t const& r,
               edge_t* column_offsets = nullptr) {
   if constexpr (has(build_views, view_t::csc) &&
                 has(build_views, view_t::csr)) {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "CSC & CSR view not yet supported together.");
   }
 

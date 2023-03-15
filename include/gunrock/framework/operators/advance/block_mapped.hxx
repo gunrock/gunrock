@@ -1,8 +1,8 @@
+#include "hip/hip_runtime.h"
 /**
  * @file block_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-20
  *
  * @copyright Copyright (c) 2020
@@ -19,8 +19,8 @@
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
 
-#include <cub/block/block_load.cuh>
-#include <cub/block/block_scan.cuh>
+#include <hipcub/block/block_load.hpp>
+#include <hipcub/block/block_scan.hpp>
 
 namespace gunrock {
 namespace operators {
@@ -49,7 +49,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   using type_t = frontier_t;
 
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
-  using block_scan_t = cub::BlockScan<edge_t, THREADS_PER_BLOCK>;
+  using block_scan_t = hipcub::BlockScan<edge_t, THREADS_PER_BLOCK>;
 
   auto global_idx = gcuda::thread::global::id::x();
   auto local_idx = gcuda::thread::local::id::x();
@@ -118,7 +118,9 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
        i += gcuda::block::size::x()     // increment by blockDim.x
   ) {
     // Binary search to find which vertex id to work on.
-    int id = search::binary::rightmost(degrees, i, length);
+    // int id = search::binary::rightmost(degrees, i, length);
+    auto it = thrust::upper_bound(thrust::seq, degrees, degrees + length, i);
+    vertex_t id = thrust::distance(degrees, it) - 1;
 
     // If the id is greater than the width of the block or the input size, we
     // exit.

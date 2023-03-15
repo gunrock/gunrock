@@ -2,7 +2,6 @@
  * @file compare.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-12-31
  *
  * @copyright Copyright (c) 2021
@@ -43,7 +42,7 @@ std::size_t compare(const type_t* d_ptr,
                     comp_t error_op = detail::default_comparator,
                     const bool verbose = false) {
   thrust::host_vector<type_t> d_vec(n);
-  cudaMemcpy(d_vec.data(), d_ptr, n * sizeof(type_t), cudaMemcpyDeviceToHost);
+  hipMemcpy(d_vec.data(), d_ptr, n * sizeof(type_t), hipMemcpyDeviceToHost);
 
   std::size_t error_count = 0;
   for (std::size_t i = 0; i < n; ++i) {

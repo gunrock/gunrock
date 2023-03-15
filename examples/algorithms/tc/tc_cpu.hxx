@@ -2,7 +2,6 @@
  * @file tc_cpu.hxx
  * @author Muhammad A. Awad (mawad@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2022-06-24
  *
  * @copyright Copyright (c) 2022

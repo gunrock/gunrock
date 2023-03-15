@@ -6,16 +6,38 @@
 
 **Gunrock**[^1] is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
 
+| Branch    | Purpose                                                                                                                            | Version        | Status     |
+|-----------|------------------------------------------------------------------------------------------------------------------------------------|----------------|------------|
+| `main`    | Default branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials), serves as the official release branch.  | $\geq$ `2.x.x` | Active     |
+| `develop` | Development feature branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials).                             | $\geq$ `2.x.x` | Active     |
+| `master`  | Previous release branch for `gunrock/gunrock` version `1.x.x` interface, preserves all commit history.                             | $\leq$ `1.x.x` | Deprecated |
+| `dev`     | Previous development branch for `gunrock/gunrock`. All changes now merged in `master`.                                             | $\leq$ `1.x.x` | Deprecated |
+| `hip-develop` | Development feature branch with a working HIP port, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials). | $\geq$ `2.x.x` | Active   
+  
+
+
 ## Quick Start Guide
-Before building Gunrock make sure you have **CUDA Toolkit**[^2] installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have a HIP compiler installed on your system. Other external dependencies are  `rocm/rocthrust`, `rocm/hipcub`, etc
+
 
 ```shell
-git clone https://github.com/gunrock/gunrock.git
+git clone https://github.com/AMD-HPC/gunrock
+git checkout hip-develop
 cd gunrock
 mkdir build && cd build
-cmake .. 
+#for NVIDIA targets, current version has been tested with rocm version 5.2.0
+export HIP_PLATFORM=nvidia
+cmake -DCMAKE_HIP_COMPILER=hipcc .. 
 make sssp # or for all algorithms, use: make -j$(nproc)
-bin/sssp ../datasets/chesapeake/chesapeake.mtx
+#to run the example,
+bin/sssp --validate -m ../datasets/chesapeake/chesapeake.mtx
+
+
+#for AMD targets:
+cmake  .. 
+make sssp # or for all algorithms, use: make -j$(nproc)
+#to run the example,
+bin/sssp --validate -m ../datasets/chesapeake/chesapeake.mtx
 ```
 
 ## Implementing Graph Algorithms

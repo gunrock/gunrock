@@ -1,8 +1,7 @@
 /**
  * @file merge_path.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief
- * @version 0.1
+ * @brief Merge-Path load-balancing based Advance.
  * @date 2020-10-20
  *
  * @copyright Copyright (c) 2020
@@ -17,9 +16,9 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 // XXX: Replace these later
-#include <moderngpu/transform.hxx>
-#include <moderngpu/kernel_scan.hxx>
-#include <moderngpu/kernel_load_balance.hxx>
+//#include <moderngpu/transform.hxx>
+//#include <moderngpu/kernel_scan.hxx>
+//#include <moderngpu/kernel_load_balance.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -38,8 +37,9 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              gcuda::standard_context_t& context) {
+#if 0
   if constexpr (direction == advance_direction_t::optimized) {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "Direction-optimized not yet implemented.");
 
     // Direction-Optimized advance is supported using CSR and CSC graph
@@ -49,16 +49,18 @@ void execute(graph_t& G,
     using find_csc_t = typename graph_t::graph_csc_view_t;
     if (!(G.template contains_representation<find_csr_t>() &&
           G.template contains_representation<find_csc_t>())) {
-      error::throw_if_exception(cudaErrorUnknown,
+      error::throw_if_exception(hipErrorUnknown,
                                 "CSR and CSC sparse-matrix representations "
                                 "required for direction-optimized advance.");
     }
   }
 
-  using type_t = typename frontier_t::type_t;
   using view_t = std::conditional_t<direction == advance_direction_t::forward,
                                     typename graph_t::graph_csr_view_t,
                                     typename graph_t::graph_csc_view_t>;
+#endif
+
+  using type_t = typename frontier_t::type_t;
 
   auto size_of_output = compute_output_offsets(
       G, input, segments, context,
@@ -95,10 +97,10 @@ void execute(graph_t& G,
     if (!gunrock::util::limits::is_valid(v))
       return;
 
-    auto start_edge = G.template get_starting_edge<view_t>(v);
+    auto start_edge = G.get_starting_edge(v);
     auto e = start_edge + rank;
-    auto n = G.template get_destination_vertex<view_t>(e);
-    auto w = G.template get_edge_weight<view_t>(e);
+    auto n = G.get_destination_vertex(e);
+    auto w = G.get_edge_weight(e);
     bool cond = op(v, n, e, w);
 
     if (output_type != advance_io_type_t::none)

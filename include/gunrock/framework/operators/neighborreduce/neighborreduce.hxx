@@ -2,7 +2,6 @@
  * @file neighborreduce.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-11-05
  *
  * @copyright Copyright (c) 2021
@@ -71,7 +70,7 @@ void execute(graph_t& G,
     using type_t = typename graph_t::vertex_type;
     using find_csr_t = typename graph_t::graph_csr_view_t;
     if (!(G.template contains_representation<find_csr_t>())) {
-      error::throw_if_exception(cudaErrorUnknown,
+      error::throw_if_exception(hipErrorUnknown,
                                 "CSR sparse-matrix representation "
                                 "required for neighborreduce operator.");
     }

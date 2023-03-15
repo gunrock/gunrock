@@ -3,7 +3,6 @@
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief A batch operator is an operator that can be used to execute a
  * function/application in bactches with different inputs using C++ threads.
- * @version 0.1
  * @date 2021-05-04
  *
  * @copyright Copyright (c) 2021
@@ -18,6 +17,7 @@
 #include <thrust/reduce.h>
 
 #include <thread>
+#include <chrono>
 
 namespace gunrock {
 namespace operators {
@@ -65,7 +65,8 @@ void execute(function_t f,
              args_t&... args) {
   thrust::host_vector<float> elapsed(number_of_jobs);
   std::vector<std::thread> threads;
-
+  using namespace std::chrono;
+  auto t_start = high_resolution_clock::now();
   for (std::size_t j = 0; j < number_of_jobs; j++) {
     threads.push_back(std::thread([&, j]() { elapsed[j] = f(j); }));
   }
@@ -73,9 +74,13 @@ void execute(function_t f,
   for (auto& thread : threads)
     thread.join();
 
-  total_elapsed[0] =
-      thrust::reduce(thrust::host, elapsed.begin(), elapsed.end(), (float)0.0f,
-                     thrust::plus<float>());
+  auto t_stop = high_resolution_clock::now();
+  auto batch_elapsed = duration_cast<microseconds>(t_stop - t_start).count();
+  total_elapsed[0] = (float)batch_elapsed / 1000;
+
+  // average_time[0] =
+  //     thrust::reduce(thrust::host, elapsed.begin(), elapsed.end(),
+  //                    (float)0.0f, thrust::plus<float>());
 }
 
 }  // namespace batch
