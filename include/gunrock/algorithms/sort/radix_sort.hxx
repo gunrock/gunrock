@@ -42,10 +42,25 @@ void sort_keys(type_t* keys,
                order_t order = order_t::ascending,
                gcuda::stream_t stream = 0) {
   if (order == order_t::ascending)
-    thrust::sort(thrust::cuda::par_nosync.on(stream), keys, keys + num_items,
+    thrust::sort(
+    #if HIP_BACKEND == 1
+    thrust::cuda::par.on(stream),
+    #else
+    thrust::hip::par.on(stream), 
+    #endif
+    keys, keys + num_items,
                  thrust::less<type_t>());
   else
-    thrust::sort(thrust::cuda::par_nosync.on(stream), keys, keys + num_items,
+    thrust::sort(
+    //thrust::hip::par.on(stream), 
+      #if HIP_BACKEND == 1
+      thrust::cuda::par.on(stream),
+      #else
+      thrust::hip::par.on(stream),
+      #endif
+
+
+    keys, keys + num_items,
                  thrust::greater<type_t>());
 }
 

@@ -12,7 +12,10 @@
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/util/compiler.hxx>
 #include <gunrock/io/git.hxx>
-
+#include <numeric>
+#include <utility>
+#include <iostream>
+//#include <execution>
 namespace gunrock {
 namespace util {
 namespace stats {
@@ -114,7 +117,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
 
   // Get average run time
   avg_run_time =
-      std::reduce(run_times.begin(), run_times.end(), 0.0) / run_times.size();
+      std::accumulate(run_times.begin(), run_times.end(), 0.0) / run_times.size();
 
   // Get run time standard deviation
   float sq_sum = std::inner_product(run_times.begin(), run_times.end(),
@@ -136,7 +139,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
 
   if (filtered_run_times.size() != run_times.size()) {
     avg_run_time =
-        std::reduce(filtered_run_times.begin(), filtered_run_times.end(), 0.0) /
+        std::accumulate(filtered_run_times.begin(), filtered_run_times.end(), 0.0) /
         filtered_run_times.size();
 
     // Get run time standard deviation
@@ -154,7 +157,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
       *std::max_element(filtered_run_times.begin(), filtered_run_times.end());
 
   // Get average search depth
-  avg_search_depth = std::reduce(filtered_search_depths.begin(),
+  avg_search_depth = std::accumulate(filtered_search_depths.begin(),
                                  filtered_search_depths.end(), 0.0) /
                      filtered_search_depths.size();
 
@@ -172,7 +175,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
   std::transform(mteps.begin(), mteps.end(), mteps.begin(),
                  [](auto& c) { return c / 1000; });
 
-  avg_mteps = std::reduce(mteps.begin(), mteps.end(), 0.0) / mteps.size();
+  avg_mteps = std::accumulate(mteps.begin(), mteps.end(), 0.0) / mteps.size();
 
   min_mteps = *std::min_element(mteps.begin(), mteps.end());
   max_mteps = *std::max_element(mteps.begin(), mteps.end());

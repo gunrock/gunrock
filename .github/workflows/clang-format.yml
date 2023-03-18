@@ -1,0 +1,34 @@
+name: Formatting
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+
+jobs:
+  formatting-check:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.ref }}
+
+    - name: Install clang-format
+      run: |
+        pip install clang-format \
+        && clang-format --version
+      shell: bash
+
+    - name: Format files
+      run: ${{github.workspace}}/scripts/format.sh ${{github.workspace}} y
+      shell: bash
+
+    - name: Commit changes
+      uses: EndBug/add-and-commit@v9
+      with:
+        committer_name: GitHub Actions
+        committer_email: 41898282+github-actions[bot]@users.noreply.github.com
+        message: ':octocat: Applied clang-format.'
+        add: '*.cpp *.cu *.cuh *.hxx'

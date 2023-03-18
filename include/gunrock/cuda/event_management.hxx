@@ -13,7 +13,7 @@
 namespace gunrock {
 namespace gcuda {
 
-typedef cudaEvent_t event_t;
+typedef hipEvent_t event_t;
 
 }  // namespace gcuda
 }  // namespace gunrock

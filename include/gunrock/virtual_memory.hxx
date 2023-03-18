@@ -11,7 +11,7 @@
 
 #include <iostream>
 #include <memory>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <gunrock/error.hxx>
 
 namespace gunrock {
@@ -35,8 +35,8 @@ enum access_flags_t {
  */
 template <typename type_t>
 struct physical_memory_t {
-  using allocation_handle_t = CUmemGenericAllocationHandle;
-  using allocation_properties_t = CUmemAllocationProp;
+  using allocation_handle_t = hipMemGenericAllocationHandle_t;
+  using allocation_properties_t = hipMemAllocationProp;
 
   std::vector<allocation_handle_t> alloc_handle;
   allocation_properties_t prop = {};
@@ -55,16 +55,16 @@ struct physical_memory_t {
         granularity(0) {
     // Set properties of the allocation to create. The following properties will
     // create a pinned memory, local to the device (GPU).
-    prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-    prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop.type = hipMemAllocationTypePinned;
+    prop.location.type = hipMemLocationTypeDevice;
 
     // Find the minimum granularity needed for the resident devices.
     for (std::size_t idx = 0; idx < resident_devices.size(); idx++) {
       std::size_t _granularity = 0;
       // get the minnimum granularity for residentDevices[idx]
       prop.location.id = resident_devices[idx];
-      cuMemGetAllocationGranularity(&_granularity, &prop,
-                                    CU_MEM_ALLOC_GRANULARITY_MINIMUM);
+      hipMemGetAllocationGranularity(&_granularity, &prop,
+                                    hipMemAllocationGranularityMinimum);
       if (granularity < _granularity)
         granularity = _granularity;
     }
@@ -80,13 +80,13 @@ struct physical_memory_t {
     alloc_handle.resize(resident_devices.size());
     for (std::size_t idx = 0; idx < resident_devices.size(); idx++) {
       prop.location.id = resident_devices[idx];
-      cuMemCreate(&alloc_handle[idx], stripe_size, &prop, flags);
+      hipMemCreate(&alloc_handle[idx], stripe_size, &prop, flags);
     }
   }
 
   ~physical_memory_t() {
     for (std::size_t idx = 0; idx < resident_devices.size(); idx++)
-      cuMemRelease(alloc_handle[idx]);
+      hipMemRelease(alloc_handle[idx]);
   }
 
   static std::size_t round_up(std::size_t x, std::size_t y) {
@@ -109,11 +109,11 @@ struct virtual_memory_t {
 
   virtual_memory_t(std::size_t padded_size)
       : size(padded_size), alignment(0), addr(0), flags(0) {
-    cuMemAddressReserve((CUdeviceptr*)&ptr, size, alignment, (CUdeviceptr)addr,
+    hipMemAddressReserve((hipDeviceptr_t*)&ptr, size, alignment, (hipDeviceptr_t)addr,
                         flags);
   }
 
-  ~virtual_memory_t() { cuMemAddressFree((CUdeviceptr)ptr, size); }
+  ~virtual_memory_t() { hipMemAddressFree((hipDeviceptr_t)ptr, size); }
 };
 
 /**
@@ -161,15 +161,15 @@ class striped_memory_mapper_t {
     const size_t stripe_size = phys.stripe_size;
 
     for (auto& device : phys.resident_devices)
-      cuMemMap((CUdeviceptr)virt.ptr + (stripe_size * device), stripe_size, 0,
+      hipMemMap((hipDeviceptr_t)virt.ptr + (stripe_size * device), stripe_size, 0,
                phys.alloc_handle[device], 0);
 
-    std::vector<CUmemAccessDesc> access_descriptors(mapping_devices.size());
+    std::vector<hipMemAccessDesc> access_descriptors(mapping_devices.size());
 
     for (auto& local : phys.resident_devices) {
       for (auto& remote : mapping_devices) {
         access_flags_t access;
-        access_descriptors[remote].location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+        access_descriptors[remote].location.type = hipMemLocationTypeDevice;
         access_descriptors[remote].location.id = remote;
 
         // If the device being mapped to is where the physical memory resides
@@ -181,21 +181,21 @@ class striped_memory_mapper_t {
 
         // Set the access_descriptors flag.
         if (access == access_flags_t::none)
-          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_NONE;
+          access_descriptors[remote].flags = hipMemAccessFlagsProtNone;
         else if (access == access_flags_t::read_only)
-          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_READ;
+          access_descriptors[remote].flags = hipMemAccessFlagsProtRead;
         else if (access == access_flags_t::read_write)
-          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+          access_descriptors[remote].flags = hipMemAccessFlagsProtReadWrite;
         else
           access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_MAX;
       }
 
-      cuMemSetAccess((CUdeviceptr)virt.ptr + (stripe_size * local), stripe_size,
+      hipMemSetAccess((hipDeviceptr_t)virt.ptr + (stripe_size * local), stripe_size,
                      access_descriptors.data(), access_descriptors.size());
     }
   }
 
-  ~striped_memory_mapper_t() { cuMemUnmap((CUdeviceptr)virt.ptr, virt.size); }
+  ~striped_memory_mapper_t() { hipMemUnmap((hipDeviceptr_t)virt.ptr, virt.size); }
 
   type_t* data() { return virt.ptr; }
   std::size_t elements_per_partition() {

@@ -89,9 +89,9 @@ float compute_error(csr_t& csr,
       vertex_t u = column_indices[e];
 
       // Do not check self-loops.
-      if(v == u)
+      if (v == u)
         continue;
-        
+
       // Check if colors are the same among neighborhoods.
       if (gpu_colors[u] == gpu_colors[v] || gpu_colors[v] == -1) {
         std::cout << "Error: " << v << " " << u << " " << gpu_colors[v] << " "

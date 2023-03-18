@@ -1,6 +1,6 @@
 #pragma once
 
-#include <moderngpu/kernel_compact.hxx>
+//#include <moderngpu/kernel_compact.hxx>
 #include <gunrock/framework/operators/configs.hxx>
 
 namespace gunrock {

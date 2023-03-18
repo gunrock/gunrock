@@ -34,7 +34,7 @@ void uniform_distribution(vector_t& input,
 
 /**
  * @brief Get a random floating point value
- * 
+ *
  * @tparam rand_t type of value (default = float)
  * @param begin low random value
  * @param end high random value

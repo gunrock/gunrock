@@ -24,9 +24,28 @@ set(ESSENTIALS_VERSION_PATCH 0)
 
 set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.${ESSENTIALS_VERSION_PATCH}")
 
+
+message(STATUS "HIP Platform: $ENV{HIP_PLATFORM}")
+
+if("$ENV{HIP_PLATFORM}" STREQUAL "nvidia")
+    message(STATUS "HIP PLATFORM IS NVIDIA = " $ENV{HIP_PLATFORM})
+      set(HIP_BACKEND_CUDA 1)
+      set(target_language CUDA)
+        
+else()
+  set(HIP_BACKEND_CUDA 0)
+  set(target_language HIP)
+endif()
+
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+message(STATUS "HIP PLATFORM IS SET TO NVIDIA " )
+endif()
+
+
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
-  LANGUAGES CXX C CUDA
+  LANGUAGES CXX C ${target_language}
 )
 
 # Apparently defines NDEBUG, such that asserts() are disabled.
@@ -39,9 +58,8 @@ set(PROJECT_DEPS_DIR externals)
 
 # begin /* Include cmake modules */
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+#include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
 # end /* Include cmake modules */
@@ -68,6 +86,7 @@ add_library(essentials INTERFACE)
 ####################################################
 ############### SET TARGET PROPERTIES ##############
 ####################################################
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
 set_target_properties(essentials 
   PROPERTIES
     CXX_STANDARD 17
@@ -79,14 +98,38 @@ set_target_properties(essentials
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_ARCHITECTURES 75 # Set required architecture.
+   #  CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
+     )
+else()
+set_target_properties(essentials 
+  PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
+    HIP_STANDARD 17
+    HIP_STANDARD_REQUIRED ON
+    
+    HIP_EXTENSIONS OFF
+    #CUDA_RESOLVE_DEVICE_SYMBOLS ON
+    #CUDA_SEPARABLE_COMPILATION ON
+    HIP_ARCHITECTURES gfx90a # Set required architecture.
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
+endif()
+
 
 # Use for later.
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
 get_target_property(ESSENTIALS_ARCHITECTURES 
   essentials 
     CUDA_ARCHITECTURES
 )
+else()
+get_target_property(ESSENTIALS_ARCHITECTURES 
+  essentials 
+    HIP_ARCHITECTURES
+)
+endif()
 
 # Add GIT SHA-1 definition
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
@@ -99,11 +142,12 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
+    HIP_BACKEND=${HIP_BACKEND_CUDA}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
     GIT_SHA1="${GIT_SHA1}"
 )
 
-message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
+message(STATUS "Essentials ${target_language} Architecture: ${ESSENTIALS_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
@@ -123,20 +167,35 @@ target_include_directories(essentials
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
-  INTERFACE ${RAPIDJSON_INCLUDE_DIR}
+  # INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
 
+find_package(Threads)
 ####################################################
 ############ TARGET LINK LIBRARIES #################
 ####################################################
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
 target_link_libraries(essentials
   INTERFACE curand
   INTERFACE cuda
   INTERFACE cusparse
+  -lstdc++fs
+  ${CMAKE_THREAD_LIBS_INIT}
 )
+else()
+target_link_libraries(essentials
+  INTERFACE hiprand
+  INTERFACE hip
+  INTERFACE hipsparse
+  -lstdc++fs
+  ${CMAKE_THREAD_LIBS_INIT}
+)
+endif()
+
 
 ####################################################
 ################# TARGET SOURCES ###################
@@ -149,11 +208,19 @@ target_sources(essentials
 ####################################################
 ############## SET CXX & CUDA FLAGS ################
 ####################################################
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+set(platform_flag __HIP_PLATFORM_NVIDIA__)
+else()
+set(platform_flag __HIP_PLATFORM_AMD__)
+endif()
+
 set(CXX_FLAGS 
   $<$<CXX_COMPILER_ID:MSVC>:
     /W4
   >
   $<$<CXX_COMPILER_ID:GNU>:
+     #-std=c++17
     -Wall 
     # -Wextra
     -Wno-unused-result
@@ -161,10 +228,31 @@ set(CXX_FLAGS
     -Wno-strict-aliasing
     -Wno-unused-function
     -Wno-format-security
+    -D ${platform_flag}
     # -Werror
     # -vvv
   >
 )
+
+
+set(HIP_FLAGS
+  #-std=c++17
+  -D ${platform_flag}
+  -ferror-limit=100
+  #--expt-extended-lambda 
+  #--expt-relaxed-constexpr
+  #--use_fast_math
+  -DHIP_FAST_MATH
+  --offload-arch=gfx90a
+  #--ptxas-options -v
+  #--generate-line-info
+  
+  $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
+   --verbose
+   --debug # Host debug
+  # --device-debug # Device debug
+)
+
 
 set(CUDA_FLAGS
   --expt-extended-lambda 
@@ -173,21 +261,37 @@ set(CUDA_FLAGS
   --ptxas-options -v
   --generate-line-info
   $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
-  # --verbose
+   --verbose
   # --debug # Host debug
   # --device-debug # Device debug
 )
 
-set(CMAKE_CUDA_FLAGS_DEBUG "--optimize 0 --debug --device-debug -g -G")
-set(CMAKE_CUDA_FLAGS_RELEASE "--optimize 3")
+set(CUDA_DEBUG_FLAGS
+  --expt-extended-lambda 
+  --expt-relaxed-constexpr
+  --ptxas-options -v
+  --debug # Host debug
+  --device-debug # Device debug
+)
 
 ####################################################
 ############ TARGET COMPILE OPTIONS ################
 ####################################################
+
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+target_compile_options(essentials INTERFACE 
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:DEBUG>>:${CXX_FLAGS}>
+  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:DEBUG>>:${CUDA_DEBUG_FLAGS}>
+  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:RELEASE>>:${CUDA_RELEASE_FLAGS}>
+)
+else()
 target_compile_options(essentials INTERFACE 
   $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
-  $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS}>
+  $<$<COMPILE_LANGUAGE:HIP>:${HIP_FLAGS}>
 )
+
+endif()
 
 ####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
@@ -212,7 +316,7 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   enable_testing()
-  add_subdirectory(unittests)
+  #add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
 
 ####################################################

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /**
  * @file merge_path_v2.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)

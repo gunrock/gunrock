@@ -17,25 +17,25 @@ struct timer_t {
   float time;
 
   timer_t() {
-    cudaEventCreate(&start_);
-    cudaEventCreate(&stop_);
-    cudaEventRecord(start_);
+    hipEventCreate(&start_);
+    hipEventCreate(&stop_);
+    hipEventRecord(start_);
   }
 
   ~timer_t() {
-    cudaEventDestroy(start_);
-    cudaEventDestroy(stop_);
+    hipEventDestroy(start_);
+    hipEventDestroy(stop_);
   }
 
   // Alias of each other, start the timer.
-  void begin() { cudaEventRecord(start_); }
+  void begin() { hipEventRecord(start_); }
   void start() { this->begin(); }
 
   // Alias of each other, stop the timer.
   float end() {
-    cudaEventRecord(stop_);
-    cudaEventSynchronize(stop_);
-    cudaEventElapsedTime(&time, start_, stop_);
+    hipEventRecord(stop_);
+    hipEventSynchronize(stop_);
+    hipEventElapsedTime(&time, start_, stop_);
 
     return milliseconds();
   }
@@ -45,7 +45,7 @@ struct timer_t {
   float milliseconds() { return time; }
 
  private:
-  cudaEvent_t start_, stop_;
+  hipEvent_t start_, stop_;
 };
 
 }  // namespace util

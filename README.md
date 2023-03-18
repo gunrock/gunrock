@@ -12,17 +12,32 @@
 | `develop` | Development feature branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials).                             | $\geq$ `2.x.x` | Active     |
 | `master`  | Previous release branch for `gunrock/gunrock` version `1.x.x` interface, preserves all commit history.                             | $\leq$ `1.x.x` | Deprecated |
 | `dev`     | Previous development branch for `gunrock/gunrock`. All changes now merged in `master`.                                             | $\leq$ `1.x.x` | Deprecated |
+| `hip-develop` | Development feature branch with a working HIP port, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials). | $\geq$ `2.x.x` | Active   
+  
+
 
 ## Quick Start Guide
-Before building Gunrock make sure you have **CUDA Toolkit**[^2] installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have a HIP compiler installed on your system. Other external dependencies are  `rocm/rocthrust`, `rocm/hipcub`, etc
+
 
 ```shell
-git clone https://github.com/gunrock/gunrock.git
+git clone https://github.com/AMD-HPC/gunrock
+git checkout hip-develop
 cd gunrock
 mkdir build && cd build
-cmake .. 
+#for NVIDIA targets, current version has been tested with rocm version 5.2.0
+export HIP_PLATFORM=nvidia
+cmake -DCMAKE_HIP_COMPILER=hipcc .. 
 make sssp # or for all algorithms, use: make -j$(nproc)
-bin/sssp ../datasets/chesapeake/chesapeake.mtx
+#to run the example,
+bin/sssp --validate -m ../datasets/chesapeake/chesapeake.mtx
+
+
+#for AMD targets:
+cmake  .. 
+make sssp # or for all algorithms, use: make -j$(nproc)
+#to run the example,
+bin/sssp --validate -m ../datasets/chesapeake/chesapeake.mtx
 ```
 
 ## Implementing Graph Algorithms
@@ -91,7 +106,7 @@ Thank you for citing our work.
   pages =	 {3:1--3:49},
   doi =		 {10.1145/3108140},
   ee =		 {http://arxiv.org/abs/1701.01170},
-  acmauthorize = {http://dl.acm.org/authorize?N45082},
+  acmauthorize = {https://dl.acm.org/doi/10.1145/3108140?cid=81100458295},
   url =		 {http://escholarship.org/uc/item/9gj6r1dj},
   code =	 {https://github.com/gunrock/gunrock},
   ucdcite =	 {a115},

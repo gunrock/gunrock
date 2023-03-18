@@ -2,7 +2,7 @@
 
 #include <exception>
 #include <string>
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 
 namespace gunrock {
 
@@ -12,7 +12,7 @@ namespace gunrock {
  */
 namespace error {
 
-typedef cudaError_t error_t;
+typedef hipError_t error_t;
 
 /**
  * @brief Exception class for errors in device code.
@@ -22,7 +22,7 @@ struct exception_t : std::exception {
   std::string report;
 
   exception_t(error_t _status, std::string _message = "") {
-    report = cudaGetErrorString(_status) + std::string("\t: ") + _message;
+    report = hipGetErrorString(_status) + std::string("\t: ") + _message;
   }
 
   exception_t(std::string _message = "") { report = _message; }
@@ -30,13 +30,13 @@ struct exception_t : std::exception {
 };
 
 /**
- * @brief Throw an exception if the given error code is not cudaSuccess.
+ * @brief Throw an exception if the given error code is not hipSuccess.
  *
- * @param status error_t error code (equivalent to cudaError_t).
+ * @param status error_t error code (equivalent to hipError_t).
  * @param message custom message to be appended to the error message.
  */
 inline void throw_if_exception(error_t status, std::string message = "") {
-  if (status != cudaSuccess)
+  if (status != hipSuccess)
     throw exception_t(status, message);
 }
 

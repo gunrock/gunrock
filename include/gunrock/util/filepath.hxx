@@ -16,10 +16,8 @@ std::string extract_dataset(std::string filename) {
 }
 
 bool is_market(std::string filename) {
-  return (
-    (filename.substr(filename.size() - 4) == ".mtx" ) ||
-    (filename.substr(filename.size() - 5) == ".mmio")
-  );
+  return ((filename.substr(filename.size() - 4) == ".mtx") ||
+          (filename.substr(filename.size() - 5) == ".mmio"));
 }
 
 bool is_binary_csr(std::string filename) {

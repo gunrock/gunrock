@@ -23,10 +23,10 @@ namespace memory {
  * @brief memory space; cuda (device) or host.
  * Can be extended to support uvm and multi-gpu.
  *
- * @todo change this enum to support cudaMemoryType
- * (see ref;  std::underlying_type<cudaMemoryType>::type)
+ * @todo change this enum to support hipMemoryType
+ * (see ref;  std::underlying_type<hipMemoryType>::type)
  * instead of some random enums, we can rely
- * on cudaMemoryTypeHost/Device/Unregistered/Managed
+ * on hipMemoryTypeHost/Device/Unregistered/Managed
  * for this.
  *
  */
@@ -46,8 +46,8 @@ void allocate(type_t* pointer,
               memory_space_t space = memory_space_t::device) {
   if (size) {
     error::throw_if_exception((device == space)
-                                  ? cudaMalloc(&pointer, size)
-                                  : cudaMallocHost(&pointer, size));
+                                  ? hipMalloc(&pointer, size)
+                                  : hipHostMalloc(&pointer, size));
   }
 }
 
@@ -65,8 +65,8 @@ inline type_t* allocate(std::size_t size,
   void* pointer = nullptr;
   if (size) {
     error::throw_if_exception((device == space)
-                                  ? cudaMalloc(&pointer, size)
-                                  : cudaMallocHost(&pointer, size));
+                                  ? hipMalloc(&pointer, size)
+                                  : hipHostMalloc(&pointer, size));
   }
   return reinterpret_cast<type_t*>(pointer);
 }
@@ -82,8 +82,8 @@ template <typename type_t>
 inline void free(type_t* pointer,
                  memory_space_t space = memory_space_t::device) {
   if (pointer) {
-    error::throw_if_exception((device == space) ? cudaFree((void*)pointer)
-                                                : cudaFreeHost((void*)pointer));
+    error::throw_if_exception((device == space) ? hipFree((void*)pointer)
+                                                : hipHostFree((void*)pointer));
   }
 }
 
