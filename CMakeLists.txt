@@ -49,6 +49,16 @@ project(essentials
   LANGUAGES CXX C CUDA
 )
 
+####################################################
+############### SET SM ARCHITECTURE ################
+####################################################
+
+## Note: This applies to NVBench as well.
+## Can be used for applications by extracting the
+## CUDA_ARCHITECTURES property from loops project.
+## see: get_target_properties()
+set(CMAKE_CUDA_ARCHITECTURES 75)
+
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
@@ -92,15 +102,12 @@ set_target_properties(essentials
     CUDA_EXTENSIONS OFF
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
     CUDA_SEPARABLE_COMPILATION ON
-    CUDA_ARCHITECTURES 75 # Set required architecture.
+    CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES} # Set required architecture.
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
 # Use for later.
-get_target_property(ESSENTIALS_ARCHITECTURES 
-  essentials 
-    CUDA_ARCHITECTURES
-)
+set(${ESSENTIALS_ARCHITECTURES} ${CMAKE_CUDA_ARCHITECTURES})
 
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
@@ -233,8 +240,6 @@ option(ESSENTIALS_BUILD_BENCHMARKS
 if(ESSENTIALS_BUILD_BENCHMARKS)
   # ... see https://github.com/NVIDIA/nvbench/issues/66
   set(NVBench_ENABLE_NVML OFF)
-  # ... set cuda architecture for nvbench.
-  set(CMAKE_CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
   include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
   add_subdirectory(benchmarks)
 endif(ESSENTIALS_BUILD_BENCHMARKS)
