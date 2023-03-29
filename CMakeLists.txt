@@ -47,6 +47,8 @@ endif()
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
   LANGUAGES CXX C CUDA
+  DESCRIPTION "Programmable CUDA/C++ GPU Graph Analytics"
+  HOMEPAGE_URL "https://github.com/gunrock/gunrock"
 )
 
 ####################################################
@@ -106,19 +108,16 @@ set_target_properties(essentials
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
-# Use for later.
-set(${ESSENTIALS_ARCHITECTURES} ${CMAKE_CUDA_ARCHITECTURES})
-
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
 target_compile_definitions(essentials
   INTERFACE 
-    SM_TARGET=${ESSENTIALS_ARCHITECTURES}
+    SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
 )
 
-message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
+message(STATUS "Essentials CUDA Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
