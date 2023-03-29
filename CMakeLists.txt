@@ -59,7 +59,13 @@ project(essentials
 ## Can be used for applications by extracting the
 ## CUDA_ARCHITECTURES property from the project.
 ## see cmake's get_target_properties()
-set(CMAKE_CUDA_ARCHITECTURES 75)
+if(NOT CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES 75)
+  message(STATUS "Using default GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
+else()
+  message(STATUS "GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
+endif()
+
 
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
@@ -116,8 +122,6 @@ target_compile_definitions(essentials
     SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
 )
-
-message(STATUS "Essentials CUDA Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
