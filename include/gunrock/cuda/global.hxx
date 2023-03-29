@@ -2,7 +2,6 @@
  * @file global.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2021-04-05
  *
  * @copyright Copyright (c) 2021

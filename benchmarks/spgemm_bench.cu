@@ -3,6 +3,8 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/spgemm.hxx>
 
+#include "benchmarks.hxx"
+
 using namespace gunrock;
 using namespace memory;
 
@@ -123,20 +125,10 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without matrix filenames to pass to NVBench.
-    char* args[argc - 4];
-    int j = 0;
-    for (int i = 0; i < argc; i++) {
-      if (strcmp(argv[i], "--amatrix") == 0 || strcmp(argv[i], "-a") == 0 ||
-          strcmp(argv[i], "--bmatrix") == 0 || strcmp(argv[i], "-b") == 0) {
-        i++;
-        continue;
-      }
-      args[j] = argv[i];
-      j++;
-    }
-
+    // Remove all gunrock parameters and pass to nvbench.
+    auto args = filtered_argv(argc, argv, "--amatrix", "-a", "--bmatrix", "-b",
+                              filename_a, filename_b);
     NVBENCH_BENCH(spgemm_bench);
-    NVBENCH_MAIN_BODY(argc - 4, args);
+    NVBENCH_MAIN_BODY(args.size(), args.data());
   }
 }

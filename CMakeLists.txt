@@ -66,7 +66,6 @@ else()
   message(STATUS "GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
 
-
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
@@ -76,6 +75,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -114,6 +114,11 @@ set_target_properties(essentials
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
+# Add GIT SHA-1 definition
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
@@ -121,6 +126,7 @@ target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
+    GIT_SHA1="${GIT_SHA1}"
 )
 
 ####################################################
@@ -144,6 +150,7 @@ target_include_directories(essentials
   # INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+  INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
 
 ####################################################

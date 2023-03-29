@@ -4,7 +4,6 @@
  * @brief support for stl based vectors on gpu. Relies on thrust::host and
  * device vectors.
  *
- * @version 0.1
  * @date 2020-10-05
  *
  * @copyright Copyright (c) 2020

@@ -5,9 +5,9 @@ name: Windows
 on:
   # Triggers the workflow on push or pull request events but only for the master and dev branch
   push:
-    branches: [ main, dev ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, develop ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -44,6 +44,7 @@ jobs:
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
         run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} # -DESSENTIALS_BUILD_BENCHMARKS=ON
+
       
       # See issue: https://github.com/NVIDIA/thrust/issues/1328
       # And... https://github.com/gunrock/essentials/issues/92
