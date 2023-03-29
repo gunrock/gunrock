@@ -1,10 +1,9 @@
-#include <cstdlib>                      // EXIT_SUCCESS
+#include <cstdlib>  // EXIT_SUCCESS
 
 #include <gunrock/error.hxx>            // error checking
 #include <gunrock/formats/formats.hxx>  // csr support
 
-void test_format()
-{
+void test_format() {
   using namespace gunrock;
   using namespace gunrock::format;
 
@@ -20,9 +19,7 @@ void test_format()
   coo_t<index_t, index_t, value_t> coo;
 }
 
-int
-main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   test_format();
   return EXIT_SUCCESS;
 }
