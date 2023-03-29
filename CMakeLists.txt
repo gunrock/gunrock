@@ -55,8 +55,8 @@ project(essentials
 
 ## Note: This applies to NVBench as well.
 ## Can be used for applications by extracting the
-## CUDA_ARCHITECTURES property from loops project.
-## see: get_target_properties()
+## CUDA_ARCHITECTURES property from the project.
+## see cmake's get_target_properties()
 set(CMAKE_CUDA_ARCHITECTURES 75)
 
 # begin /* Dependencies directory */
