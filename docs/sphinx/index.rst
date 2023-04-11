@@ -139,12 +139,12 @@ GPU programming knowledge.
    gunrock.wiki/PageRank.md
    How to add multiple GPU support <https://github.com/gunrock/gunrock/discussions/1028>
    How to bind an application to python <https://github.com/bkj/python_gunrock>
-   How to use `thrust` or `cub` <https://docs.nvidia.com/cuda/thrust/index.html>
+   How to use thrust or cub <https://docs.nvidia.com/cuda/thrust/index.html>
    Sparse-Linear Algebra with Graphs <https://github.com/gunrock/gunrock/discussions/1030>
    Variadic Inheritance <https://gist.github.com/neoblizz/254fc21a137346591f0b99e77b7469d2>
    Polymorphic-Virtual (Diamond) Inheritance <https://gist.github.com/neoblizz/a61709e78a51ab7be622298f5f6fa5b4>
    Need for custom copy constructor <https://gist.github.com/neoblizz/0a7dcebac76ab6c703d502b70e18a2e2>
-   CUDA-enabled `std::shared_ptr` <https://github.com/gunrock/gunrock/blob/main/examples/experiments/shared_ptr.cu>
+   CUDA-enabled std::shared_ptr <https://github.com/gunrock/gunrock/blob/main/examples/experiments/shared_ptr.cu>
 
 Quick Start Guide
 -----------------
