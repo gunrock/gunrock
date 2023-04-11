@@ -73,6 +73,7 @@ jobs:
       - name: Build Documentation
         run: |
           cd ${{github.workspace}}/docs/sphinx
+          git clone https://github.com/gunrock/gunrock.wiki.git
           make html
         
       - name: Setup Pages

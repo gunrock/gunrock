@@ -103,9 +103,13 @@ html_css_files = [
 
 html_theme_options = {
     "repository_url": "https://github.com/gunrock/gunrock",
+    "use_repository_button": True,
+    # "home_page_in_toc": True,
+    # "show_navbar_depth": 3,
+    # "show_toc_level": 3
 }
-
-# html_favicon = nwgraph.ico
+html_logo = "https://raw.githubusercontent.com/gunrock/docs/develop/docs/_media/logo.png"
+html_favicon = "https://raw.githubusercontent.com/gunrock/docs/develop/docs/_media/logo.png"
 # html_additional_pages = []
 # html_copy_source = True
 # html_show_source_link = True
@@ -153,7 +157,7 @@ exhale_args = {
     GENERATE_HTML          = YES
     HIDE_UNDOC_CLASSES     = YES
     HIDE_UNDOC_MEMBERS     = YES
-    LAYOUT_FILE            = "/Users/lums/Contrib/stdgraph/graph-v2/docs/sphinx/layout.xml"
+    LAYOUT_FILE            = "./layout.xml"
     HTML_COLORSTYLE_HUE    = 75
     HTML_DYNAMIC_SECTIONS  = YES
     HTML_INDEX_NUM_ENTRIES = 0
