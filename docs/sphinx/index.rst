@@ -1,20 +1,7 @@
-Gunrock: CUDA/C++ GPU Graph Analytics
+Gunrock: GPU Graph Analytics
 =====================================
 
 |Ubuntu| |Windows| |Code Quality|
-
-.. raw:: html
-
-   <table>
-   <thead>
-   <tr>
-   <th><a href="https://github.com/gunrock/gunrock/tree/main/examples/algorithms"><strong>Examples</strong></a></th>
-   <th><a href="https://github.com/gunrock/template"><strong>Project Template</strong></a></th>
-   <th><a href="https://github.com/gunrock/gunrock/wiki"><strong>Documentation</strong></a></th>
-   <th><a href="https://github.com/gunrock/gunrock/actions"><strong>GitHub Actions</strong></a></th>
-   </tr>
-   </thead>
-   </table>
 
 **Gunrock**\  [1]_ is a CUDA library for graph-processing designed
 specifically for the GPU. It uses a **high-level**,
@@ -66,6 +53,99 @@ GPU programming knowledge.
    </tbody>
    </table>
 
+.. toctree::
+   :hidden:
+   :caption: Gunrock Project
+   :name: project
+   :maxdepth: 2
+
+   gunrock.wiki/Overview.md
+   gunrock.wiki/Publications.md
+   gunrock.wiki/Presentations.md
+   Copyright and License <https://github.com/gunrock/gunrock/tree/main/LICENSE>
+   Developers and Contributors <https://github.com/gunrock/gunrock/graphs/contributors>
+
+.. toctree::
+   :hidden:
+   :caption: Quick Links
+   :name: quick_links
+
+   Examples <https://github.com/gunrock/gunrock/tree/main/examples/algorithms>
+   File a Bug <https://github.com/gunrock/gunrock/issues>
+   Discussions <https://github.com/gunrock/gunrock/discussions>
+   Getting Started Template <https://github.com/gunrock/template>
+   GitHub Actions (CI) <https://github.com/gunrock/gunrock/actions>
+
+.. toctree::
+   :hidden:
+   :caption: Graph Analytics
+   :name: graph_analytics
+   :maxdepth: 2
+   
+   gunrock.wiki/Programming-Model.md
+   gunrock.wiki/Gunrock-Operators.md
+   gunrock.wiki/Graph-Algorithms.md
+
+.. toctree::
+   :hidden:
+   :caption: Getting Gunrock
+   :maxdepth: 2
+   
+   gunrock.wiki/Linux.md
+   gunrock.wiki/Windows.md
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Reference Manual
+   :name: manual
+   :glob:
+
+   reference/*
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Experimental Projects
+
+   gunrock.wiki/Multiple-GPUs-And-Python.md
+   Boolmap Frontier <https://github.com/gunrock/gunrock/blob/main/include/gunrock/framework/frontier/experimental/boolmap_frontier.hxx>
+   Hypergraphs (Request Access) <https://github.com/owensgroup/hypergraphs>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Developers Corner
+
+   gunrock.wiki/Modern-CPP-Features.md
+   gunrock.wiki/API.md
+   gunrock.wiki/Style-Guide.md
+   gunrock.wiki/Code-Structure.md
+   gunrock.wiki/Git-Workflow.md
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Debugging, Profiling and Testing
+
+   gunrock.wiki/Unit-testing-with-GoogleTest.md
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Tutorials
+
+   gunrock.wiki/How-to-write-a-new-graph-algorithm.md
+   gunrock.wiki/PageRank.md
+   How to add multiple GPU support <https://github.com/gunrock/gunrock/discussions/1028>
+   How to bind an application to python <https://github.com/bkj/python_gunrock>
+   How to use `thrust` or `cub` <https://docs.nvidia.com/cuda/thrust/index.html>
+   Sparse-Linear Algebra with Graphs <https://github.com/gunrock/gunrock/discussions/1030>
+   Variadic Inheritance <https://gist.github.com/neoblizz/254fc21a137346591f0b99e77b7469d2>
+   Polymorphic-Virtual (Diamond) Inheritance <https://gist.github.com/neoblizz/a61709e78a51ab7be622298f5f6fa5b4>
+   Need for custom copy constructor <https://gist.github.com/neoblizz/0a7dcebac76ab6c703d502b70e18a2e2>
+   CUDA-enabled `std::shared_ptr` <https://github.com/gunrock/gunrock/blob/main/examples/experiments/shared_ptr.cu>
+
 Quick Start Guide
 -----------------
 
@@ -88,7 +168,7 @@ Implementing Graph Algorithms
 
 For a detailed explanation, please see the full
 `documentation <https://github.com/gunrock/gunrock/wiki/How-to-write-a-new-graph-algorithm>`__.
-The following example shows simple APIs using Gunrock’s data-centric,
+The following example shows simple APIs using Gunrock's data-centric,
 bulk-synchronous programming model, we implement Breadth-First Search on
 GPUs. This example skips the setup phase of creating a ``problem_t`` and
 ``enactor_t`` struct and jumps straight into the actual algorithm.
@@ -143,14 +223,6 @@ converges when the frontier is empty.
    }
 
 `include/gunrock/algorithms/bfs.hxx <include/gunrock/algorithms/bfs.hxx>`__
-
-API Reference
---------------------------------
-
-.. toctree::
-   :maxdepth: 2
-
-   gunrock-api.rst
 
 How to Cite Gunrock & Essentials
 --------------------------------

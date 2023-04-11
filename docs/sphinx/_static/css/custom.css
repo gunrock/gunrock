@@ -1,3 +1,15 @@
+body {
+    font-family: Helvetica Neue,Arial,sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+}
+
+a {
+    color: #ddb300;
+    font-weight: 400;
+    text-overflow: ellipsis;
+}
+
 .tight-table td {
     white-space: normal !important;
 }
@@ -15,4 +27,31 @@
 .sig.sig-object.cpp .sig-name.descname .n .pre { color: #0000FF; } 
 .sig.sig-object.cpp .sig-prename.descclassname .n .pre {  color: #0000FF;}
 
+/* Newline after the last parameter (so the closing bracket is on a new line) */
+dt em.sig-param:last-of-type::after {
+    content: "\a";
+    white-space: pre;
+}
 
+/* To have blue background of width of the block (instead of width of content) */
+dl.class > dt:first-of-type {
+    display: block !important;
+}
+
+table tr {
+    border-top: 1px solid #ccc;
+}
+
+table th, table td {
+    border: 1px solid #ddd;
+    padding: 6px 13px;
+}
+
+table tr:nth-child(2n) {
+    background-color: #f8f8f8;
+}
+
+nav.bd-links ul {
+    list-style: none;
+    margin-left: 5%;
+}
