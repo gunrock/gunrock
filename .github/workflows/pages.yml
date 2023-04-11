@@ -54,10 +54,17 @@ jobs:
           python-version: '3.7' 
         
       # Install requirements
-      - name: Install Requirements
+      # Note: doxygen is not visible in $PATH until the subsequent actions.
+      - name: Install Doxygen
+        run: |
+          wget https://www.doxygen.nl/files/doxygen-1.9.5.linux.bin.tar.gz
+          tar -xvf doxygen-1.9.5.linux.bin.tar.gz
+          echo "${{github.workspace}}/doxygen-1.9.5/bin" >> $GITHUB_PATH
+        shell: bash
+        
+      - name: Install/Verify Requirements
         run: |
           python --version
-          sudo apt-get install doxygen
           doxygen --version
           cd ${{github.workspace}}/docs/sphinx
           pip install -r requirements.txt

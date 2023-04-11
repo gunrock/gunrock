@@ -153,6 +153,13 @@ exhale_args = {
     GENERATE_HTML          = YES
     HIDE_UNDOC_CLASSES     = YES
     HIDE_UNDOC_MEMBERS     = YES
+    LAYOUT_FILE            = "/Users/lums/Contrib/stdgraph/graph-v2/docs/sphinx/layout.xml"
+    HTML_COLORSTYLE_HUE    = 75
+    HTML_DYNAMIC_SECTIONS  = YES
+    HTML_INDEX_NUM_ENTRIES = 0
+    DISABLE_INDEX          = YES
+    GENERATE_TREEVIEW      = YES
+    TREEVIEW_WIDTH         = 270
     '''),
     # "verboseBuild": True,
     "listingExclude": [ r'.*_tag_invoke*' ],
