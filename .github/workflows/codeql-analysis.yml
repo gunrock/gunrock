@@ -17,7 +17,8 @@ on:
 env:
   # Customize the CMake build type here (Release, Debug)
   BUILD_TYPE: Release
-
+  ARCHITECTURES: 75
+  
 jobs:
   analyze:
     name: Analyze
@@ -56,11 +57,11 @@ jobs:
           languages: ${{ matrix.language }}
       
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        run: cmake -B ${{github.workspace}}/build -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -D CMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target sssp 
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
