@@ -1,4 +1,4 @@
-Frontiers
+Frontiers Datastructure
 ======================
 
 .. highlight:: c++

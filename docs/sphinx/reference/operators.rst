@@ -1,4 +1,4 @@
-Operators
+Graph Operators
 ======================
 
 .. highlight:: c++

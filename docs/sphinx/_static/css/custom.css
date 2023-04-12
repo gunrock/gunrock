@@ -15,17 +15,25 @@ a {
 }
 
 .sig.sig-object.cpp {
-    background: #f2f2f2 !important;
-    color: #555555 !important;
-    border-top: 3px solid #777777 !important;
+    background: var(--pst-color-surface) !important;
+    color: var(--pst-color-text-base) !important;
+    border-top: 1px solid var(--pst-color-border) !important;
+    padding: 10px;
+    font-size: .875em;
 }
 
-.sig.sig-object.cpp .k .pre { color: #AA22FF; font-weight: bold; font-style: normal } /* Keyword */
-.kt { color: #00A000; font-weight: bold } /* Keyword.Type */
-.p { color: #666666 } /* Operator */
-.sig.sig-object.cpp .n .pre { color: #444444; }
-.sig.sig-object.cpp .sig-name.descname .n .pre { color: #0000FF; } 
-.sig.sig-object.cpp .sig-prename.descclassname .n .pre {  color: #0000FF;}
+.sig.sig-object.cpp .k .pre { color: #AA22FF; } /* Keyword */
+.kt { color: #00A000; } /* Keyword.Type */
+.p { color: #abe338 } /* Operator */
+.sig.sig-object.cpp .n .pre { color: var(--pst-color-text-base); }
+.sig.sig-object.cpp .sig-name.descname .n .pre { color: var(--pst-color-text-base); } 
+.sig.sig-object.cpp .sig-prename.descclassname .n .pre {  color: var(--pst-color-text-base);}
+
+/* Newlines (\a) and spaces (\20) before each parameter */
+.sig.sig-object.cpp a.reference.internal::before {
+    content: "\a\20\20\20\20\20\20\20\20\20\20\20\20\20\20\20\20";
+    white-space: pre;
+}
 
 /* Newline after the last parameter (so the closing bracket is on a new line) */
 dt em.sig-param:last-of-type::after {
@@ -39,16 +47,16 @@ dl.class > dt:first-of-type {
 }
 
 table tr {
-    border-top: 1px solid #ccc;
+    border-top: 1px solid var(--pst-color-border);
 }
 
 table th, table td {
-    border: 1px solid #ddd;
+    border: 1px solid var(--pst-color-border);
     padding: 6px 13px;
 }
 
 table tr:nth-child(2n) {
-    background-color: #f8f8f8;
+    background-color: var(--pst-color-surface);
 }
 
 nav.bd-links ul {

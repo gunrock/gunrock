@@ -1,4 +1,4 @@
-Algorithms
+Graph Algorithms
 ======================
 
 .. highlight:: c++
