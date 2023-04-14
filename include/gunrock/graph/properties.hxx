@@ -16,11 +16,15 @@ struct graph_properties_t {
   graph_properties_t() = default;
 };
 
+/**
+ * @brief Available graph views.
+ *
+ */
 enum view_t : uint32_t {
-  csr = 1 << 1,
-  csc = 1 << 2,
-  coo = 1 << 3,
-  invalid = 1 << 0
+  csr = 1 << 1,     ///< CSR-based view
+  csc = 1 << 2,     ///< CSC-based view
+  coo = 1 << 3,     ///< COO-based view
+  invalid = 1 << 0  ///< Invalid-view
 };
 
 constexpr inline view_t operator|(view_t lhs, view_t rhs) {

@@ -15,8 +15,8 @@
 #include <thrust/host_vector.h>
 
 enum my_enum_t {
-  X,  /// for each X
-  Y   /// for each Y
+  X,  ///< for each X
+  Y   ///< for each Y
 };
 
 template <my_enum_t t,

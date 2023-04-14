@@ -25,29 +25,43 @@ namespace operators {
  * respective underlying load-balanced advance kernel to use. The following
  * table attempts to summarize these techniques:
  *  https://gist.github.com/neoblizz/fc4a3da5f4fc51f2f2a90753b5c49762
+ * 
+ * // clang-format off
+ * 
+ * | Technique | Thread-Mapped | Block-Mapped | Warp-Mapped | Bucketing | Non-Zero Split | Merge-Path | Work Stealing |
+ * |-|-|-|-|-|-|-|-|
+ * | Summary | 1 element per thread | Block-sized elements per block | Warp-sized elements per warp | Buckets per threads, warps, blocks | Equal non-zeros per thread | Equal work-item (input and output) per thread | Steal work from threads when starving |
+ * | Number of Scans | 1 | 2 | 2 | Unknown | Unknown | 1 | Unknown |
+ * | Type of Scans | Device | Device (not-required), Block | Device, Warp | Unknown | Unknown | Device | Unknown |
+ * | Binary-Search | N/A | N/A | N/A | N/A | 1 | 2 | N/A |
+ * | Static or Dynamic | Static | Static | Static | Dynamic | Static | Static | Dynamic |
+ * | Overall Estimated Overhead | None | Minor | Minor | Medium | High | Very High | High |
+ * | Quality of Balancing | Poor (Data dependent) | HW Block-Scheduler dependent (Fair) | HW Warp-Scheduler dependent (Fair) | Good | Perfect Non-zeros quality | Perfect input and output | Medium |
+ * | Storage Requirement | Input Size (for scan) | Input Size (for scan) | Input Size (for scan) | Unknown | Unknown | Unknown | Unknown |
+ * 
+ * // clang-format on
  *
  * @todo somehow make that gist part of the in-code comments.
  */
 enum load_balance_t {
-  thread_mapped,  /// 1 element per thread
-  warp_mapped,    /// (wip) Equal # of elements per warp
-  block_mapped,   /// Equal # of elements per block
-  bucketing,      /// (wip) Davidson et al. (SSSP)
-  merge_path,     /// Merrill & Garland (SpMV):: ModernGPU
-  merge_path_v2,  /// Merrill & Garland (SpMV):: CUSTOM
-  work_stealing,  /// (wip) <cite>
+  thread_mapped,  ///< 1 element per thread
+  warp_mapped,    ///< (wip) Equal # of elements per warp
+  block_mapped,   ///< Equal # of elements per block
+  bucketing,      ///< (wip) Davidson et al. (SSSP)
+  merge_path,     ///< Merrill & Garland (SpMV):: ModernGPU
+  merge_path_v2,  ///< Merrill & Garland (SpMV):: CUSTOM
+  work_stealing,  ///< (wip) <cite>
 };
 
 /**
  * @brief Type of the input and output for advance. E.g. none imples that there
  * will be no output for the advance.
- * @see advance_output_t
  */
 enum advance_io_type_t {
-  graph,     /// Entire graph as an input frontier
-  vertices,  /// Vertex input or output frontier
-  edges,     /// Edge input or output frontier
-  none       /// No output frontier
+  graph,     ///< Entire graph as an input frontier
+  vertices,  ///< Vertex input or output frontier
+  edges,     ///< Edge input or output frontier
+  none       ///< No output frontier
 };
 
 /**
@@ -56,9 +70,9 @@ enum advance_io_type_t {
  * threshold.
  */
 enum advance_direction_t {
-  forward,   /// Push-based approach
-  backward,  /// Pull-based approach
-  optimized  /// Push-pull optimized
+  forward,   ///< Push-based approach
+  backward,  ///< Pull-based approach
+  optimized  ///< Push-pull optimized
 };
 
 /**
@@ -71,24 +85,24 @@ enum advance_direction_t {
  * instead of explicitly removing it from the frontier.
  */
 enum filter_algorithm_t {
-  remove,      /// Remove if predicate = true
-  predicated,  /// Copy if predicate = true
-  compact,     /// 2-Pass Transform compact
-  bypass       /// Marks as invalid, instead of culling
+  remove,      ///< Remove if predicate = true
+  predicated,  ///< Copy if predicate = true
+  compact,     ///< 2-Pass Transform compact
+  bypass       ///< Marks as invalid, instead of culling
 };
 
 enum uniquify_algorithm_t {
-  unique,  /// Keep only the unique item for each consecutive group. Sort for
-           /// 100% uniqueness.
-  unique_copy  /// Copy the unique items for each consecutive group. Sort for
-               /// 100% uniqueness.
+  unique,  ///< Keep only the unique item for each consecutive group. Sort for
+           ///< 100% uniqueness.
+  unique_copy  ///< Copy the unique items for each consecutive group. Sort for
+               ///< 100% uniqueness.
 };
 
 enum parallel_for_each_t {
-  vertex,  /// for each vertex in the graph
-  edge,    /// for each edge in the graph
-  weight,  /// for each weight in the graph
-  element  /// for each element in the frontier
+  vertex,  ///< for each vertex in the graph
+  edge,    ///< for each edge in the graph
+  weight,  ///< for each weight in the graph
+  element  ///< for each element in the frontier
 };
 
 }  // namespace operators
