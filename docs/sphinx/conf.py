@@ -129,8 +129,8 @@ breathe_default_project = "gunrock"
 # Tell sphinx what the primary language being documented is.
 primary_domain = 'cpp'
 
-cpp_id_attributes = ["__host__", "__device__", "__force_inline__"]
-cpp_paren_attributes = ["__host__", "__device__", "__force_inline__"]
+cpp_id_attributes = ["__host__", "__device__", "__forceinline__"]
+cpp_paren_attributes = ["__host__", "__device__", "__forceinline__"]
 
 todo_include_todos = False
 
