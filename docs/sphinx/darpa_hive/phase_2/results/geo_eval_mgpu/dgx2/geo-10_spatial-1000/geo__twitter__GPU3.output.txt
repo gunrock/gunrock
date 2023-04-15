@@ -1,0 +1,55 @@
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.mtx.meta
+  Reading edge lists from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.mtx.coo_edge_pairs
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.mtx.coo_edge_pairs, typeId = 262, targetId = 262, length = 251154219
+  Reading edge values from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.mtx.coo_edge_values
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.mtx.coo_edge_values, typeId = 18, targetId = 18, length = 251154219
+  Subtracting 1 from node Ids...
+  graph loaded as COO in 57.568499s.
+Converting 50190344 vertices, 251154219 directed edges ( ordered tuples) to CSR format...Done (4s).
+Degree Histogram (50190344 vertices, 251154219 edges):
+    Degree 0: 36685242 (73.092231 %)
+    Degree 2^0: 3247790 (6.470946 %)
+    Degree 2^1: 2832542 (5.643599 %)
+    Degree 2^2: 2386296 (4.754492 %)
+    Degree 2^3: 1950693 (3.886590 %)
+    Degree 2^4: 1447011 (2.883047 %)
+    Degree 2^5: 898593 (1.790370 %)
+    Degree 2^6: 447155 (0.890918 %)
+    Degree 2^7: 188784 (0.376136 %)
+    Degree 2^8: 71386 (0.142231 %)
+    Degree 2^9: 24538 (0.048890 %)
+    Degree 2^10: 7569 (0.015081 %)
+    Degree 2^11: 2033 (0.004051 %)
+    Degree 2^12: 540 (0.001076 %)
+    Degree 2^13: 117 (0.000233 %)
+    Degree 2^14: 44 (0.000088 %)
+    Degree 2^15: 9 (0.000018 %)
+    Degree 2^16: 2 (0.000004 %)
+
+Labels File Input: /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.labels
+Loading Labels into an array ...
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/geolocation/twitter/graph/twitter.labels:
+  Parsing LABELS
+ (50190344 nodes) 
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=false undirected=false advance-mode=LB
+Number of iterations: 10
+Initializing problem ... 
+Number of nodes for allocation: 50190344
+Initializing enactor ... 
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 839.735031, #iterations = 10
+-------- NO VALIDATION --------
+[geolocation] finished.
+ avg. elapsed: 839.735031 ms
+ iterations: 10
+ min. elapsed: 839.735031 ms
+ max. elapsed: 839.735031 ms
+ load time: 69965.1 ms
+ preprocess time: 2125.200000 ms
+ postprocess time: 279.542923 ms
+ total time: 3396.224976 ms

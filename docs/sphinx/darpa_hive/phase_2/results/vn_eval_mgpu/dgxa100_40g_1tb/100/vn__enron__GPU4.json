@@ -1,0 +1,26 @@
+{
+    "avg-process-time": 1.313,
+    "command-line": "./main /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/enron/enron.bin 100 vn_eval_mgpu/dgxa100_40g_1tb/100/vn__enron__GPU4.json ",
+    "dataset": "enron",
+    "gpuinfo": {
+        "clock_rate": 1410000,
+        "compute_version": 80,
+        "driver_api": 11000,
+        "driver_version": 11000,
+        "major": 8,
+        "minor": 0,
+        "multi_processor_count": 108,
+        "name": "A100-SXM4-40GB",
+        "runtime_version": 11000,
+        "total_global_mem": 42506321920
+    },
+    "graph-edges": 276143,
+    "graph-file": "/home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/enron/enron.bin",
+    "graph-nodes": 69244,
+    "primitive": "vn",
+    "tag": [
+        "variant:num_seeds-100",
+        "num-gpus:4"
+    ],
+    "time": "Fri May 28 20:52:32 2021\n"
+}

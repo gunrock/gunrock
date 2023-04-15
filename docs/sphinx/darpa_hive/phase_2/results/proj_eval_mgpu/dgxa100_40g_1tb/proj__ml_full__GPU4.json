@@ -1,0 +1,25 @@
+{
+    "avg-process-time": 1945.634033203125,
+    "command-line": "./proj /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/proj_movielens/ml_full.bin proj_eval_mgpu/dgxa100_40g_1tb/proj__ml_full__GPU4.json ",
+    "dataset": "ml_full",
+    "gpuinfo": {
+        "clock_rate": 1410000,
+        "compute_version": 80,
+        "driver_api": 11000,
+        "driver_version": 11000,
+        "major": 8,
+        "minor": 0,
+        "multi_processor_count": 108,
+        "name": "A100-SXM4-40GB",
+        "runtime_version": 11000,
+        "total_global_mem": 42506321920
+    },
+    "graph-edges": 20000263,
+    "graph-file": "/home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/proj_movielens/ml_full.bin",
+    "graph-nodes": 165237,
+    "primitive": "proj",
+    "tag": [
+        "num-gpus:4"
+    ],
+    "time": "Fri May 28 20:33:53 2021\n"
+}

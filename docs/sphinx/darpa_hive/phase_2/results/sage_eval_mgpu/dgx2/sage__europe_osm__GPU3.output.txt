@@ -1,0 +1,40 @@
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/europe_osm/europe_osm.mtx.meta
+  Reading edge lists from /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/europe_osm/europe_osm.mtx.coo_edge_pairs
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/europe_osm/europe_osm.mtx.coo_edge_pairs, typeId = 262, targetId = 262, length = 54054660
+  Subtracting 1 from node Ids...
+  Edge doubleing: 54054660 -> 108109320 edges
+  graph loaded as COO in 8.379719s.
+Converting 50912018 vertices, 108109320 directed edges ( ordered tuples) to CSR format...Done (2s).
+Degree Histogram (50912018 vertices, 108109320 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 2055578 (4.037510 %)
+    Degree 2^1: 47863091 (94.011381 %)
+    Degree 2^2: 993289 (1.950991 %)
+    Degree 2^3: 60 (0.000118 %)
+
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=false undirected=true feature-column=64 num-children-per-source=10 num-leafs-per-child=-1
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=false undirected=true batch-size=16384
+Using randomly generated Wf1
+Using randomly generated Wa1
+Using randomly generated Wf2
+Using randomly generated Wa2
+Using randomly generated features
+Using advance mode LB
+Using filter mode CULL
+rand-seed = 1622219223
+__________________________
+--------------------------
+Run 0 elapsed: 26311.544895 ms, #iterations = 3108
+Embedding validation: PASS
+[sage] finished.
+ avg. elapsed: 26311.544895 ms
+ iterations: 3108
+ min. elapsed: 26311.544895 ms
+ max. elapsed: 26311.544895 ms
+ load time: 11444.6 ms
+ preprocess time: 106677.000000 ms
+ postprocess time: 74738.929987 ms
+ total time: 207747.959137 ms

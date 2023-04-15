@@ -1,0 +1,25 @@
+{
+    "avg-process-time": 107.9241943359375,
+    "command-line": "./bin/sgm /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/seeded-graph-matching/connectome/DS06481/sparse/A.mtx sgm_eval_mgpu/dgx2/sgm__DS06481__GPU6.json ",
+    "dataset": "DS06481",
+    "gpuinfo": {
+        "clock_rate": 1702000,
+        "compute_version": 70,
+        "driver_api": 11030,
+        "driver_version": 11000,
+        "major": 7,
+        "minor": 0,
+        "multi_processor_count": 80,
+        "name": "Tesla V100-SXM3-32GB-H",
+        "runtime_version": 11030,
+        "total_global_mem": 34089730048
+    },
+    "graph-edges": 150009,
+    "graph-file": "/home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/seeded-graph-matching/connectome/DS06481/sparse/A.mtx",
+    "graph-nodes": 12962,
+    "primitive": "sgm",
+    "tag": [
+        "num-gpus:6"
+    ],
+    "time": "Sun May 30 00:46:21 2021\n"
+}

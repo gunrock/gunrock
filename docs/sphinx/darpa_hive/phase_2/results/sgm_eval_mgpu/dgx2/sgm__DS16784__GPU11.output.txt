@@ -1,0 +1,3 @@
+Dimension = 16784
+Tolerance = 1
+Elapsed (ms): 486.601318

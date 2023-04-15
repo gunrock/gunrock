@@ -1,0 +1,72 @@
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/graphsearch/dir_gs_twitter.mtx.meta
+  Reading edge lists from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/graphsearch/dir_gs_twitter.mtx.coo_edge_pairs
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/graphsearch/dir_gs_twitter.mtx.coo_edge_pairs, typeId = 262, targetId = 262, length = 21741663
+  Reading node values from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/graphsearch/dir_gs_twitter.mtx.coo_node_values
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/graphsearch/dir_gs_twitter.mtx.coo_node_values, typeId = 18, targetId = 18, length = 7199978
+  Subtracting 1 from node Ids...
+  graph loaded as COO in 0.551382s.
+Converting 7199978 vertices, 21741663 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (7199978 vertices, 21741663 edges):
+    Degree 0: 2678671 (37.203878 %)
+    Degree 2^0: 2133686 (29.634618 %)
+    Degree 2^1: 1231362 (17.102302 %)
+    Degree 2^2: 617329 (8.574040 %)
+    Degree 2^3: 299147 (4.154832 %)
+    Degree 2^4: 142144 (1.974228 %)
+    Degree 2^5: 62483 (0.867822 %)
+    Degree 2^6: 24570 (0.341251 %)
+    Degree 2^7: 8009 (0.111236 %)
+    Degree 2^8: 2094 (0.029083 %)
+    Degree 2^9: 390 (0.005417 %)
+    Degree 2^10: 71 (0.000986 %)
+    Degree 2^11: 14 (0.000194 %)
+    Degree 2^12: 7 (0.000097 %)
+    Degree 2^13: 1 (0.000014 %)
+
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=false undirected=false advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 119.403124, #iterations = 128
+__________________________
+--------------------------
+Run 1 elapsed: 129.248142, #iterations = 128
+__________________________
+--------------------------
+Run 2 elapsed: 123.869181, #iterations = 128
+__________________________
+--------------------------
+Run 3 elapsed: 138.122082, #iterations = 128
+__________________________
+--------------------------
+Run 4 elapsed: 134.203911, #iterations = 128
+__________________________
+--------------------------
+Run 5 elapsed: 110.627174, #iterations = 128
+__________________________
+--------------------------
+Run 6 elapsed: 117.974043, #iterations = 128
+__________________________
+--------------------------
+Run 7 elapsed: 117.449045, #iterations = 128
+__________________________
+--------------------------
+Run 8 elapsed: 124.638796, #iterations = 128
+__________________________
+--------------------------
+Run 9 elapsed: 133.967161, #iterations = 128
+Validate_Results: total_neighbors_seen=230042905
+Validate_Results: total_steps_taken=12139759
+-------- NO VALIDATION --------
+[rw] finished.
+ avg. elapsed: 124.950266 ms
+ iterations: 128
+ min. elapsed: 110.627174 ms
+ max. elapsed: 138.122082 ms
+ load time: 786.634 ms
+ preprocess time: 2901.150000 ms
+ postprocess time: 103.486061 ms
+ total time: 4428.344011 ms

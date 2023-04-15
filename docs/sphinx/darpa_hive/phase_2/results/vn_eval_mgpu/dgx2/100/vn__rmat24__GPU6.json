@@ -1,0 +1,26 @@
+{
+    "avg-process-time": 37.821,
+    "command-line": "./main ./data/rmat24.bin 100 vn_eval_mgpu/dgx2/100/vn__rmat24__GPU6.json ",
+    "dataset": "rmat24",
+    "gpuinfo": {
+        "clock_rate": 1702000,
+        "compute_version": 70,
+        "driver_api": 11000,
+        "driver_version": 11000,
+        "major": 7,
+        "minor": 0,
+        "multi_processor_count": 80,
+        "name": "Tesla V100-SXM3-32GB-H",
+        "runtime_version": 11000,
+        "total_global_mem": 34089730048
+    },
+    "graph-edges": 520523686,
+    "graph-file": "./data/rmat24.bin",
+    "graph-nodes": 8860450,
+    "primitive": "vn",
+    "tag": [
+        "variant:num_seeds-100",
+        "num-gpus:6"
+    ],
+    "time": "Fri May 28 22:31:02 2021\n"
+}

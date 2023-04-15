@@ -104,6 +104,7 @@ html_css_files = [
 html_theme_options = {
     "repository_url": "https://github.com/gunrock/gunrock",
     "use_repository_button": True,
+    # "show_nav_level": 3
     # "home_page_in_toc": True,
     # "show_navbar_depth": 3,
     # "show_toc_level": 3

@@ -1,0 +1,6 @@
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+n_seeds=100 | cpu_time=0 | gpu_time_microseconds=13371 | n_errors=0 | n_gpus=5
+dataset=/home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/hollywood-2009/hollywood-2009.bin
+num-vertices=1139905
+num-edges=113891327

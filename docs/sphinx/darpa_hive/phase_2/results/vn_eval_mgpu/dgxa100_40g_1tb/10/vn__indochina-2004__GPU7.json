@@ -1,0 +1,26 @@
+{
+    "avg-process-time": 90.163,
+    "command-line": "./main /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/indochina-2004/indochina-2004.bin 10 vn_eval_mgpu/dgxa100_40g_1tb/10/vn__indochina-2004__GPU7.json ",
+    "dataset": "indochina-2004",
+    "gpuinfo": {
+        "clock_rate": 1410000,
+        "compute_version": 80,
+        "driver_api": 11000,
+        "driver_version": 11000,
+        "major": 8,
+        "minor": 0,
+        "multi_processor_count": 108,
+        "name": "A100-SXM4-40GB",
+        "runtime_version": 11000,
+        "total_global_mem": 42506321920
+    },
+    "graph-edges": 194109311,
+    "graph-file": "/home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/indochina-2004/indochina-2004.bin",
+    "graph-nodes": 7414866,
+    "primitive": "vn",
+    "tag": [
+        "variant:num_seeds-10",
+        "num-gpus:7"
+    ],
+    "time": "Fri May 28 20:51:48 2021\n"
+}

@@ -1,0 +1,48 @@
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/hollywood-2009/hollywood-2009.mtx.meta
+  Reading edge lists from /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/hollywood-2009/hollywood-2009.mtx.coo_edge_pairs
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/gunrock_dataset/mario-2TB/large/hollywood-2009/hollywood-2009.mtx.coo_edge_pairs, typeId = 262, targetId = 262, length = 57515616
+  Subtracting 1 from node Ids...
+  Edge doubleing: 57515616 -> 115031232 edges
+  Removed 2279810 duplicate edges and self circles.
+  graph loaded as COO in 3.762846s.
+Converting 1139905 vertices, 112751422 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (1139905 vertices, 112751422 edges):
+    Degree 0: 32662 (2.865326 %)
+    Degree 2^0: 24445 (2.144477 %)
+    Degree 2^1: 50032 (4.389138 %)
+    Degree 2^2: 99398 (8.719849 %)
+    Degree 2^3: 174673 (15.323470 %)
+    Degree 2^4: 231414 (20.301165 %)
+    Degree 2^5: 219393 (19.246604 %)
+    Degree 2^6: 139586 (12.245406 %)
+    Degree 2^7: 78822 (6.914787 %)
+    Degree 2^8: 44379 (3.893219 %)
+    Degree 2^9: 25905 (2.272558 %)
+    Degree 2^10: 13729 (1.204399 %)
+    Degree 2^11: 5233 (0.459073 %)
+    Degree 2^12: 230 (0.020177 %)
+    Degree 2^13: 4 (0.000351 %)
+
+__________________________
+pr_nibble::CPU_Reference: reached max iterations. breaking at it=5
+--------------------------
+ Elapsed: 1275.550781
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=true undirected=false advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+pr_nibble::Stop_Condition: reached max iterations. breaking at it=5
+--------------------------
+Run 0 elapsed: 15.100956, #iterations = 5
+256 errors occurred.
+[pr_nibble] finished.
+ avg. elapsed: 15.100956 ms
+ iterations: 5
+ min. elapsed: 15.100956 ms
+ max. elapsed: 15.100956 ms
+ load time: 3890.47 ms
+ preprocess time: 4848.810000 ms
+ postprocess time: 47.702074 ms
+ total time: 4916.424990 ms

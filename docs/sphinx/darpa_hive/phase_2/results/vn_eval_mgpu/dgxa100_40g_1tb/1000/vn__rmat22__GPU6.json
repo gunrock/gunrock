@@ -1,0 +1,26 @@
+{
+    "avg-process-time": 7.975,
+    "command-line": "./main ./data/rmat22.bin 1000 vn_eval_mgpu/dgxa100_40g_1tb/1000/vn__rmat22__GPU6.json ",
+    "dataset": "rmat22",
+    "gpuinfo": {
+        "clock_rate": 1410000,
+        "compute_version": 80,
+        "driver_api": 11000,
+        "driver_version": 11000,
+        "major": 8,
+        "minor": 0,
+        "multi_processor_count": 108,
+        "name": "A100-SXM4-40GB",
+        "runtime_version": 11000,
+        "total_global_mem": 42506321920
+    },
+    "graph-edges": 128194008,
+    "graph-file": "./data/rmat22.bin",
+    "graph-nodes": 2393285,
+    "primitive": "vn",
+    "tag": [
+        "variant:num_seeds-1000",
+        "num-gpus:6"
+    ],
+    "time": "Fri May 28 21:08:58 2021\n"
+}

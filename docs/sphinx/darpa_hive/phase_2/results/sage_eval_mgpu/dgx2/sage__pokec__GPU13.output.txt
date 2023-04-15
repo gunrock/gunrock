@@ -1,0 +1,51 @@
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/pokec/pokec.mtx.meta
+  Reading edge lists from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/pokec/pokec.mtx.coo_edge_pairs
+Reading from /home/u00u7u37rw7AjJoA4e357/data/gunrock/hive_datasets/mario-2TB/pokec/pokec.mtx.coo_edge_pairs, typeId = 262, targetId = 262, length = 30622564
+  Subtracting 1 from node Ids...
+  Edge doubleing: 30622564 -> 61245128 edges
+  Removed 16641200 duplicate edges and self circles.
+  graph loaded as COO in 2.028179s.
+Converting 1632803 vertices, 44603928 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (1632803 vertices, 44603928 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 163971 (10.042301 %)
+    Degree 2^1: 201604 (12.347111 %)
+    Degree 2^2: 238757 (14.622523 %)
+    Degree 2^3: 273268 (16.736128 %)
+    Degree 2^4: 298404 (18.275567 %)
+    Degree 2^5: 265002 (16.229882 %)
+    Degree 2^6: 148637 (9.103180 %)
+    Degree 2^7: 38621 (2.365319 %)
+    Degree 2^8: 4089 (0.250428 %)
+    Degree 2^9: 418 (0.025600 %)
+    Degree 2^10: 23 (0.001409 %)
+    Degree 2^11: 3 (0.000184 %)
+    Degree 2^12: 3 (0.000184 %)
+    Degree 2^13: 3 (0.000184 %)
+
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=false undirected=true feature-column=64 num-children-per-source=10 num-leafs-per-child=-1
+==============================================
+64bit-VertexT=false 64bit-SizeT=false 64bit-ValueT=false undirected=true batch-size=16384
+Using randomly generated Wf1
+Using randomly generated Wa1
+Using randomly generated Wf2
+Using randomly generated Wa2
+Using randomly generated features
+Using advance mode LB
+Using filter mode CULL
+rand-seed = 1622221544
+__________________________
+--------------------------
+Run 0 elapsed: 927.484989 ms, #iterations = 100
+Embedding validation: PASS
+[sage] finished.
+ avg. elapsed: 927.484989 ms
+ iterations: 100
+ min. elapsed: 927.484989 ms
+ max. elapsed: 927.484989 ms
+ load time: 2129.31 ms
+ preprocess time: 5952.610000 ms
+ postprocess time: 628.625870 ms
+ total time: 7529.126883 ms

@@ -1,0 +1,6 @@
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 0 0 2 2 2 2 2 2 2 1 2 2 2 2 2 3.40282e+38 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 
+n_seeds=10 | cpu_time=0 | gpu_time_microseconds=7083 | n_errors=0 | n_gpus=10
+dataset=./data/rmat22.bin
+num-vertices=2393285
+num-edges=128194008
