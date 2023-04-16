@@ -26,24 +26,24 @@ void test_bfs(int num_arguments, char** argument_array) {
   gunrock::io::cli::parameters_t params(num_arguments, argument_array,
                                         "Breadth First Search");
 
-  csr_t csr;
-  //coo_t coo;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
+  loader = mm.load(params.filename);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
-    csr.from_coo(mm.load(params.filename));
+    csr.from_coo(loader.coo);
   }
 
-  // Data for CSC format.
-  // thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  // thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   // --
-  // Build graph + metadata
+  // Build graph
 
-  auto G = graph::build::build<memory_space_t::device, edge_t, vertex_t, weight_t>(csr);
+  auto G =
+      graph::build::build<memory_space_t::device>(loader.properties, csr);
+
 
   // --
   // Params and memory allocation

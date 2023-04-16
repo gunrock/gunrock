@@ -26,7 +26,6 @@ void test_bc(int num_arguments, char** argument_array) {
   gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
   loader = mm.load(params.filename);
   
-  // Test CSR
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
