@@ -21,7 +21,9 @@ void test_spmv(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
-
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  
   // --
   // IO
 
@@ -31,24 +33,19 @@ void test_spmv(int num_arguments, char** argument_array) {
   // Load the matrix-market dataset into csr format.
   // See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-  csr.from_coo(mm.load(filename));
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
+  loader = mm.load(filename);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  csr.from_coo(loader.coo);
 
   // --
   // Build graph
 
   // Convert the dataset you loaded into an `essentials` graph.
   // `memory_space_t::device` -> the graph will be created on the GPU.
-  // `graph::view_t::csr`     -> your input data is in `csr` format.
-  //
-  // Note that `graph::build::from_csr` expects pointers, but the `csr` data
-  // arrays are `thrust` vectors, so we need to unwrap them w/ `.data().get()`.
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows, csr.number_of_columns, csr.number_of_nonzeros,
-      csr.row_offsets.data().get(), csr.column_indices.data().get(),
-      csr.nonzero_values.data().get());
+  auto G =
+      graph::build::build<memory_space_t::device>(loader.properties, csr);
 
   // --
   // Params and memory allocation
