@@ -19,33 +19,44 @@ void test_spmv(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
+  constexpr memory_space_t space = memory_space_t::device;
+  using csr_t =
+      format::csr_t<space, vertex_t, edge_t, weight_t>;
 
+  // Load A
   // Filename to be read
   std::string filename_a = argument_array[1];
-  constexpr memory_space_t space = memory_space_t::device;
 
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  using csr_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
-  csr_t a_csr;
-  a_csr.from_coo(mm.load(filename_a));
+  format::csr_t<space, vertex_t, edge_t, weight_t> a_csr;
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> a_loader;
+  
+  a_loader = mm.load(filename_a);
+  a_csr.from_coo(a_loader.coo);
 
-  auto A = graph::build::from_csr<space, graph::view_t::csr>(
-      a_csr.number_of_rows, a_csr.number_of_columns, a_csr.number_of_nonzeros,
-      a_csr.row_offsets.data().get(), a_csr.column_indices.data().get(),
-      a_csr.nonzero_values.data().get());
-
+  // --
+  // Build graph for A
+  auto A =
+      graph::build::build<memory_space_t::device>(a_loader.properties, a_csr);
+  
+  // Load B 
+  // Filename to be read
   std::string filename_b = argument_array[2];
-  csr_t b_csr;
-  b_csr.from_coo(mm.load(filename_b));
 
-  /// For now, we are using the transpose of CSR-matrix A as the second operand
-  /// for our spgemm.
-  auto B = graph::build::from_csr<space, graph::view_t::csr>(
-      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
-      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
-      b_csr.nonzero_values.data().get());
+  /// Load the matrix-market dataset into csr format.
+  /// See `format` to see other supported formats.
+  format::csr_t<space, vertex_t, edge_t, weight_t> b_csr;
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> b_loader;
+  
+  b_loader = mm.load(filename_b);
+  b_csr.from_coo(b_loader.coo);
+
+  // --
+  // Build graph for B
+  auto B =
+      graph::build::build<memory_space_t::device>(b_loader.properties, b_csr);
 
   /// Let's use CSR representation
   csr_t C;
