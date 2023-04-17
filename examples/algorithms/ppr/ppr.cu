@@ -29,10 +29,13 @@ void test_ppr(int num_arguments, char** argument_array) {
   vertex_t n_seeds = 10;
 
   std::string filename = argument_array[1];
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
+  loader = mm.load(filename);
 
   if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(mm.load(filename));
+    csr.from_coo(loader.coo);
   } else if (util::is_binary_csr(filename)) {
     csr.read_binary(filename);
   } else {
@@ -43,14 +46,8 @@ void test_ppr(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );  // supports row_indices and column_offsets (default = nullptr)
+  auto G =
+      graph::build::build<memory_space_t::device>(loader.properties, csr);
 
   // --
   // Params and memory allocation
