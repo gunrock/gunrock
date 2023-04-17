@@ -19,28 +19,31 @@ void test_hits(int num_arguments, char** argument_array) {
   // IO
 
   gunrock::io::cli::parameters_t params(num_arguments, argument_array,
-                                        "Hyperlink-Induced Topic Search");
+                                        "Betweenness Centrality");
 
-  csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
+  loader = mm.load(params.filename);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
-    csr.from_coo(mm.load(params.filename));
+    csr.from_coo(loader.coo);
   }
 
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
+  // --
+  // Build graph
+
+  auto G =
+      graph::build::build<memory_space_t::device>(loader.properties, csr);
 
   hits::result_c<vertex_t, weight_t> result;
   unsigned int max_iter = 20;
+
+  // --
+  // GPU Run
 
   auto time = gunrock::hits::run(G, max_iter, result);
   result.print_result();
