@@ -79,24 +79,22 @@ void tc_bench(nvbench::state& state) {
 
   // --
   // Build graph + metadata
-  csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto mmatrix = mm.load(filename_);
-  if (!mm_is_symmetric(mm.code)) {
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
+  loader = mm.load(filename_);
+  if (!loader.properties.symmetric) {
     std::cerr << "Error: input matrix must be symmetric" << std::endl;
     exit(1);
   }
-  csr.from_coo(mmatrix);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  csr.from_coo(loader.coo);
 
-  auto G = graph::build::from_csr<memory_space_t::device,
-                                  graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
+  // --
+  // Build graph
+
+  auto G =
+      graph::build::build<memory_space_t::device>(loader.properties, csr);
 
   // --
   // Params and memory allocation

@@ -92,20 +92,18 @@ void spgemm_bench(nvbench::state& state) {
   // Build graphs + metadata
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr_t a_csr;
-  a_csr.from_coo(mm.load(filename_a));
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> a_loader;
+  a_loader = mm.load(filename_a);
 
-  auto A = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      a_csr.number_of_rows, a_csr.number_of_columns, a_csr.number_of_nonzeros,
-      a_csr.row_offsets.data().get(), a_csr.column_indices.data().get(),
-      a_csr.nonzero_values.data().get());
+  auto A =
+      graph::build::build<memory_space_t::device>(a_loader.properties, a_csr);
 
   csr_t b_csr;
-  b_csr.from_coo(mm.load(filename_b));
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> b_loader;
+  b_loader = mm.load(filename_b);
 
-  auto B = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
-      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
-      b_csr.nonzero_values.data().get());
+  auto B =
+      graph::build::build<memory_space_t::device>(a_loader.properties, a_csr);
 
   csr_t C;
 
