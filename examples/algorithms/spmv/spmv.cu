@@ -67,11 +67,13 @@ void test_spmv(int num_arguments, char** argument_array) {
 
   // --
   // Log + Validate
-  int n_errors = util::compare(y.data().get(), y_h.data(), n_vertices,
-                               [=](const weight_t a, const weight_t b) {
-                                 // TODO: needs better accuracy.
-                                 return std::abs(a - b) > 1e-2; 
-                               }, true);
+  int n_errors = util::compare(
+      y.data().get(), y_h.data(), n_vertices,
+      [=](const weight_t a, const weight_t b) {
+        // TODO: needs better accuracy.
+        return std::abs(a - b) > 1e-2;
+      },
+      true);
 
   gunrock::print::head(y, 40, "GPU y-vector");
   gunrock::print::head(y_h, 40, "CPU y-vector");

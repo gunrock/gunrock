@@ -91,7 +91,7 @@ Thank you for citing our work.
   pages =	 {3:1--3:49},
   doi =		 {10.1145/3108140},
   ee =		 {http://arxiv.org/abs/1701.01170},
-  acmauthorize = {http://dl.acm.org/authorize?N45082},
+  acmauthorize = {https://dl.acm.org/doi/10.1145/3108140?cid=81100458295},
   url =		 {http://escholarship.org/uc/item/9gj6r1dj},
   code =	 {https://github.com/gunrock/gunrock},
   ucdcite =	 {a115},

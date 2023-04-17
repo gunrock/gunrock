@@ -1,0 +1,9 @@
+{% if meta is defined and meta is not none and meta.layout is defined%}
+{%- extends (meta.layout+".html")|default('!layout.html') %}
+{% else %}
+{%- extends "!layout.html" %}
+{% endif %}
+
+{% block footer %}
+    Gunrock © 2023 The Regents of the University of California.
+{% endblock %}
