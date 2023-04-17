@@ -155,7 +155,9 @@ int main(int argc, char** argv) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> A;
-  A.from_coo(mm.load(filename));
+  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
+  loader = mm.load(filename);
+  A.from_coo(loader.coo);
 
   std::size_t m = A.number_of_rows;
   std::size_t k = A.number_of_columns;

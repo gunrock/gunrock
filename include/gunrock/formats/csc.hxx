@@ -2,6 +2,8 @@
 
 #include <gunrock/container/vector.hxx>
 #include <gunrock/memory.hxx>
+#include <thrust/sort.h>
+#include <thrust/execution_policy.h>
 
 namespace gunrock {
 namespace format {

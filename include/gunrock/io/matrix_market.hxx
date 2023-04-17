@@ -19,6 +19,7 @@
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/memory.hxx>
 #include <gunrock/error.hxx>
+#include <gunrock/graph/properties.hxx>
 
 namespace gunrock {
 namespace io {

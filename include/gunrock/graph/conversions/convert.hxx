@@ -9,6 +9,10 @@
  */
 
 #include <gunrock/cuda/cuda.hxx>
+#include <thrust/binary_search.h>
+#include <thrust/device_vector.h>
+#include <thrust/functional.h>
+#include <thrust/execution_policy.h>
 
 namespace gunrock {
 namespace graph {
