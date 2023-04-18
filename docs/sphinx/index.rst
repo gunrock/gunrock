@@ -17,6 +17,7 @@
    Copyright and License <https://github.com/gunrock/gunrock/tree/main/LICENSE>
    Developers and Contributors <https://github.com/gunrock/gunrock/graphs/contributors>
    gunrock.wiki/Frequently-Asked-Questions.md
+   gunrock.wiki/Acknowledgments.md
 
 .. toctree::
    :hidden:
