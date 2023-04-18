@@ -1,3 +1,0 @@
-Dimension = 833
-Tolerance = 1
-Elapsed (ms): 8.758400

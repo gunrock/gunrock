@@ -1,6 +1,0 @@
-0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
-0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
-n_seeds=100 | cpu_time=0 | gpu_time_microseconds=29747 | n_errors=0 | n_gpus=10
-dataset=./data/rmat24.bin
-num-vertices=8860450
-num-edges=520523686
