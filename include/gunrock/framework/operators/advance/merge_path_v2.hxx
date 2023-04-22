@@ -158,29 +158,40 @@ __global__ void merge_path_v2_kernel(graph_t G,
   // Perf-sync, not required.
   __syncthreads();
 
+  // Early exit if out-of-bound.
+  if (thread_idx_start.x >= elements) {
+#if 0
+    printf("REACHED: (row,elements,nz) %d,%d,%d\n",  //
+           thread_idx_start.x,                       //
+           static_cast<offset_t>(elements),          //
+           tile_nonzeros[thread_idx_start.y]         //
+    );
+#endif
+    return;
+  }
+
 #pragma unroll
   for (int ITEM = 0; ITEM < items_per_thread; ++ITEM) {
-    // Early exit if out-of-bound.
-    if (thread_idx_start.x >= elements)
-      return;
-
-    // Find the actual vertex by queuing the frontier/graph.
-    auto v = (input_type == advance_io_type_t::graph)
-                 ? type_t(thread_idx_start.x)
-                 : input.get_element_at(thread_idx_start.x);
-
-    // If vertex is invalid, exit.
-    if (!gunrock::util::limits::is_valid(v))
-      return;
-
-    // Contiguous index that goes from 0..num_edges_for_frontier, unique among
-    // all threads across all blocks.
-    offset_t global_contiguous_edge_index_processed =
-        std::min(static_cast<offset_t>(tile_nonzeros[thread_idx_start.y]),
-                 static_cast<offset_t>(atoms - 1));
-
     if (tile_nonzeros[thread_idx_start.y] <
         tile_row_offsets_end[thread_idx_start.x]) {
+      // Find the actual vertex by queuing the frontier/graph.
+      auto v = (input_type == advance_io_type_t::graph)
+                   ? type_t(thread_idx_start.x)
+                   : input.get_element_at(thread_idx_start.x);
+
+      // If vertex is invalid, exit. If we do this exit outside this
+      // if-condition, we skip a very important aspect of incrementing the
+      // thread_idx_start.x (in the else statement). This will cause parts of
+      // the frontier to be unexplored.
+      if (!gunrock::util::limits::is_valid(v))
+        continue;
+
+      // Contiguous index that goes from 0..num_edges_for_frontier, unique among
+      // all threads across all blocks.
+      offset_t global_contiguous_edge_index_processed =
+          std::min(static_cast<offset_t>(tile_nonzeros[thread_idx_start.y]),
+                   static_cast<offset_t>(atoms - 1));
+
       // Some weird computation to figure out which edge we are
       // processing in the frontier. This is simpler when being done
       // for the whole graph, but for frontier with non-sorted subset of the
@@ -268,6 +279,11 @@ void execute(graph_t& G,
                                  ? G.get_number_of_vertices()
                                  : input.get_number_of_elements();
 
+  // Calculated number of blocks, if they do not fit into the x-dimension
+  // of dim3, overflow the rest to y-dimension (for larger problems)
+  int max_dim_x =
+      gcuda::properties::get_max_grid_dimension_x(context.ordinal());
+
   // Kernel configuration.
   constexpr std::size_t num_threads = 128;
   constexpr std::size_t items_per_thread = 3;
@@ -282,7 +298,12 @@ void execute(graph_t& G,
   std::size_t num_merge_tiles =
       math::divide_round_up(num_merge_items, merge_tile_size);
 
-  dim3 grid(num_merge_tiles, num_merge_tiles, 1);
+  std::size_t within_bounds =
+      std::min(num_merge_tiles, static_cast<std::size_t>(max_dim_x));
+  std::size_t overflow = math::divide_round_up(
+      num_merge_tiles, static_cast<std::size_t>(max_dim_x));
+
+  dim3 grid(within_bounds, overflow, 1);
 
   // Launch kernel.
   merge_path_v2_kernel<items_per_thread, num_threads, merge_tile_size,
