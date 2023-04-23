@@ -18,7 +18,10 @@ using namespace memory;
 
 struct empty_coo_t {};
 
-template <memory_space_t space, typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space,
+          typename vertex_t,
+          typename edge_t,
+          typename weight_t>
 class graph_coo_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -115,7 +118,7 @@ class graph_coo_t {
 
  protected:
   __host__ void set(
-      gunrock::format::coo_t<space, vertex_t, edge_t, weight_t> coo) {
+      gunrock::format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
     this->number_of_vertices = coo.number_of_rows;
     this->number_of_edges = coo.number_of_nonzeros;
     // Set raw pointers

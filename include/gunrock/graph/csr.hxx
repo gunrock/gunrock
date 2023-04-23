@@ -212,7 +212,7 @@ class graph_csr_t {
   }
 
  protected:
-  __host__ void set(gunrock::format::csr_t<space, vertex_t, edge_t, weight_t> csr) {
+  __host__ void set(gunrock::format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
     this->number_of_vertices = csr.number_of_rows;
     this->number_of_edges = csr.number_of_nonzeros;
     // Set raw pointers
