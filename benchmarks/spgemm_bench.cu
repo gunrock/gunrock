@@ -92,18 +92,18 @@ void spgemm_bench(nvbench::state& state) {
   // Build graphs + metadata
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr_t a_csr;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> a_loader;
-  a_loader = mm.load(filename_a);
+  auto [a_properties, a_coo] = mm.load(filename_a);
+  a_csr.from_coo(a_coo);
 
   auto A =
-      graph::build::build<memory_space_t::device>(a_loader.properties, a_csr);
+      graph::build::build<memory_space_t::device>(a_properties, a_csr);
 
   csr_t b_csr;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> b_loader;
-  b_loader = mm.load(filename_b);
+  auto [b_properties, b_coo] = mm.load(filename_b);
+  b_csr.from_coo(b_coo);
 
   auto B =
-      graph::build::build<memory_space_t::device>(a_loader.properties, a_csr);
+      graph::build::build<memory_space_t::device>(b_properties, b_csr);
 
   csr_t C;
 

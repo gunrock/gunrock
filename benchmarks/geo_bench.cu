@@ -183,18 +183,16 @@ void geo_bench(nvbench::state& state) {
   // --
   // Build graph + metadata
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
-  loader = mm.load(matrix_filename);
+  auto [properties, coo] = mm.load(matrix_filename);
   
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
-  csr.from_coo(loader.coo);
+  csr.from_coo(coo);
 
   // --
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(loader.properties, csr);
-
+      graph::build::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

@@ -30,12 +30,11 @@ void test_ppr(int num_arguments, char** argument_array) {
 
   std::string filename = argument_array[1];
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
-  loader = mm.load(filename);
+  auto [properties, coo] = mm.load(filename);
 
   if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(loader.coo);
+    csr.from_coo(coo);
   } else if (util::is_binary_csr(filename)) {
     csr.read_binary(filename);
   } else {
@@ -47,7 +46,7 @@ void test_ppr(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(loader.properties, csr);
+      graph::build::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

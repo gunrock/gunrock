@@ -27,22 +27,21 @@ void test_bfs(int num_arguments, char** argument_array) {
                                         "Breadth First Search");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
-  loader = mm.load(params.filename);
+  auto [properties, coo] = mm.load(params.filename);
   
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
-    csr.from_coo(loader.coo);
+    csr.from_coo(coo);
   }
 
   // --
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(loader.properties, csr);
+      graph::build::build<memory_space_t::device>(properties, csr);
 
 
   // --

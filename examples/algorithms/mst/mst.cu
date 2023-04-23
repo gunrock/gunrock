@@ -70,20 +70,20 @@ void test_mst(int num_arguments, char** argument_array) {
   parameters_t params(num_arguments, argument_array);
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
-  loader = mm.load(params.filename);
-  if (!loader.properties.symmetric) {
+  auto [properties, coo] = mm.load(params.filename);
+  
+  if (!properties.symmetric) {
     printf("Error: input matrix must be symmetric\n");
     exit(1);
   }
   
-  csr.from_coo(loader.coo);
+  csr.from_coo(coo);
 
   // --
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(loader.properties, csr);
+      graph::build::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

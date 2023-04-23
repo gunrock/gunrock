@@ -21,11 +21,6 @@ namespace graph {
 struct empty_csr_t {};
 
 using namespace memory;
-using vertex_t = int;
-using edge_t = int;
-using weight_t = float;
-using csr_t =
-    gunrock::format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
 // XXX: The ideal thing to do here is to inherit
 // base class with virtual keyword specifier, therefore
@@ -35,7 +30,7 @@ using csr_t =
 // memory error. Another important thing to note is that
 // virtual functions should also have undefined behavior,
 // but they seem to work.
-template <typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space, typename vertex_t, typename edge_t, typename weight_t>
 class graph_csr_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -217,17 +212,13 @@ class graph_csr_t {
   }
 
  protected:
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               edge_type* _row_offsets,
-                               vertex_type* _column_indices,
-                               weight_type* _values) {
-    this->number_of_vertices = _number_of_vertices;
-    this->number_of_edges = _number_of_edges;
+  __host__ void set(gunrock::format::csr_t<space, vertex_t, edge_t, weight_t> csr) {
+    this->number_of_vertices = csr.number_of_rows;
+    this->number_of_edges = csr.number_of_nonzeros;
     // Set raw pointers
-    offsets = raw_pointer_cast<edge_type>(_row_offsets);
-    indices = raw_pointer_cast<vertex_type>(_column_indices);
-    values = raw_pointer_cast<weight_type>(_values);
+    offsets = raw_pointer_cast(csr.row_offsets.data());
+    indices = raw_pointer_cast(csr.column_indices.data());
+    values = raw_pointer_cast(csr.nonzero_values.data());
   }
 
  private:

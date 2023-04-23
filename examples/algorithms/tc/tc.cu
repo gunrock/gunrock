@@ -57,20 +57,20 @@ void test_tc(int num_arguments, char** argument_array) {
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
 
   // --
   // IO
   parameters_t params(num_arguments, argument_array);
+  gunrock::graph::graph_properties_t properties = gunrock::graph::graph_properties_t();
 
   if (util::is_market(params.filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    loader = mm.load(params.filename);
-    if (!mm_is_symmetric(mm.code)) {
+    auto [properties, coo] = mm.load(params.filename);
+    if (!properties.symmetric) {
       std::cerr << "Error: input matrix must be symmetric" << std::endl;
       exit(1);
     }
-    csr.from_coo(loader.coo);
+    csr.from_coo(coo);
   } else if (util::is_binary_csr(params.filename)) {
     csr.read_binary(params.filename);
   } else {
@@ -82,7 +82,7 @@ void test_tc(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(loader.properties, csr);
+      graph::build::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

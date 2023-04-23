@@ -81,9 +81,9 @@ class graph_t : public graph_view_t... {
       graph_t<space, vertex_type, edge_type, weight_type, graph_view_t...>;
 
   /// Different supported graph representation views.
-  using graph_csr_view_t = graph_csr_t<vertex_type, edge_type, weight_type>;
-  using graph_csc_view_t = graph_csc_t<vertex_type, edge_type, weight_type>;
-  using graph_coo_view_t = graph_coo_t<vertex_type, edge_type, weight_type>;
+  using graph_csr_view_t = graph_csr_t<space, vertex_type, edge_type, weight_type>;
+  using graph_csc_view_t = graph_csc_t<space, vertex_type, edge_type, weight_type>;
+  using graph_coo_view_t = graph_coo_t<space, vertex_type, edge_type, weight_type>;
 
   /**
    * @brief Default constructor for the graph.
@@ -188,37 +188,31 @@ class graph_t : public graph_view_t... {
    * graph class. Note, this is important because this graph object does NOT own
    * the data. The data is passed to the graph_view_t objects by the user. So,
    * the user is responsible of creating the csr/csc/coo (for example) matrices,
-   * passing the data pointers and sizes to the appropriate input graph_view_t
-   * objects, and after the use is done, the user is responsible of freeing the
-   * data.
+   * passing these to the appropriate input graph_view_t objects, and after the 
+   * user is done, the user is responsible of freeing the data.
    *
    * An example usage is:
    * \code
    *  // Create a graph object and set the data pointers and sizes.
    *  using view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
+   *  using format_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
    *  using graph_t = graph::graph_t<space, vertex_t, edge_t, weight_t, view_t>;
    *  graph_t G;
-   *  G.template set<view_t>(r, nnz, row_offsets, column_indices, values);
+   *  G.template set<view_t, format_t>(csr);
    * \endcode
    *
    * @tparam input_view_t input graph view to set.
-   * @tparam args_t Type of data pointers.
-   * @param _number_of_vertices number of vertices in the graph.
-   * @param _number_of_edges number of edges in the graph.
-   * @param args data pointers of the view to set csr = (row_offsets,
-   * column_indices, values), csc = (column_offsets, row_indices, values), coo =
-   * (row_indices, column_indices, values).
+   * @tparam input_format_t input format type to use.
+   * @param format an object of type input_format_t that holds the graph data.
    */
-  template <class input_view_t = default_view_t, typename... args_t>
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               args_t... args) {
-    input_view_t::set(_number_of_vertices, _number_of_edges, args...);
+  template <class input_view_t = default_view_t, typename input_format_t>
+  __host__ void set(input_format_t format) {
+    input_view_t::set(format);
   }
-
-  /**
+  
+ /**
    * @brief Get the number of neighbors for a given vertex.
-   *
+   * 
    * @tparam input_view_t specify a view (such as csr_view_t) to get the number
    * of neighbors using a specific underlying view/graph representation.
    * Otherwise, it defaults to the first valid view.

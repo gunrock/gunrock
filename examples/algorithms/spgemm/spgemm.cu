@@ -31,15 +31,14 @@ void test_spmv(int num_arguments, char** argument_array) {
   /// See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   format::csr_t<space, vertex_t, edge_t, weight_t> a_csr;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> a_loader;
   
-  a_loader = mm.load(filename_a);
-  a_csr.from_coo(a_loader.coo);
-
+  auto [a_properties, a_coo] = mm.load(filename_a);
+  a_csr.from_coo(a_coo);
+  
   // --
   // Build graph for A
   auto A =
-      graph::build::build<memory_space_t::device>(a_loader.properties, a_csr);
+      graph::build::build<memory_space_t::device>(a_properties, a_csr);
   
   // Load B 
   // Filename to be read
@@ -48,15 +47,13 @@ void test_spmv(int num_arguments, char** argument_array) {
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
   format::csr_t<space, vertex_t, edge_t, weight_t> b_csr;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> b_loader;
+  auto [b_properties, b_coo] = mm.load(filename_b);
+  b_csr.from_coo(b_coo);
   
-  b_loader = mm.load(filename_b);
-  b_csr.from_coo(b_loader.coo);
-
   // --
   // Build graph for B
   auto B =
-      graph::build::build<memory_space_t::device>(b_loader.properties, b_csr);
+      graph::build::build<memory_space_t::device>(b_properties, b_csr);
 
   /// Let's use CSR representation
   csr_t C;
