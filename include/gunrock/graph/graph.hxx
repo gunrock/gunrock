@@ -206,7 +206,7 @@ class graph_t : public graph_view_t... {
    * @param format an object of type input_format_t that holds the graph data.
    */
   template <class input_view_t = default_view_t, typename input_format_t>
-  __host__ void set(input_format_t& format) {
+  void set(input_format_t& format) {
     input_view_t::set(format);
   }
   
