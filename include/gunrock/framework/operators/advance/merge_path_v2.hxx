@@ -255,6 +255,7 @@ void execute(graph_t& G,
              frontier_t& output,
              work_tiles_t& segments,
              gcuda::standard_context_t& context) {
+  using type_t = typename frontier_t::type_t;
   // Merge-path works on the "prefix sum", so even if there is no output
   // required for this; we still need the scan to balance the work.
   std::size_t size_of_output = compute_output_offsets(
@@ -273,6 +274,7 @@ void execute(graph_t& G,
     if (output.get_capacity() < size_of_output)
       output.reserve(size_of_output);
     output.set_number_of_elements(size_of_output);
+    output.fill(gunrock::numeric_limits<type_t>::invalid(), context.stream());
   }
 
   std::size_t num_elements = (input_type == advance_io_type_t::graph)
@@ -286,7 +288,7 @@ void execute(graph_t& G,
 
   // Kernel configuration.
   constexpr std::size_t num_threads = 128;
-  constexpr std::size_t items_per_thread = 3;
+  constexpr std::size_t items_per_thread = 5;
 
   // Tile size of merge path.
   constexpr std::size_t merge_tile_size = num_threads * items_per_thread;
@@ -305,6 +307,10 @@ void execute(graph_t& G,
 
   dim3 grid(within_bounds, overflow, 1);
 
+  std::cout << "Input ";
+  input.sort();
+  input.print();
+
   // Launch kernel.
   merge_path_v2_kernel<items_per_thread, num_threads, merge_tile_size,
                        input_type, output_type>
@@ -312,6 +318,10 @@ void execute(graph_t& G,
           G, op, input, output, segments.data().get(), num_merge_tiles);
 
   context.synchronize();
+
+  std::cout << "Output ";
+  output.sort();
+  output.print();
 }
 }  // namespace merge_path_v2
 }  // namespace advance
