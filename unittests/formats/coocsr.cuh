@@ -17,13 +17,12 @@ void test_coo_csr(int num_arguments, char** argument_array) {
   using weight_t = float;
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
-  loader = mm.load(filename);
+  auto [properties, coo_load] = mm.load(filename);
   
   // Test COO and CSR
   format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo;
   format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t> csr;
-  csr.from_coo(loader.coo);
+  csr.from_coo(coo_load);
   coo.from_csr(csr);
 
   // CSR
@@ -60,7 +59,7 @@ void test_coo_csr(int num_arguments, char** argument_array) {
   
   // Use COO and CSR views
   auto G =
-      graph::build::build<memory_space_t::host>(loader.properties, coo, csr);
+      graph::build::build<memory_space_t::host>(properties, coo, csr);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";
@@ -68,8 +67,8 @@ void test_coo_csr(int num_arguments, char** argument_array) {
   std::cout << "Weighted: " << G.is_weighted() << "\n";
 
   // Test COO and CSR views 
-  using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
-  using coo_v_t = graph::graph_coo_t<vertex_t, edge_t, weight_t>;
+  using csr_v_t = graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  using coo_v_t = graph::graph_coo_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
   // CSR number of vertices
   std::cout << "G.get_number_of_vertices<csr_v_t>() : "

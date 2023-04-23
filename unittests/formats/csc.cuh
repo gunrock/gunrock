@@ -17,13 +17,12 @@ void test_csc(int num_arguments, char** argument_array) {
   using weight_t = float;
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  gunrock::io::loader_struct<vertex_t, edge_t, weight_t> loader;
-  loader = mm.load(filename);
+  auto [properties, coo] = mm.load(filename);
   
   // Test CSC
   format::csc_t<memory_space_t::host, vertex_t, edge_t, weight_t> csc;
   format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t> csr;
-  csr.from_coo(loader.coo);
+  csr.from_coo(coo);
   csc.from_csr(csr);
 
   // CSC
@@ -44,7 +43,7 @@ void test_csc(int num_arguments, char** argument_array) {
   
   // Use CSC view
   auto G =
-      graph::build::build<memory_space_t::host>(loader.properties, csc);
+      graph::build::build<memory_space_t::host>(properties, csc);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";
@@ -52,9 +51,9 @@ void test_csc(int num_arguments, char** argument_array) {
   std::cout << "Weighted: " << G.is_weighted() << "\n";
 
   // Test CSC view 
-  using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
-  using csc_v_t = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
-  using coo_v_t = graph::graph_coo_t<vertex_t, edge_t, weight_t>;
+  using csr_v_t = graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  using csc_v_t = graph::graph_csc_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  using coo_v_t = graph::graph_coo_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
   // CSC number of vertices
   std::cout << "G.get_number_of_vertices<csc_v_t>() : "
