@@ -42,17 +42,27 @@ void test_spmv(int num_arguments, char** argument_array) {
 
   /// For now, we are using the transpose of CSR-matrix A as the second operand
   /// for our spgemm.
-  auto B = graph::build::from_csr<space, graph::view_t::csr>(
+  auto B_csr = graph::build::from_csr<space, graph::view_t::csr>(
       b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
       b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
       b_csr.nonzero_values.data().get());
+
+  thrust::device_vector<vertex_t> row_indices(b_csr.number_of_nonzeros);
+  thrust::device_vector<edge_t> column_offsets(b_csr.number_of_columns + 1);
+
+  auto B = graph::build::from_csr<space, graph::view_t::csc>(
+      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
+      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
+      b_csr.nonzero_values.data().get(),
+      row_indices.data().get(),         
+      column_offsets.data().get());
 
   /// Let's use CSR representation
   csr_t C;
 
   // --
   // GPU Run
-  float gpu_elapsed = gunrock::spgemm::run(A, B, C);
+  float gpu_elapsed = gunrock::spgemm::run(A, B_csr, B, C);
 
   std::cout << "Number of rows: " << C.number_of_rows << std::endl;
   std::cout << "Number of columns: " << C.number_of_columns << std::endl;
