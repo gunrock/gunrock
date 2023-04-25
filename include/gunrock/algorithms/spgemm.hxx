@@ -25,7 +25,8 @@ struct param_t {
   graph_t& A;
   graph_t& B_csr;
   graph_type& B;
-  param_t(graph_t& _A, graph_t& _B_csr, graph_type& _B) : A(_A), B_csr(_B_csr), B(_B) {}
+  param_t(graph_t& _A, graph_t& _B_csr, graph_type& _B)
+      : A(_A), B_csr(_B_csr), B(_B) {}
 };
 
 template <typename csr_t>
@@ -121,7 +122,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 weight_t const& nz     // weight (nonzero).
                                 ) -> bool {
       // Compute number of nonzeros of the sparse-matrix C for each row.
-      math::atomic::add(&(estimated_nz_ptr[m]), B_csr.get_number_of_neighbors(k));
+      math::atomic::add(&(estimated_nz_ptr[m]),
+                        B_csr.get_number_of_neighbors(k));
       return false;
     };
 
@@ -133,8 +135,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     /// Step X. Calculate upperbound of C's row-offsets.
     thrust::exclusive_scan(policy, P->estimated_nz_per_row.begin(),
-                           P->estimated_nz_per_row.end() + 1, row_offsets.begin(),
-                           edge_t(0), thrust::plus<edge_t>());
+                           P->estimated_nz_per_row.end() + 1,
+                           row_offsets.begin(), edge_t(0),
+                           thrust::plus<edge_t>());
 
     // thrust::copy(row_offsets.begin() + A.get_number_of_vertices() - 1,
     //              row_offsets.begin() + A.get_number_of_vertices(),
@@ -173,32 +176,34 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto a_nz_idx = a_offset;
 
         // For the row in A, multiple with corresponding element in B.
-        while ((a_nz_idx < (a_offset + a_nnz)) && (b_nz_idx < (b_offset + b_nnz))) {
+        while ((a_nz_idx < (a_offset + a_nnz)) &&
+               (b_nz_idx < (b_offset + b_nnz))) {
           auto a_col = A.get_destination_vertex(a_nz_idx);
           auto b_row = B.get_source_vertex(b_nz_idx);
 
           //  Multiply if the column of A equals row of B.
           if (a_col == b_row) {
-              auto a_nz = A.get_edge_weight(a_nz_idx);
-              auto b_nz = B.get_edge_weight(b_nz_idx);
+            auto a_nz = A.get_edge_weight(a_nz_idx);
+            auto b_nz = B.get_edge_weight(b_nz_idx);
 
-              // Calculate  C's nonzero index.
-              std::size_t c_nz_idx = c_offset + n;
-              assert(c_nz_idx < estimated_nzs);
+            // Calculate  C's nonzero index.
+            std::size_t c_nz_idx = c_offset + n;
+            assert(c_nz_idx < estimated_nzs);
 
-              // Assign column index.
-              thread::store(&col_ind[c_nz_idx], n);
+            // Assign column index.
+            thread::store(&col_ind[c_nz_idx], n);
 
-              // Accumulate the nonzero value.
-              nz_vals[c_nz_idx] += a_nz * b_nz;
+            // Accumulate the nonzero value.
+            nz_vals[c_nz_idx] += a_nz * b_nz;
 
-              a_nz_idx++;
-              b_nz_idx++;
+            a_nz_idx++;
+            b_nz_idx++;
 
-              increment = true;
-          }
-          else if (a_col < b_row) a_nz_idx++;
-          else b_nz_idx++;
+            increment = true;
+          } else if (a_col < b_row)
+            a_nz_idx++;
+          else
+            b_nz_idx++;
         }
         // a non zero element was stored in C, so we increment n
         if (increment) {

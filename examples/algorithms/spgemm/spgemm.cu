@@ -53,8 +53,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   auto B = graph::build::from_csr<space, graph::view_t::csc>(
       b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
       b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
-      b_csr.nonzero_values.data().get(),
-      row_indices.data().get(),         
+      b_csr.nonzero_values.data().get(), row_indices.data().get(),
       column_offsets.data().get());
 
   /// Let's use CSR representation
