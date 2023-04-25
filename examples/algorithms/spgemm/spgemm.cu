@@ -20,8 +20,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
   constexpr memory_space_t space = memory_space_t::device;
-  using csr_t =
-      format::csr_t<space, vertex_t, edge_t, weight_t>;
+  using csr_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
 
   // Load A
   // Filename to be read
@@ -30,30 +29,28 @@ void test_spmv(int num_arguments, char** argument_array) {
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  format::csr_t<space, vertex_t, edge_t, weight_t> a_csr;
-  
+  csr_t a_csr;
+
   auto [a_properties, a_coo] = mm.load(filename_a);
   a_csr.from_coo(a_coo);
-  
+
   // --
   // Build graph for A
-  auto A =
-      graph::build<memory_space_t::device>(a_properties, a_csr);
-  
-  // Load B 
+  auto A = graph::build<memory_space_t::device>(a_properties, a_csr);
+
+  // Load B
   // Filename to be read
   std::string filename_b = argument_array[2];
 
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
-  format::csr_t<space, vertex_t, edge_t, weight_t> b_csr;
+  csr_t b_csr;
   auto [b_properties, b_coo] = mm.load(filename_b);
   b_csr.from_coo(b_coo);
-  
+
   // --
   // Build graph for B
-  auto B =
-      graph::build<memory_space_t::device>(b_properties, b_csr);
+  auto B = graph::build<memory_space_t::device>(b_properties, b_csr);
 
   /// Let's use CSR representation
   csr_t C;

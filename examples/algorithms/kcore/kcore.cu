@@ -31,7 +31,7 @@ void test_kcore(int num_arguments, char** argument_array) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(filename);
-  
+
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   csr.from_coo(coo);
@@ -39,8 +39,7 @@ void test_kcore(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   std::cout << "G.get_number_of_vertices() : " << G.get_number_of_vertices()
             << std::endl;

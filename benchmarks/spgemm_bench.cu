@@ -95,15 +95,13 @@ void spgemm_bench(nvbench::state& state) {
   auto [a_properties, a_coo] = mm.load(filename_a);
   a_csr.from_coo(a_coo);
 
-  auto A =
-      graph::build<memory_space_t::device>(a_properties, a_csr);
+  auto A = graph::build<memory_space_t::device>(a_properties, a_csr);
 
   csr_t b_csr;
   auto [b_properties, b_coo] = mm.load(filename_b);
   b_csr.from_coo(b_coo);
 
-  auto B =
-      graph::build<memory_space_t::device>(b_properties, b_csr);
+  auto B = graph::build<memory_space_t::device>(b_properties, b_csr);
 
   csr_t C;
 

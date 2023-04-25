@@ -45,8 +45,7 @@ void test_ppr(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

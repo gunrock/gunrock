@@ -67,24 +67,17 @@ void hits_bench(nvbench::state& state) {
   state.collect_stores_efficiency();
 
   // --
-  // Define types
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-
-  // --
   // Build graph + metadata
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(filename);
-  
+
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
   csr.from_coo(coo);
 
   // --
   // Build graph
 
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
-
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

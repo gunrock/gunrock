@@ -81,9 +81,12 @@ class graph_t : public graph_view_t... {
       graph_t<space, vertex_type, edge_type, weight_type, graph_view_t...>;
 
   /// Different supported graph representation views.
-  using graph_csr_view_t = graph_csr_t<space, vertex_type, edge_type, weight_type>;
-  using graph_csc_view_t = graph_csc_t<space, vertex_type, edge_type, weight_type>;
-  using graph_coo_view_t = graph_coo_t<space, vertex_type, edge_type, weight_type>;
+  using graph_csr_view_t =
+      graph_csr_t<space, vertex_type, edge_type, weight_type>;
+  using graph_csc_view_t =
+      graph_csc_t<space, vertex_type, edge_type, weight_type>;
+  using graph_coo_view_t =
+      graph_coo_t<space, vertex_type, edge_type, weight_type>;
 
   /**
    * @brief Default constructor for the graph.
@@ -188,7 +191,7 @@ class graph_t : public graph_view_t... {
    * graph class. Note, this is important because this graph object does NOT own
    * the data. The data is passed to the graph_view_t objects by the user. So,
    * the user is responsible of creating the csr/csc/coo (for example) matrices,
-   * passing these to the appropriate input graph_view_t objects, and after the 
+   * passing these to the appropriate input graph_view_t objects, and after the
    * user is done, the user is responsible of freeing the data.
    *
    * An example usage is:
@@ -209,10 +212,10 @@ class graph_t : public graph_view_t... {
   void set(input_format_t& format) {
     input_view_t::set(format);
   }
-  
- /**
+
+  /**
    * @brief Get the number of neighbors for a given vertex.
-   * 
+   *
    * @tparam input_view_t specify a view (such as csr_view_t) to get the number
    * of neighbors using a specific underlying view/graph representation.
    * Otherwise, it defaults to the first valid view.
@@ -431,7 +434,9 @@ void build_degree_histogram(graph_type const& G,
  * @param G graph to remove self-loops.
  */
 template <typename graph_type>
-void remove_self_loops(graph_type& G) {}
+void remove_self_loops(graph_type& G) {
+  error::throw_if_exception(true, "Remove Self-Loops not yet implemented.");
+}
 
 }  // namespace graph
 }  // namespace gunrock

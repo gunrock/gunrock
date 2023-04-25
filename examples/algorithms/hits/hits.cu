@@ -12,9 +12,6 @@ void test_hits(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-
   // --
   // IO
 
@@ -23,7 +20,7 @@ void test_hits(int num_arguments, char** argument_array) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(params.filename);
-  
+
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
@@ -35,8 +32,7 @@ void test_hits(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   hits::result_c<vertex_t, weight_t> result;
   unsigned int max_iter = 20;

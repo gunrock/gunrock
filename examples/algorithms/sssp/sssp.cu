@@ -25,8 +25,8 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(params.filename);
-  
-  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+
+  csr_t csr;
 
   if (params.binary) {
     csr.read_binary(params.filename);
@@ -37,8 +37,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

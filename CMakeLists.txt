@@ -244,7 +244,7 @@ endif(ESSENTIALS_BUILD_TESTS)
 ####################################################
 option(ESSENTIALS_BUILD_BENCHMARKS
   "If on, builds essentials with benchmarking support."
-  OFF)
+  ON)
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_BENCHMARKS)

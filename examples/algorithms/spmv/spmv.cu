@@ -23,7 +23,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   using weight_t = float;
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  
+
   // --
   // IO
 
@@ -34,8 +34,8 @@ void test_spmv(int num_arguments, char** argument_array) {
   // See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(filename);
-  
-  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+
+  csr_t csr;
   csr.from_coo(coo);
 
   // --
@@ -43,8 +43,7 @@ void test_spmv(int num_arguments, char** argument_array) {
 
   // Convert the dataset you loaded into an `essentials` graph.
   // `memory_space_t::device` -> the graph will be created on the GPU.
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation
