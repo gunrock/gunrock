@@ -1,6 +1,7 @@
 /**
  * @file spgemm.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @author Marjerie Suresh (msuresh@ucdavis.edu)
  * @brief Sparse-Matrix-Matrix multiplication.
  * @version 0.1
  * @date 2022-01-04
@@ -139,10 +140,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                            row_offsets.begin(), edge_t(0),
                            thrust::plus<edge_t>());
 
-    // thrust::copy(row_offsets.begin() + A.get_number_of_vertices() - 1,
-    //              row_offsets.begin() + A.get_number_of_vertices(),
-    //              row_offsets.begin() + A.get_number_of_vertices());
-
     /// Step X. Calculate the upperbound of total number of nonzeros in the
     /// sparse-matrix C.
     thrust::copy(row_offsets.begin() + A.get_number_of_vertices(),
@@ -159,6 +156,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     vertex_t* col_ind = column_indices.data().get();
     weight_t* nz_vals = nonzero_values.data().get();
 
+    /// Step X. Calculate C's column indices and values.
     auto naive_spgemm = [=] __host__ __device__(vertex_t const& row) -> bool {
       // Get the number of nonzeros in row of sparse-matrix A.
       auto a_offset = A.get_starting_edge(row);
@@ -167,7 +165,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       auto n = 0;
       bool increment = false;
 
-      // iterate over the columns of B.
+      // Iterate over the columns of B.
       for (edge_t b_col = 0; b_col < B.get_number_of_vertices(); ++b_col) {
         // Get the number of nonzeros in column of sparse-matrix B.
         auto b_offset = B.get_starting_edge(b_col);
@@ -205,7 +203,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           else
             b_nz_idx++;
         }
-        // a non zero element was stored in C, so we increment n
+        // A non zero element was stored in C, so we increment n.
         if (increment) {
           n++;
           increment = false;
@@ -216,42 +214,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
         A, naive_spgemm, context);
-
-    /// Step X. Calculate C's column indices and values.
-    // auto gustavsons =
-    //     [=] __host__ __device__(
-    //         vertex_t const& m,  // ... source (A: row index)
-    //         vertex_t const& k,  // neighbor (A: column index or B: row index)
-    //         edge_t const& a_nz_idx,  // edge (A: row ↦ column)
-    //         weight_t const& a_nz     // weight (A: nonzero).
-    //         ) -> bool {
-    //   // Get the number of nonzeros in row k of sparse-matrix B.
-    //   auto offset = B.get_starting_edge(k);
-    //   auto nnz = B.get_number_of_neighbors(k);
-    //   auto c_offset = thread::load(&row_off[m]);
-
-    //   // Loop over all the nonzeros in row k of sparse-matrix B.
-    //   for (edge_t b_nz_idx = offset; b_nz_idx < (offset + nnz); ++b_nz_idx) {
-    //     auto n = B.get_destination_vertex(b_nz_idx);
-    //     auto b_nz = B.get_edge_weight(b_nz_idx);
-
-    //     // Calculate c's nonzero index.
-    //     std::size_t c_nz_idx = c_offset + n;
-
-    //     // Assign column index.
-    //     thread::store(&col_ind[c_nz_idx], n);
-
-    //     // Accumulate the nonzero value.
-    //     math::atomic::add(nz_vals + c_nz_idx, a_nz * b_nz);
-    //   }
-    //   return false;
-    // };
-
-    // operators::advance::execute<operators::load_balance_t::block_mapped,
-    //                             operators::advance_direction_t::forward,
-    //                             operators::advance_io_type_t::graph,
-    //                             operators::advance_io_type_t::none>(
-    //     A, E, gustavsons, context);
 
     /// Step X. Fix-up, i.e., remove overestimated nonzeros and rellocate the
     /// storage as necessary.
