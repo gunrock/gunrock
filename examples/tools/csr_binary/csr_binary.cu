@@ -24,7 +24,7 @@ void mtx2bin(int num_arguments, char** argument_array) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(inpath);
-  
+
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
   csr.from_coo(coo);
 

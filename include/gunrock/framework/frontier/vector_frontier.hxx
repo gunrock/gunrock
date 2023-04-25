@@ -93,18 +93,14 @@ class vector_frontier_t {
    * @brief Get the capacity (number of elements possible).
    * @return std::size_t
    */
-  std::size_t get_capacity() const {
-    return p_storage.get()->capacity();
-  }
+  std::size_t get_capacity() const { return p_storage.get()->capacity(); }
 
   /**
    * @brief Get the resizing factor used to scale the frontier size.
    *
    * @return resizing factor for the frontier.
    */
-  float get_resizing_factor() const {
-    return resizing_factor;
-  }
+  float get_resizing_factor() const { return resizing_factor; }
 
   /**
    * @brief Get the element (const) at the specified index.
@@ -148,9 +144,7 @@ class vector_frontier_t {
    *
    * @param factor a float defining the resizing factor, 1.0f means no scaling.
    */
-  void set_resizing_factor(float factor) {
-    resizing_factor = factor;
-  }
+  void set_resizing_factor(float factor) { resizing_factor = factor; }
 
   /**
    * @brief Set how many number of elements the frontier contains. Note, this is
@@ -176,27 +170,21 @@ class vector_frontier_t {
    *
    * @return type_t* data pointer.
    */
-  auto data() {
-    return raw_pointer_cast(p_storage.get()->data());
-  }
+  auto data() { return raw_pointer_cast(p_storage.get()->data()); }
 
   /**
    * @brief Access to the begin pointer of the frontier.
    *
    * @return type_t* begin pointer.
    */
-  auto begin() {
-    return this->data();
-  }
+  auto begin() { return this->data(); }
 
   /**
    * @brief Access to the end pointer of the frontier.
    *
    * @return type_t* end pointer.
    */
-  auto end() {
-    return this->begin() + this->get_number_of_elements();
-  }
+  auto end() { return this->begin() + this->get_number_of_elements(); }
 
   /**
    * @brief Checks if the frontier is empty.
@@ -204,9 +192,7 @@ class vector_frontier_t {
    * @return true
    * @return false
    */
-  bool is_empty() const {
-    return (this->get_number_of_elements() == 0);
-  }
+  bool is_empty() const { return (this->get_number_of_elements() == 0); }
 
   /**
    * @brief (vertex-like) push back a value to the frontier. Can only be done on

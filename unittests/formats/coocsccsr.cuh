@@ -1,6 +1,5 @@
 #include <gunrock/algorithms/algorithms.hxx>
 
-
 void test_coo_csc_csr(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./<program-name> filename.mtx" << std::endl;
@@ -18,7 +17,7 @@ void test_coo_csc_csr(int num_arguments, char** argument_array) {
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo_load] = mm.load(filename);
-  
+
   // Test COO, CSC, and CSR
   format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo;
   format::csc_t<memory_space_t::host, vertex_t, edge_t, weight_t> csc;
@@ -58,7 +57,7 @@ void test_coo_csc_csr(int num_arguments, char** argument_array) {
   for (auto nz : coo.nonzero_values)
     std::cout << nz << " ";
   std::cout << std::endl;
-  
+
   // CSC
   std::cout << "Row Indices: ";
   for (auto index : csc.row_indices)
@@ -74,20 +73,22 @@ void test_coo_csc_csr(int num_arguments, char** argument_array) {
   for (auto nz : csc.nonzero_values)
     std::cout << nz << " ";
   std::cout << std::endl;
-  
+
   // Use COO, CSC, and CSR views
-  auto G =
-      graph::build<memory_space_t::host>(properties, coo, csc, csr);
+  auto G = graph::build<memory_space_t::host>(properties, coo, csc, csr);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";
   std::cout << "Symmetric: " << G.is_symmetric() << "\n";
   std::cout << "Weighted: " << G.is_weighted() << "\n";
 
-  // Test COO, CSC, and CSR views 
-  using csr_v_t = graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
-  using csc_v_t = graph::graph_csc_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
-  using coo_v_t = graph::graph_coo_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  // Test COO, CSC, and CSR views
+  using csr_v_t =
+      graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  using csc_v_t =
+      graph::graph_csc_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
+  using coo_v_t =
+      graph::graph_coo_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
   // CSR number of vertices
   std::cout << "G.get_number_of_vertices<csr_v_t>() : "

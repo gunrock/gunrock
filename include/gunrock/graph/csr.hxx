@@ -30,7 +30,10 @@ using namespace memory;
 // memory error. Another important thing to note is that
 // virtual functions should also have undefined behavior,
 // but they seem to work.
-template <memory_space_t space, typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space,
+          typename vertex_t,
+          typename edge_t,
+          typename weight_t>
 class graph_csr_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -212,7 +215,8 @@ class graph_csr_t {
   }
 
  protected:
-  __host__ void set(gunrock::format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
+  __host__ void set(
+      gunrock::format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
     this->number_of_vertices = csr.number_of_rows;
     this->number_of_edges = csr.number_of_nonzeros;
     // Set raw pointers

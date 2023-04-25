@@ -48,7 +48,7 @@ struct coo_t {
   ~coo_t() {}
 
   /**
-   * @brief Convert CSR format into COO  
+   * @brief Convert CSR format into COO
    * Format.
    *
    * @tparam index_t
@@ -70,13 +70,14 @@ struct coo_t {
 
     // Convert offsets to indices
     gunrock::graph::convert::offsets_to_indices<memory_space_t::host>(
-        memory::raw_pointer_cast(csr.row_offsets.data()), csr.number_of_rows + 1,
-        memory::raw_pointer_cast(row_indices.data()), number_of_nonzeros);
+        memory::raw_pointer_cast(csr.row_offsets.data()),
+        csr.number_of_rows + 1, memory::raw_pointer_cast(row_indices.data()),
+        number_of_nonzeros);
 
     column_indices = csr.column_indices;
     nonzero_values = csr.nonzero_values;
 
-    return *this;  // COO representation 
+    return *this;  // COO representation
   }
 
 };  // struct coo_t

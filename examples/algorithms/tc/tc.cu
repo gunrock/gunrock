@@ -61,7 +61,8 @@ void test_tc(int num_arguments, char** argument_array) {
   // --
   // IO
   parameters_t params(num_arguments, argument_array);
-  gunrock::graph::graph_properties_t properties = gunrock::graph::graph_properties_t();
+  gunrock::graph::graph_properties_t properties =
+      gunrock::graph::graph_properties_t();
 
   if (util::is_market(params.filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
@@ -81,8 +82,7 @@ void test_tc(int num_arguments, char** argument_array) {
   // --
   // Build graph
 
-  auto G =
-      graph::build<memory_space_t::device>(properties, csr);
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation
