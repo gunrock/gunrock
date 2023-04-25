@@ -9,6 +9,7 @@
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
+#include <gunrock/formats/formats.hxx>
 
 #include <thrust/binary_search.h>
 #include <thrust/execution_policy.h>
@@ -29,7 +30,7 @@ using namespace memory;
 // memory error. Another important thing to note is that
 // virtual functions should also have undefined behavior,
 // but they seem to work.
-template <typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space, typename vertex_t, typename edge_t, typename weight_t>
 class graph_csr_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -91,6 +92,7 @@ class graph_csr_t {
     return {get_source_vertex(e), get_destination_vertex(e)};
   }
 
+  // TODO: this uses 1-based indexing while other views use 0-based indexing
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
     return (edge_type)search::binary::execute(
@@ -210,17 +212,13 @@ class graph_csr_t {
   }
 
  protected:
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               edge_type* _row_offsets,
-                               vertex_type* _column_indices,
-                               weight_type* _values) {
-    this->number_of_vertices = _number_of_vertices;
-    this->number_of_edges = _number_of_edges;
+  __host__ void set(gunrock::format::csr_t<space, vertex_t, edge_t, weight_t>& csr) {
+    this->number_of_vertices = csr.number_of_rows;
+    this->number_of_edges = csr.number_of_nonzeros;
     // Set raw pointers
-    offsets = raw_pointer_cast<edge_type>(_row_offsets);
-    indices = raw_pointer_cast<vertex_type>(_column_indices);
-    values = raw_pointer_cast<weight_type>(_values);
+    offsets = raw_pointer_cast(csr.row_offsets.data());
+    indices = raw_pointer_cast(csr.column_indices.data());
+    values = raw_pointer_cast(csr.nonzero_values.data());
   }
 
  private:

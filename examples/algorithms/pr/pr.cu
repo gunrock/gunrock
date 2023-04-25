@@ -22,28 +22,22 @@ void test_pr(int num_arguments, char** argument_array) {
   gunrock::io::cli::parameters_t params(num_arguments, argument_array,
                                         "Page Rank");
 
-  csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto [properties, coo] = mm.load(params.filename);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
-    csr.from_coo(mm.load(params.filename));
+    csr.from_coo(coo);
   }
 
   // --
   // Build graph
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get(),  // values
-      row_indices.data().get()          // row_indices
-  );  // supports column_offsets (default = nullptr)
+  auto G =
+      graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

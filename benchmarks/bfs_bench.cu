@@ -73,22 +73,17 @@ void bfs_bench(nvbench::state& state) {
 
   // --
   // IO
-  csr_t csr;
-
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  csr.from_coo(mm.load(filename));
+  auto [properties, coo] = mm.load(filename);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  csr.from_coo(coo);
 
   // --
-  // Build graph + metadata
-  auto G = graph::build::from_csr<memory_space_t::device,
-                                  graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
+  // Build graph
+
+  auto G =
+      graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

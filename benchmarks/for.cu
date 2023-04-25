@@ -13,8 +13,8 @@ void parallel_for(nvbench::state& state) {
   // Build a graph using a sample csr.
   auto csr = io::sample::csr();
   auto G =
-      graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(csr);
-
+      graph::build<memory_space_t::device>({}, csr); 
+  
   // Initialize the context.
   gcuda::device_id_t device = 0;
   gcuda::multi_context_t context(device);

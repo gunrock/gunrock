@@ -17,6 +17,8 @@ void test_bfs(int num_arguments, char** argument_array) {
 
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  //using coo_t =
+  //    format::coo_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
   // --
   // IO
@@ -24,34 +26,23 @@ void test_bfs(int num_arguments, char** argument_array) {
   gunrock::io::cli::parameters_t params(num_arguments, argument_array,
                                         "Breadth First Search");
 
-  csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto [properties, coo] = mm.load(params.filename);
+  
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
-    csr.from_coo(mm.load(params.filename));
+    csr.from_coo(coo);
   }
 
-  // Data for CSC format.
-  // thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  // thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   // --
-  // Build graph + metadata
+  // Build graph
 
   auto G =
-      graph::build::from_csr<memory_space_t::device,
-                             graph::view_t::csr /* | graph::view_t::csc */>(
-          csr.number_of_rows,               // rows
-          csr.number_of_columns,            // columns
-          csr.number_of_nonzeros,           // nonzeros
-          csr.row_offsets.data().get(),     // row_offsets
-          csr.column_indices.data().get(),  // column_indices
-          csr.nonzero_values.data().get()   // values
-          // row_indices.data().get(),         // row_indices
-          // column_offsets.data().get()       // column_offsets
-      );
+      graph::build<memory_space_t::device>(properties, csr);
+
 
   // --
   // Params and memory allocation
