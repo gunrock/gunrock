@@ -39,8 +39,8 @@ struct empty_graph_t {};
  * | scan          | O(n^2)           | O(m) | O(m+n)       | O(m+n)  |
  * | get neighbors | O(n)             | O(m) | O(d)         | O(d)    |
  * | is edge       | O(1)             | O(m) | O(d)         | O(d)    |
- * | insert edge   | O(1)             | O(1) | O(1) or O(d) | O(m+n)  | (x)
- * | delete edge   | O(1)             | O(m) | O(d)         | O(m+n)  | (x)
+ * | insert edge   | O(1)             | O(1) | O(1) or O(d) | O(m+n)  |
+ * | delete edge   | O(1)             | O(m) | O(d)         | O(m+n)  |
  *
  *
  * @tparam space memory space to use for the graph (device or host).
@@ -336,7 +336,7 @@ class graph_t : public graph_view_t... {
 
   graph_properties_t properties;
 
-};  // namespace graph
+};  // class graph_t
 
 /**
  * @brief Get the average degree of a graph.

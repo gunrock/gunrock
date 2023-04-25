@@ -14,16 +14,18 @@ on:
 
 env:
   BUILD_TYPE: Release
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+  ARCHITECTURES: 75
+  
 jobs:
-  # This workflow contains a single job called "build"
   build:
+    strategy:
+      matrix:
+        os: [windows-2022, windows-2019]
+        
     # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
     if: "!contains(github.event.commits[0].message, '[skip windows]')"
     runs-on: windows-2019
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
@@ -33,18 +35,13 @@ jobs:
           cuda: '12.1.0'
           linux-local-args: '["--toolkit"]'
 
-      # Runs a single command using the runners shell
       - name: Check nvcc version
         run: nvcc -V
         
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
       
       - name: Configure cmake
-        # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-        # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
         run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} # -DESSENTIALS_BUILD_BENCHMARKS=ON
         
       - name: Build all applications
-        # Build your program with the given configuration
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

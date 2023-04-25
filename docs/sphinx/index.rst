@@ -16,6 +16,8 @@
    gunrock.wiki/Presentations.md
    Copyright and License <https://github.com/gunrock/gunrock/tree/main/LICENSE>
    Developers and Contributors <https://github.com/gunrock/gunrock/graphs/contributors>
+   gunrock.wiki/Frequently-Asked-Questions.md
+   gunrock.wiki/Acknowledgments.md
 
 .. toctree::
    :hidden:
@@ -34,7 +36,7 @@
    :name: manual
    :glob:
 
-   reference/*
+   gunrock.wiki/reference/*
 
 .. toctree::
    :hidden:
@@ -52,6 +54,14 @@
    gunrock.wiki/Multiple-GPUs-And-Python.md
    Boolmap Frontier <https://github.com/gunrock/gunrock/blob/main/include/gunrock/framework/frontier/experimental/boolmap_frontier.hxx>
    Hypergraphs (Request Access) <https://github.com/owensgroup/hypergraphs>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 3
+   :caption: DARPA HIVE Project
+
+   gunrock.wiki/darpa_hive/phase_1/README.md
+   gunrock.wiki/darpa_hive/phase_2/README.md
 
 .. toctree::
    :hidden:
