@@ -59,7 +59,7 @@ void test_csc_csr(int num_arguments, char** argument_array) {
   
   // Use CSC and CSR views
   auto G =
-      graph::build::build<memory_space_t::host>(properties, csc, csr);
+      graph::build<memory_space_t::host>(properties, csc, csr);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";

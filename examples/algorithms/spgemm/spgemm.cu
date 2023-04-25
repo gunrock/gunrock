@@ -38,7 +38,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   // --
   // Build graph for A
   auto A =
-      graph::build::build<memory_space_t::device>(a_properties, a_csr);
+      graph::build<memory_space_t::device>(a_properties, a_csr);
   
   // Load B 
   // Filename to be read
@@ -53,7 +53,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   // --
   // Build graph for B
   auto B =
-      graph::build::build<memory_space_t::device>(b_properties, b_csr);
+      graph::build<memory_space_t::device>(b_properties, b_csr);
 
   /// Let's use CSR representation
   csr_t C;

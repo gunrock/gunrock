@@ -43,7 +43,7 @@ void test_coo(int num_arguments, char** argument_array) {
   
   // Use COO view 
   auto G =
-      graph::build::build<memory_space_t::host>(properties, coo);
+      graph::build<memory_space_t::host>(properties, coo);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";

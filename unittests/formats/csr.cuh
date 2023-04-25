@@ -41,7 +41,7 @@ void test_csr(int num_arguments, char** argument_array) {
 
   // Use CSR view
   auto G =
-      graph::build::build<memory_space_t::host>(properties, csr);
+      graph::build<memory_space_t::host>(properties, csr);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";

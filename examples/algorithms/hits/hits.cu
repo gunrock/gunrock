@@ -19,7 +19,7 @@ void test_hits(int num_arguments, char** argument_array) {
   // IO
 
   gunrock::io::cli::parameters_t params(num_arguments, argument_array,
-                                        "Betweenness Centrality");
+                                        "Hyperlink-Induced Topic Search");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(params.filename);
@@ -36,7 +36,7 @@ void test_hits(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(properties, csr);
+      graph::build<memory_space_t::device>(properties, csr);
 
   hits::result_c<vertex_t, weight_t> result;
   unsigned int max_iter = 20;

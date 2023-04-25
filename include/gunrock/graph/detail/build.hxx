@@ -1,6 +1,6 @@
 /**
  * @file build.hxx
- * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @author Annie Robison (amrobison@ucdavis.edu)
  * @brief
  * @date 2020-12-04
  *
@@ -13,7 +13,6 @@
 
 namespace gunrock {
 namespace graph {
-namespace build {
 namespace detail {
 
 template <memory_space_t space,
@@ -178,6 +177,5 @@ auto builder(graph::graph_properties_t properties,
   return G;
 }
 }  // namespace detail
-}  // namespace build
 }  // namespace graph
 }  // namespace gunrock

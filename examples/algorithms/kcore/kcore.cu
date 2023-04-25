@@ -40,7 +40,7 @@ void test_kcore(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(properties, csr);
+      graph::build<memory_space_t::device>(properties, csr);
 
   std::cout << "G.get_number_of_vertices() : " << G.get_number_of_vertices()
             << std::endl;

@@ -36,7 +36,7 @@ void test_async_bfs(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(properties, csr);
+      graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

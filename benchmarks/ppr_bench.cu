@@ -90,7 +90,7 @@ void ppr_bench(nvbench::state& state) {
   // Build graph
 
   auto G =
-      graph::build::build<memory_space_t::device>(properties, csr);
+      graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

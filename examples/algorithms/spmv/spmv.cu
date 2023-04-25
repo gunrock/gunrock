@@ -44,7 +44,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   // Convert the dataset you loaded into an `essentials` graph.
   // `memory_space_t::device` -> the graph will be created on the GPU.
   auto G =
-      graph::build::build<memory_space_t::device>(properties, csr);
+      graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

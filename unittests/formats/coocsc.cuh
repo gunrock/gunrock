@@ -61,7 +61,7 @@ void test_coo_csc(int num_arguments, char** argument_array) {
   
   // Use COO and CSC views
   auto G =
-      graph::build::build<memory_space_t::host>(properties, coo, csc);
+      graph::build<memory_space_t::host>(properties, coo, csc);
 
   // Test graph properties
   std::cout << "Directed: " << G.is_directed() << "\n";
