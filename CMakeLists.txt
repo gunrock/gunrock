@@ -76,6 +76,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchThreads.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -147,7 +148,6 @@ target_include_directories(essentials
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
-  # INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
@@ -160,6 +160,7 @@ target_link_libraries(essentials
   INTERFACE curand
   INTERFACE cuda
   INTERFACE cusparse
+  INTERFACE ${CMAKE_THREAD_LIBS_INIT}
 )
 
 ####################################################
