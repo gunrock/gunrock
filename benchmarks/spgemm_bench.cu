@@ -87,6 +87,8 @@ void spgemm_bench(nvbench::state& state) {
   // Define types
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csc_t =
+      format::csc_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
   // --
   // Build graphs + metadata
@@ -98,10 +100,14 @@ void spgemm_bench(nvbench::state& state) {
   auto A = graph::build<memory_space_t::device>(a_properties, a_csr);
 
   csr_t b_csr;
-  auto [b_properties, b_coo] = mm.load(filename_b);
-  b_csr.from_coo(b_coo);
+  csc_t b_csc;
 
-  auto B = graph::build<memory_space_t::device>(b_properties, b_csr);
+  auto [b_properties, b_coo] = mm.load(filename_b);
+
+  b_csr.from_coo(b_coo);
+  b_csc.from_csr(b_csr);
+
+  auto B = graph::build<memory_space_t::device>(b_properties, b_csc, b_csr);
 
   csr_t C;
 

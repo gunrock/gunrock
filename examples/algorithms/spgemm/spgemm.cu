@@ -21,6 +21,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   using weight_t = float;
   constexpr memory_space_t space = memory_space_t::device;
   using csr_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
+  using csc_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
 
   // Load A
   // Filename to be read
@@ -45,12 +46,18 @@ void test_spmv(int num_arguments, char** argument_array) {
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
   csr_t b_csr;
+  csc_t b_csc;
+
   auto [b_properties, b_coo] = mm.load(filename_b);
+
   b_csr.from_coo(b_coo);
+  b_csc.from_csr(b_csr);
 
   // --
   // Build graph for B
-  auto B = graph::build<memory_space_t::device>(b_properties, b_csr);
+  /// For now, we are using the transpose of CSR-matrix A as the second operand
+  /// for our spgemm.
+  auto B = graph::build<memory_space_t::device>(b_properties, b_csc, b_csr);
 
   /// Let's use CSR representation
   csr_t C;
