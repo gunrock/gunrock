@@ -25,20 +25,27 @@ namespace operators {
  * respective underlying load-balanced advance kernel to use. The following
  * table attempts to summarize these techniques:
  *  https://gist.github.com/neoblizz/fc4a3da5f4fc51f2f2a90753b5c49762
- * 
+ *
  * clang-format off
- * 
- * | Technique | Thread-Mapped | Block-Mapped | Warp-Mapped | Bucketing | Non-Zero Split | Merge-Path | Work Stealing |
+ *
+ * | Technique | Thread-Mapped | Block-Mapped | Warp-Mapped | Bucketing |
+ * Non-Zero Split | Merge-Path | Work Stealing |
  * |-|-|-|-|-|-|-|-|
- * | Summary | 1 element per thread | Block-sized elements per block | Warp-sized elements per warp | Buckets per threads, warps, blocks | Equal non-zeros per thread | Equal work-item (input and output) per thread | Steal work from threads when starving |
- * | Number of Scans | 1 | 2 | 2 | Unknown | Unknown | 1 | Unknown |
- * | Type of Scans | Device | Device (not-required), Block | Device, Warp | Unknown | Unknown | Device | Unknown |
- * | Binary-Search | N/A | N/A | N/A | N/A | 1 | 2 | N/A |
- * | Static or Dynamic | Static | Static | Static | Dynamic | Static | Static | Dynamic |
- * | Overall Estimated Overhead | None | Minor | Minor | Medium | High | Very High | High |
- * | Quality of Balancing | Poor (Data dependent) | HW Block-Scheduler dependent (Fair) | HW Warp-Scheduler dependent (Fair) | Good | Perfect Non-zeros quality | Perfect input and output | Medium |
- * | Storage Requirement | Input Size (for scan) | Input Size (for scan) | Input Size (for scan) | Unknown | Unknown | Unknown | Unknown |
- * 
+ * | Summary | 1 element per thread | Block-sized elements per block |
+ * Warp-sized elements per warp | Buckets per threads, warps, blocks | Equal
+ * non-zeros per thread | Equal work-item (input and output) per thread | Steal
+ * work from threads when starving | | Number of Scans | 1 | 2 | 2 | Unknown |
+ * Unknown | 1 | Unknown | | Type of Scans | Device | Device (not-required),
+ * Block | Device, Warp | Unknown | Unknown | Device | Unknown | | Binary-Search
+ * | N/A | N/A | N/A | N/A | 1 | 2 | N/A | | Static or Dynamic | Static | Static
+ * | Static | Dynamic | Static | Static | Dynamic | | Overall Estimated Overhead
+ * | None | Minor | Minor | Medium | High | Very High | High | | Quality of
+ * Balancing | Poor (Data dependent) | HW Block-Scheduler dependent (Fair) | HW
+ * Warp-Scheduler dependent (Fair) | Good | Perfect Non-zeros quality | Perfect
+ * input and output | Medium | | Storage Requirement | Input Size (for scan) |
+ * Input Size (for scan) | Input Size (for scan) | Unknown | Unknown | Unknown |
+ * Unknown |
+ *
  * clang-format on
  *
  * @todo somehow make that gist part of the in-code comments.
