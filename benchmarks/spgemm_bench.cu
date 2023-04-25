@@ -100,17 +100,27 @@ void spgemm_bench(nvbench::state& state) {
   csr_t b_csr;
   b_csr.from_coo(mm.load(filename_b));
 
-  auto B = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
+  auto B_csr = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
       b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
       b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
       b_csr.nonzero_values.data().get());
+
+  thrust::device_vector<vertex_t> row_indices(b_csr.number_of_nonzeros);
+  thrust::device_vector<edge_t> column_offsets(b_csr.number_of_columns + 1);
+
+  auto B = graph::build::from_csr<space, graph::view_t::csc>(
+      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
+      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
+      b_csr.nonzero_values.data().get(),
+      row_indices.data().get(),         
+      column_offsets.data().get());
 
   csr_t C;
 
   // --
   // Run SPGEMM with NVBench
   state.exec(nvbench::exec_tag::sync,
-             [&](nvbench::launch& launch) { gunrock::spgemm::run(A, B, C); });
+             [&](nvbench::launch& launch) { gunrock::spgemm::run(A, B_csr, B, C); });
 }
 
 int main(int argc, char** argv) {
