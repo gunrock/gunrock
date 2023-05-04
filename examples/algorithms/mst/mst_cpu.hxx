@@ -130,7 +130,7 @@ float run(csr_t& csr, weight_t* mst_weight) {
     }
   }
 
-  delete (supers);
+  delete[] supers;
 
   auto t_stop = high_resolution_clock::now();
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();

@@ -102,7 +102,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, intersect, context);
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     if (this->iteration == 1)
       return true;
     return false;

@@ -69,9 +69,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   void loop(gcuda::multi_context_t& context) override {
-    // TODO: Use a parameter (enum) to select between the two:
-    // Maybe use the existing advance_direction_t enum.
+// TODO: Use a parameter (enum) to select between the two:
+// Maybe use the existing advance_direction_t enum.
+#if __HIP_PLATFORM_NVIDIA__
     pull(context);
+#else
+    push(context);
+#endif
   }
 
   void push(gcuda::multi_context_t& context) {
@@ -103,6 +107,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, spmv, context);
   }
 
+#if __HIP_PLATFORM_NVIDIA__
   void pull(gcuda::multi_context_t& context) {
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -124,8 +129,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::neighborreduce::execute(G, E, y, spmv, plus_t, weight_t(0),
                                        context);
   }
+#endif
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     return this->iteration == 0 ? false : true;
   }
 };  // struct enactor_t

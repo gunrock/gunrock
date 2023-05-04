@@ -44,20 +44,57 @@ else()
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release")
 endif()
 
-message(STATUS "HIP Platform: $ENV{HIP_PLATFORM}")
+####################################################
+############# DEFINE PROJECT OPTIONS ###############
+####################################################
 
-if("$ENV{HIP_PLATFORM}" STREQUAL "nvidia")
-  message(STATUS "HIP PLATFORM IS NVIDIA = " $ENV{HIP_PLATFORM})
-  set(HIP_BACKEND_CUDA 1)
-  set(TARGET_LANGUAGE CUDA)      
-else()
-  set(HIP_BACKEND_CUDA 0)
-  set(TARGET_LANGUAGE HIP)
+option(ESSENTIALS_BUILD_EXAMPLES
+  "If on, builds the example graph applications."
+  ON)
+
+option(ESSENTIALS_AMD_BACKEND
+  "If on, builds essentials with __HIP_PLATFORM_AMD__ set."
+  ON)
+
+option(ESSENTIALS_NVIDIA_BACKEND
+  "If on, builds essentials with __HIP_PLATFORM_NVIDIA__ set."
+  OFF)
+
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  message(FATAL_ERROR "NVIDIA backend is currently not supported in this branch.")
 endif()
 
+if((${ESSENTIALS_AMD_BACKEND} AND ${ESSENTIALS_NVIDIA_BACKEND}))
+  message(FATAL_ERROR "Both NVIDIA and AMD backends specified [ON], select one: -DESSENTIALS_AMD_BACKEND=ON or -DESSENTIALS_NVIDIA_BACKEND=ON.")
+endif()
 
-if("${HIP_BACKEND_CUDA}" STREQUAL "1")
-  message(STATUS "HIP PLATFORM IS SET TO NVIDIA " )
+if(NOT(${ESSENTIALS_AMD_BACKEND}) AND NOT(${ESSENTIALS_NVIDIA_BACKEND}))
+  message(FATAL_ERROR "Both NVIDIA and AMD backends specified [OFF], select one: -DESSENTIALS_AMD_BACKEND=ON or -DESSENTIALS_NVIDIA_BACKEND=ON.")
+endif()
+
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  option(ESSENTIALS_BUILD_TESTS
+    "If on, builds the unit tests."
+    ON)
+  option(ESSENTIALS_BUILD_BENCHMARKS
+    "If on, builds essentials with benchmarking support."
+    ON)
+else()
+  # Benchmarking and testing not supported w/ AMD.
+  option(ESSENTIALS_BUILD_TESTS
+    "If on, builds the unit tests."
+    OFF)
+  option(ESSENTIALS_BUILD_BENCHMARKS
+    "If on, builds essentials with benchmarking support."
+    OFF)
+endif()
+
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  message(STATUS "Essentials building with NVIDIA backend.")
+  set(TARGET_LANGUAGE CUDA)
+else()
+  message(STATUS "Essentials building with AMD backend.")
+  set(TARGET_LANGUAGE HIP)
 endif()
 
 project(essentials
@@ -75,11 +112,23 @@ project(essentials
 ## Can be used for applications by extracting the
 ## CUDA_ARCHITECTURES property from the project.
 ## see cmake's get_target_properties()
-if(NOT CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 75)
-  message(STATUS "Using default GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  if(NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75)
+    message(STATUS "Using default GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
+  else()
+    message(STATUS "GPU Architecture (-DCMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+  endif()
 else()
-  message(STATUS "GPU Architecture (-DCMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+  if(NOT CMAKE_HIP_ARCHITECTURES)
+    set(CMAKE_HIP_ARCHITECTURES gfx90a)
+    message(STATUS "Using default GPU Architecture: ${CMAKE_HIP_ARCHITECTURES}")
+  else()
+    message(STATUS "GPU Architecture (-DCMAKE_HIP_ARCHITECTURES): ${CMAKE_HIP_ARCHITECTURES}")
+  endif()
+  set(AMDGPU_TARGETS ${CMAKE_HIP_ARCHITECTURES})
+  set(DEFAULT_AMDGPU_TARGETS AMDGPU_TARGETS)
+  message(STATUS "AMDGPU_TARGETS: ${AMDGPU_TARGETS}")
 endif()
 
 # begin /* Dependencies directory */
@@ -87,13 +136,19 @@ set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
 # begin /* Include cmake modules */
+if(${ESSENTIALS_AMD_BACKEND})
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchROCMHIP.cmake)
+endif()
+
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
-#include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+endif()
+
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThreads.cmake)
-find_package(Threads)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -118,7 +173,7 @@ add_library(essentials INTERFACE)
 ####################################################
 ############### SET TARGET PROPERTIES ##############
 ####################################################
-if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+if(${ESSENTIALS_NVIDIA_BACKEND})
   set_target_properties(essentials 
     PROPERTIES
       CXX_STANDARD 17
@@ -144,19 +199,6 @@ else()
   )
 endif()
 
-# Use for later.
-if("${HIP_BACKEND_CUDA}" STREQUAL "1")
-  target_compile_definitions(essentials
-    INTERFACE 
-      SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
-  )
-else()
-  target_compile_definitions(essentials
-    INTERFACE 
-      SM_TARGET=${CMAKE_HIP_ARCHITECTURES}
-  )
-endif()
-
 # Add GIT SHA-1 definition
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
 include(GetGitRevisionDescription)
@@ -165,14 +207,27 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  target_compile_definitions(essentials
+    INTERFACE 
+      SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
+      ESSENTIALS_BACKEND="NVIDIA"
+      __HIP_PLATFORM_NVIDIA__
+  )
+else()
+  target_compile_definitions(essentials
+    INTERFACE 
+      SM_TARGET=${CMAKE_HIP_ARCHITECTURES}
+      ESSENTIALS_BACKEND="AMD"
+      __HIP_PLATFORM_AMD__
+  )
+endif()
+
 target_compile_definitions(essentials
   INTERFACE 
-    HIP_BACKEND=${HIP_BACKEND_CUDA}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
     GIT_SHA1="${GIT_SHA1}"
 )
-
-message(STATUS "Essentials ${TARGET_LANGUAGE} Architecture: ${ESSENTIALS_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
@@ -201,7 +256,7 @@ target_include_directories(essentials
 ############ TARGET LINK LIBRARIES #################
 ####################################################
 
-if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+if(${ESSENTIALS_NVIDIA_BACKEND})
   target_link_libraries(essentials
     INTERFACE curand
     INTERFACE cuda
@@ -231,18 +286,11 @@ endif()
 ####################################################
 target_sources(essentials
   INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include/gunrock/util/gitsha1make.c"
-  INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include/gunrock/io/detail/mmio.cpp"
 )
 
 ####################################################
 ############## SET CXX & CUDA FLAGS ################
 ####################################################
-
-if("${HIP_BACKEND_CUDA}" STREQUAL "1")
-  set(PLATFORM_FLAG __HIP_PLATFORM_NVIDIA__)
-else()
-  set(PLATFORM_FLAG __HIP_PLATFORM_AMD__)
-endif()
 
 set(CXX_FLAGS 
   $<$<CXX_COMPILER_ID:MSVC>:
@@ -307,27 +355,7 @@ set(HIP_FLAGS
   -Wno-deprecated-builtins
   -Wno-ignored-attributes
   "-Wno-\#pragma-messages"
-  -D ${PLATFORM_FLAG}
 )
-
-set(HIP_FLAGS
-  #-std=c++17
-  -D ${PLATFORM_FLAG}
-  -ferror-limit=100
-  #--expt-extended-lambda 
-  #--expt-relaxed-constexpr
-  #--use_fast_math
-  -DHIP_FAST_MATH
-  --offload-arch=gfx90a
-  #--ptxas-options -v
-  #--generate-line-info
-  
-  $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
-   --verbose
-   --debug # Host debug
-  # --device-debug # Device debug
-)
-
 
 set(HIP_RELEASE_FLAGS
   ${HIP_FLAGS}
@@ -345,7 +373,7 @@ set(HIP_DEBUG_FLAGS
 ####################################################
 
 
-if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+if(${ESSENTIALS_NVIDIA_BACKEND})
   target_compile_options(essentials INTERFACE 
     $<$<AND:$<COMPILE_LANGUAGE:CXX>>:${CXX_FLAGS}>
     $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:DEBUG>>:${CUDA_DEBUG_FLAGS}>
@@ -362,9 +390,6 @@ endif()
 ####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
 ####################################################
-option(ESSENTIALS_BUILD_EXAMPLES
-  "If on, builds the example graph applications."
-  ON)
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_EXAMPLES)
@@ -374,23 +399,17 @@ endif(ESSENTIALS_BUILD_EXAMPLES)
 ####################################################
 ################ BUILD UNIT TESTS  #################
 ####################################################
-option(ESSENTIALS_BUILD_TESTS
-  "If on, builds the unit tests."
-  ON)
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   enable_testing()
-  #add_subdirectory(unittests)
+  add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
 
 ####################################################
 ################ BUILD BENCHMARKS  #################
 ####################################################
-option(ESSENTIALS_BUILD_BENCHMARKS
-  "If on, builds essentials with benchmarking support."
-  ON)
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_BENCHMARKS)

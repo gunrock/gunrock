@@ -21,6 +21,7 @@ namespace launch_box {
  */
 enum sm_flag_t : unsigned {
   fallback = ~0u,
+#if __HIP_PLATFORM_NVIDIA__
   sm_30 = 1 << 0,
   sm_35 = 1 << 1,
   sm_37 = 1 << 2,
@@ -35,7 +36,33 @@ enum sm_flag_t : unsigned {
   sm_75 = 1 << 11,
   sm_80 = 1 << 12,
   sm_86 = 1 << 13,
-  sm_gfx90a = 1 << 14
+  sm_87 = 1 << 14,
+  sm_89 = 1 << 15,
+  sm_90 = 1 << 16,
+#else
+  sm_gfx700 = 1 << 0,
+  sm_gfx701 = 1 << 1,
+  sm_gfx801 = 1 << 2,
+  sm_gfx802 = 1 << 3,
+  sm_gfx803 = 1 << 4,
+  sm_gfx900 = 1 << 5,
+  sm_gfx902 = 1 << 6,
+  sm_gfx904 = 1 << 7,
+  sm_gfx906 = 1 << 8,
+  sm_gfx908 = 1 << 9,
+  sm_gfx90a = 1 << 10,
+  sm_gfx90c = 1 << 11,
+  sm_gfx1010 = 1 << 12,
+  sm_gfx1011 = 1 << 13,
+  sm_gfx1012 = 1 << 14,
+  sm_gfx1013 = 1 << 15,
+  sm_gfx1030 = 1 << 16,
+  sm_gfx1031 = 1 << 17,
+  sm_gfx1032 = 1 << 18,
+  sm_gfx1033 = 1 << 19,
+  sm_gfx1034 = 1 << 20,
+  sm_gfx1035 = 1 << 21,
+#endif
 };
 
 /**

@@ -17,11 +17,15 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 #include <gunrock/framework/operators/advance/helpers.hxx>
-// #include <gunrock/framework/operators/advance/merge_path.hxx>
+
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/bucketing.hxx>
+
+#if __HIP_PLATFORM_NVIDIA__
 #include <gunrock/framework/operators/advance/merge_path_v2.hxx>
+#include <gunrock/framework/operators/advance/merge_path.hxx>
+#endif
 
 namespace gunrock {
 namespace operators {
@@ -104,15 +108,17 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
-    if (lb == load_balance_t::merge_path) {
-      merge_path::execute<direction, input_type, output_type>(
-          G, op, input, output, segments, *context0);
+    if (lb == load_balance_t::thread_mapped) {
+      thread_mapped::execute<direction, input_type, output_type>(
+          G, op, *input, *output, segments, *context0);
+#if __HIP_PLATFORM_NVIDIA__
     } else if (lb == load_balance_t::merge_path_v2) {
       merge_path_v2::execute<direction, input_type, output_type>(
           G, op, *input, *output, segments, *context0);
-    } else if (lb == load_balance_t::thread_mapped) {
-      thread_mapped::execute<direction, input_type, output_type>(
-          G, op, *input, *output, segments, *context0);
+    } else if (lb == load_balance_t::merge_path) {
+      merge_path::execute<direction, input_type, output_type>(
+          G, op, input, output, segments, *context0);
+#endif
     } else if (lb == load_balance_t::block_mapped) {
       block_mapped::execute<direction, input_type, output_type>(
           G, op, *input, *output, *context0);

@@ -2,7 +2,6 @@
 
 #include <exception>
 #include <string>
-#include <hip/hip_runtime_api.h>
 
 namespace gunrock {
 

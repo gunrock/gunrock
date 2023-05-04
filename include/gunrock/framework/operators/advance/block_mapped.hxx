@@ -1,4 +1,4 @@
-#include "hip/hip_runtime.h"
+
 /**
  * @file block_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)

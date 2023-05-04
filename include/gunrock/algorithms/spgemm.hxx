@@ -278,7 +278,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
    * @param context The context of the execution (unused).
    * @return true returns true after one iteration.
    */
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     return this->iteration == 0 ? false : true;
   }
 };  // struct enactor_t

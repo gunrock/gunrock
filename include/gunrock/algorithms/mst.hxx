@@ -254,7 +254,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     thrust::copy_n(policy, new_roots, P->n_vertices, roots);
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     return (P->super_vertices[0] == 1);
   }

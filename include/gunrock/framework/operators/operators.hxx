@@ -21,4 +21,7 @@ namespace operators {}  // namespace operators
 #include <gunrock/framework/operators/for/for.hxx>
 #include <gunrock/framework/operators/uniquify/uniquify.hxx>
 #include <gunrock/framework/operators/batch/batch.hxx>
-// #include <gunrock/framework/operators/neighborreduce/neighborreduce.hxx>
+
+#if __HIP_PLATFORM_NVIDIA__
+#include <gunrock/framework/operators/neighborreduce/neighborreduce.hxx>
+#endif

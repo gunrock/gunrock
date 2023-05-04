@@ -268,7 +268,7 @@ inline constexpr unsigned total_global_memory(device_properties_t& prop) {
 
 inline int get_max_grid_dimension_x(device_id_t device) {
   int max_dim_x;
-  cudaDeviceGetAttribute(&max_dim_x, cudaDevAttrMaxGridDimX, device);
+  hipDeviceGetAttribute(&max_dim_x, hipDeviceAttributeMaxGridDimX, device);
   return max_dim_x;
 }
 

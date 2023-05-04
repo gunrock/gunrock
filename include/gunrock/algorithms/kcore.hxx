@@ -176,7 +176,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     }
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto n_vertices = G.get_number_of_vertices();
