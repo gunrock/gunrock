@@ -17,9 +17,9 @@ namespace frontier {
  * @brief Underlying frontier data structure.
  */
 enum frontier_view_t {
-  vector,  /// vector-based frontier
-  bitmap,  /// bitmap-based frontier
-  boolmap  /// boolmap-based frontier
+  vector,  ///< vector-based frontier
+  bitmap,  ///< bitmap-based frontier
+  boolmap  ///< boolmap-based frontier
 };         // enum: frontier_view_t
 
 /**
@@ -27,9 +27,9 @@ enum frontier_view_t {
  * @todo Use a better name than frontier_kind_t.
  */
 enum frontier_kind_t {
-  vertex_frontier,      /// vertex frontier storage only
-  edge_frontier,        /// edge frontier storage only
-  vertex_edge_frontier  /// (wip)
+  vertex_frontier,      ///< vertex frontier storage only
+  edge_frontier,        ///< edge frontier storage only
+  vertex_edge_frontier  ///< (wip)
 };                      // enum: frontier_kind_t
 
 }  // namespace frontier

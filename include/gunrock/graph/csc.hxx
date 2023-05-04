@@ -16,7 +16,10 @@ struct empty_csc_t {};
 
 using namespace memory;
 
-template <typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space,
+          typename vertex_t,
+          typename edge_t,
+          typename weight_t>
 class graph_csc_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -117,17 +120,14 @@ class graph_csc_t {
   }
 
  protected:
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               edge_type* _column_offsets,
-                               vertex_type* _row_indices,
-                               weight_type* _values) {
-    this->number_of_vertices = _number_of_vertices;
-    this->number_of_edges = _number_of_edges;
+  __host__ void set(
+      gunrock::format::csc_t<space, vertex_t, edge_t, weight_t>& csc) {
+    this->number_of_vertices = csc.number_of_rows;
+    this->number_of_edges = csc.number_of_nonzeros;
     // Set raw pointers
-    offsets = raw_pointer_cast<edge_type>(_column_offsets);
-    indices = raw_pointer_cast<vertex_type>(_row_indices);
-    values = raw_pointer_cast<weight_type>(_values);
+    offsets = raw_pointer_cast(csc.column_offsets.data());
+    indices = raw_pointer_cast(csc.row_indices.data());
+    values = raw_pointer_cast(csc.nonzero_values.data());
   }
 
  private:

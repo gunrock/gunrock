@@ -103,9 +103,16 @@ html_css_files = [
 
 html_theme_options = {
     "repository_url": "https://github.com/gunrock/gunrock",
+    "use_repository_button": True,
+    "extra_footer": "<div>Gunrock © 2023 The Regents of the University of California.</div>"
+    # "show_nav_level": 3
+    # "home_page_in_toc": True,
+    # "show_navbar_depth": 3,
+    # "show_toc_level": 3
 }
+html_logo = "https://raw.githubusercontent.com/gunrock/docs/develop/docs/_media/logo.png"
+html_favicon = "https://raw.githubusercontent.com/gunrock/docs/develop/docs/_media/logo.png"
 
-# html_favicon = nwgraph.ico
 # html_additional_pages = []
 # html_copy_source = True
 # html_show_source_link = True
@@ -124,6 +131,9 @@ breathe_default_project = "gunrock"
 
 # Tell sphinx what the primary language being documented is.
 primary_domain = 'cpp'
+
+cpp_id_attributes = ["__host__", "__device__", "__forceinline__"]
+cpp_paren_attributes = ["__host__", "__device__", "__forceinline__"]
 
 todo_include_todos = False
 
@@ -153,6 +163,13 @@ exhale_args = {
     GENERATE_HTML          = YES
     HIDE_UNDOC_CLASSES     = YES
     HIDE_UNDOC_MEMBERS     = YES
+    LAYOUT_FILE            = "./layout.xml"
+    HTML_COLORSTYLE_HUE    = 75
+    HTML_DYNAMIC_SECTIONS  = YES
+    HTML_INDEX_NUM_ENTRIES = 0
+    DISABLE_INDEX          = YES
+    GENERATE_TREEVIEW      = YES
+    TREEVIEW_WIDTH         = 270
     '''),
     # "verboseBuild": True,
     "listingExclude": [ r'.*_tag_invoke*' ],

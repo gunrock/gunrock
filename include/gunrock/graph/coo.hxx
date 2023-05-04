@@ -9,6 +9,7 @@
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
+#include <gunrock/formats/formats.hxx>
 
 namespace gunrock {
 namespace graph {
@@ -17,7 +18,10 @@ using namespace memory;
 
 struct empty_coo_t {};
 
-template <typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space,
+          typename vertex_t,
+          typename edge_t,
+          typename weight_t>
 class graph_coo_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -113,17 +117,14 @@ class graph_coo_t {
   }
 
  protected:
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               vertex_type* _row_indices,
-                               vertex_type* _column_indices,
-                               weight_type* _values) {
-    this->number_of_vertices = _number_of_vertices;
-    this->number_of_edges = _number_of_edges;
+  __host__ void set(
+      gunrock::format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
+    this->number_of_vertices = coo.number_of_rows;
+    this->number_of_edges = coo.number_of_nonzeros;
     // Set raw pointers
-    row_indices = raw_pointer_cast<edge_type>(_row_indices);
-    column_indices = raw_pointer_cast<vertex_type>(_column_indices);
-    values = raw_pointer_cast<weight_type>(_values);
+    row_indices = raw_pointer_cast(coo.row_indices.data());
+    column_indices = raw_pointer_cast(coo.column_indices.data());
+    values = raw_pointer_cast(coo.nonzero_values.data());
   }
 
  private:
