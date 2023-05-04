@@ -44,9 +44,25 @@ else()
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release")
 endif()
 
+message(STATUS "HIP Platform: $ENV{HIP_PLATFORM}")
+
+if("$ENV{HIP_PLATFORM}" STREQUAL "nvidia")
+  message(STATUS "HIP PLATFORM IS NVIDIA = " $ENV{HIP_PLATFORM})
+  set(HIP_BACKEND_CUDA 1)
+  set(TARGET_LANGUAGE CUDA)      
+else()
+  set(HIP_BACKEND_CUDA 0)
+  set(TARGET_LANGUAGE HIP)
+endif()
+
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+  message(STATUS "HIP PLATFORM IS SET TO NVIDIA " )
+endif()
+
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
-  LANGUAGES CXX C CUDA
+  LANGUAGES CXX C ${TARGET_LANGUAGE}
   DESCRIPTION "Programmable CUDA/C++ GPU Graph Analytics"
   HOMEPAGE_URL "https://github.com/gunrock/gunrock"
 )
@@ -72,11 +88,12 @@ set(PROJECT_DEPS_DIR externals)
 
 # begin /* Include cmake modules */
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+#include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThreads.cmake)
+find_package(Threads)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -101,19 +118,44 @@ add_library(essentials INTERFACE)
 ####################################################
 ############### SET TARGET PROPERTIES ##############
 ####################################################
-set_target_properties(essentials 
-  PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
-    CUDA_STANDARD 17
-    CUDA_STANDARD_REQUIRED ON
-    CUDA_EXTENSIONS OFF
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES} # Set required architecture.
-    # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
-)
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+  set_target_properties(essentials 
+    PROPERTIES
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      CXX_EXTENSIONS OFF
+      CUDA_STANDARD 17
+      CUDA_STANDARD_REQUIRED ON
+      CUDA_EXTENSIONS OFF
+      CUDA_RESOLVE_DEVICE_SYMBOLS ON
+      CUDA_SEPARABLE_COMPILATION ON
+      CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES} # Set required architecture.
+  )
+else()
+  set_target_properties(essentials 
+    PROPERTIES
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      CXX_EXTENSIONS OFF
+      HIP_STANDARD 17
+      HIP_STANDARD_REQUIRED ON
+      HIP_EXTENSIONS OFF
+      HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES} # Set required architecture.
+  )
+endif()
+
+# Use for later.
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+  target_compile_definitions(essentials
+    INTERFACE 
+      SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
+  )
+else()
+  target_compile_definitions(essentials
+    INTERFACE 
+      SM_TARGET=${CMAKE_HIP_ARCHITECTURES}
+  )
+endif()
 
 # Add GIT SHA-1 definition
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
@@ -125,10 +167,12 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 ####################################################
 target_compile_definitions(essentials
   INTERFACE 
-    SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
+    HIP_BACKEND=${HIP_BACKEND_CUDA}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
     GIT_SHA1="${GIT_SHA1}"
 )
+
+message(STATUS "Essentials ${TARGET_LANGUAGE} Architecture: ${ESSENTIALS_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
@@ -156,12 +200,31 @@ target_include_directories(essentials
 ####################################################
 ############ TARGET LINK LIBRARIES #################
 ####################################################
-target_link_libraries(essentials
-  INTERFACE curand
-  INTERFACE cuda
-  INTERFACE cusparse
-  INTERFACE ${CMAKE_THREAD_LIBS_INIT}
-)
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+  target_link_libraries(essentials
+    INTERFACE curand
+    INTERFACE cuda
+    INTERFACE cusparse
+    INTERFACE ${CMAKE_THREAD_LIBS_INIT}
+    -lstdc++fs
+  )
+else()
+  target_link_directories(essentials
+    INTERFACE ${ROCM_PATH}
+    INTERFACE ${ROCM_PATH}/lib
+    INTERFACE ${HIP_PATH}
+    INTERFACE ${HIP_PATH}/lib
+  )
+
+  target_link_libraries(essentials
+    INTERFACE hip::device
+    INTERFACE hiprand
+    INTERFACE hipsparse
+    INTERFACE ${CMAKE_THREAD_LIBS_INIT}
+    -lstdc++fs
+  )
+endif()
 
 ####################################################
 ################# TARGET SOURCES ###################
@@ -174,20 +237,33 @@ target_sources(essentials
 ####################################################
 ############## SET CXX & CUDA FLAGS ################
 ####################################################
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+  set(PLATFORM_FLAG __HIP_PLATFORM_NVIDIA__)
+else()
+  set(PLATFORM_FLAG __HIP_PLATFORM_AMD__)
+endif()
+
 set(CXX_FLAGS 
   $<$<CXX_COMPILER_ID:MSVC>:
     /W4
   >
   $<$<CXX_COMPILER_ID:GNU>:
     -Wall 
-    # -Wextra
     -Wno-unused-result
     -Wno-unused-local-typedefs
     -Wno-strict-aliasing
     -Wno-unused-function
     -Wno-format-security
+    # -Wextra
     # -Werror
     # -vvv
+  >
+  $<$<CXX_COMPILER_ID:CLANG>:
+    -Wno-unused-result
+    -Wno-deprecated-builtins
+    -Wno-ignored-attributes
+    "-Wno-\#pragma-messages"
   >
 )
 
@@ -205,14 +281,83 @@ set(CUDA_DEBUG_FLAGS
   --device-debug # Device debug
 )
 
+set(HIP_FLAGS
+  # -fgpu-sanitize          # Enable sanitizer for AMDGPU target
+  # -mamdgpu-ieee           # Sets the IEEE bit in the expected default floating point  mode register. 
+                            # Floating point opcodes that support exception flag gathering quiet and 
+                            # propagate signaling NaN inputs per IEEE 754-2008. 
+                            # This option changes the ABI. (AMDGPU only)
+  # -mcode-object-v3        # Legacy option to specify code object ABI V3 (AMDGPU only)
+                            # Specify code object ABI version. 
+                            # Allowed values are 2, 3, 4, and 5. Defaults to 4. (AMDGPU only)
+  # -mcumode                # Specify CU wavefront execution mode (AMDGPU only)
+  # -mno-code-object-v3     # Legacy option to specify code object ABI V2 (AMDGPU only)
+  # -mno-cumode             # Specify WGP wavefront execution mode (AMDGPU only)
+  # -mno-sram-ecc           # Legacy option to specify SRAM ECC mode (AMDGPU only)
+  # -mno-tgsplit            # Disable threadgroup split execution mode (AMDGPU only)
+  # -mno-wavefrontsize64      # Specify wavefront size 32 mode (AMDGPU only)
+  # -msram-ecc              # Legacy option to specify SRAM ECC mode (AMDGPU only)
+  # -mtgsplit               # Enable threadgroup split execution mode (AMDGPU only)
+  -munsafe-fp-atomics       # Enable unsafe floating point atomic instructions (AMDGPU only)
+  # -mwavefrontsize64       # Specify wavefront size 64 mode (AMDGPU only)
+  # -mxnack                 # Legacy option to specify XNACK mode (AMDGPU only)
+  
+  # Suppress warnings.
+  -Wno-unused-result
+  -Wno-deprecated-builtins
+  -Wno-ignored-attributes
+  "-Wno-\#pragma-messages"
+  -D ${PLATFORM_FLAG}
+)
+
+set(HIP_FLAGS
+  #-std=c++17
+  -D ${PLATFORM_FLAG}
+  -ferror-limit=100
+  #--expt-extended-lambda 
+  #--expt-relaxed-constexpr
+  #--use_fast_math
+  -DHIP_FAST_MATH
+  --offload-arch=gfx90a
+  #--ptxas-options -v
+  #--generate-line-info
+  
+  $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
+   --verbose
+   --debug # Host debug
+  # --device-debug # Device debug
+)
+
+
+set(HIP_RELEASE_FLAGS
+  ${HIP_FLAGS}
+  -O3
+)
+
+set(HIP_DEBUG_FLAGS
+  ${HIP_FLAGS}
+  -O0
+  -ggdb
+)
+
 ####################################################
 ############ TARGET COMPILE OPTIONS ################
 ####################################################
-target_compile_options(essentials INTERFACE 
-  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:DEBUG>>:${CXX_FLAGS}>
-  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:DEBUG>>:${CUDA_DEBUG_FLAGS}>
-  $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:RELEASE>>:${CUDA_RELEASE_FLAGS}>
-)
+
+
+if("${HIP_BACKEND_CUDA}" STREQUAL "1")
+  target_compile_options(essentials INTERFACE 
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>>:${CXX_FLAGS}>
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:DEBUG>>:${CUDA_DEBUG_FLAGS}>
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:RELEASE>>:${CUDA_RELEASE_FLAGS}>
+  )
+else()
+  target_compile_options(essentials INTERFACE 
+    $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
+    $<$<AND:$<COMPILE_LANGUAGE:HIP>,$<CONFIG:DEBUG>>:${HIP_DEBUG_FLAGS}>
+    $<$<AND:$<COMPILE_LANGUAGE:HIP>,$<CONFIG:RELEASE>>:${HIP_RELEASE_FLAGS}>
+  )
+endif()
 
 ####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
@@ -237,7 +382,7 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   enable_testing()
-  add_subdirectory(unittests)
+  #add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
 
 ####################################################

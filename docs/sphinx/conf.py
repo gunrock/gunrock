@@ -112,6 +112,7 @@ html_theme_options = {
 }
 html_logo = "https://raw.githubusercontent.com/gunrock/docs/develop/docs/_media/logo.png"
 html_favicon = "https://raw.githubusercontent.com/gunrock/docs/develop/docs/_media/logo.png"
+
 # html_additional_pages = []
 # html_copy_source = True
 # html_show_source_link = True

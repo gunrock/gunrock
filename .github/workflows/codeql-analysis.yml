@@ -18,7 +18,7 @@ env:
   # Customize the CMake build type here (Release, Debug)
   BUILD_TYPE: Release
   ARCHITECTURES: 75
-  
+
 jobs:
   analyze:
     name: Analyze

@@ -17,7 +17,7 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 #include <gunrock/framework/operators/advance/helpers.hxx>
-#include <gunrock/framework/operators/advance/merge_path.hxx>
+//#include <gunrock/framework/operators/advance/merge_path.hxx>
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/bucketing.hxx>
@@ -117,12 +117,12 @@ void execute(graph_t& G,
       block_mapped::execute<direction, input_type, output_type>(
           G, op, *input, *output, *context0);
     } else {
-      error::throw_if_exception(cudaErrorUnknown,
+      error::throw_if_exception(hipErrorUnknown,
                                 "Advance type not supported.");
     }
 
   } else {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "`context.size() != 1` not supported");
   }
 }

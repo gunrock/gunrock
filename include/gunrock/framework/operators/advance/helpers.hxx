@@ -65,6 +65,7 @@ std::size_t compute_output_offsets(graph_t& G,
 
   auto new_length = thrust::transform_exclusive_scan(
       context.execution_policy(),                      // execution policy
+      //thrust::cuda::par.on(context.stream()),
       thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
       thrust::make_counting_iterator<std::size_t>(total_elems +
                                                   1),  // input iterator: last

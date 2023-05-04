@@ -1,6 +1,6 @@
 include(FetchContent)
 set(FETCHCONTENT_QUIET ON)
-
+#[[
 message(STATUS "Cloning External Project: Thrust")
 get_filename_component(FC_BASE "${PROJECT_SOURCE_DIR}/externals"
                 REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
@@ -21,3 +21,7 @@ endif()
 set(THRUST_INCLUDE_DIR "${thrust_SOURCE_DIR}")
 # Windows doesn't support symblink, so make sure we link to the real library.
 set(CUB_INCLUDE_DIR "${thrust_SOURCE_DIR}/dependencies/cub")
+]]
+
+set(THRUST_INCLUDE_DIR "${/opt/rocm-5.2.3/rocthrust/include}")
+set(CUB_INCLUDE_DIR "${/opt/rocm-5.2.3/hipcub/include/hipcub}")

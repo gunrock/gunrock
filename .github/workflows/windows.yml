@@ -15,7 +15,7 @@ on:
 env:
   BUILD_TYPE: Release
   ARCHITECTURES: 75
-  
+
 jobs:
   build:
     strategy:

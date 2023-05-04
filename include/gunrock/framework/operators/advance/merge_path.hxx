@@ -16,9 +16,9 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 // XXX: Replace these later
-#include <moderngpu/transform.hxx>
-#include <moderngpu/kernel_scan.hxx>
-#include <moderngpu/kernel_load_balance.hxx>
+//#include <moderngpu/transform.hxx>
+//#include <moderngpu/kernel_scan.hxx>
+//#include <moderngpu/kernel_load_balance.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -39,7 +39,7 @@ void execute(graph_t& G,
              gcuda::standard_context_t& context) {
 #if 0
   if constexpr (direction == advance_direction_t::optimized) {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "Direction-optimized not yet implemented.");
 
     // Direction-Optimized advance is supported using CSR and CSC graph
@@ -49,7 +49,7 @@ void execute(graph_t& G,
     using find_csc_t = typename graph_t::graph_csc_view_t;
     if (!(G.template contains_representation<find_csr_t>() &&
           G.template contains_representation<find_csc_t>())) {
-      error::throw_if_exception(cudaErrorUnknown,
+      error::throw_if_exception(hipErrorUnknown,
                                 "CSR and CSC sparse-matrix representations "
                                 "required for direction-optimized advance.");
     }

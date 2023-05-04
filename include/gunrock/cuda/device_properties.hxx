@@ -15,7 +15,7 @@
 namespace gunrock {
 namespace gcuda {
 
-typedef cudaDeviceProp device_properties_t;
+typedef hipDeviceProp_t device_properties_t;
 
 struct compute_capability_t {
   unsigned major;
@@ -53,9 +53,9 @@ constexpr compute_capability_t make_compute_capability(unsigned combined) {
  * @brief Fetch compute capability from SM_TARGET macro.
  * \return compute_capabilty_t
  */
-constexpr compute_capability_t fetch_compute_capability() {
-  return make_compute_capability(SM_TARGET);
-}
+//constexpr compute_capability_t fetch_compute_capability() {
+//  return make_compute_capability(SM_TARGET);
+//}
 
 /**
  * @namespace properties
@@ -147,21 +147,22 @@ inline constexpr unsigned sm_registers(compute_capability_t capability) {
 
 /**
  * @brief Maximum amount of shared memory per SM.
- * @tparam sm3XCacheConfig cudaFuncCache enum representing the shared data
+ * @tparam sm3XCacheConfig hipFuncCache_t enum representing the shared data
  *                         cache configuration used when called on compute
  *                         capability 3.x
  * @param capability       Compute capability from which to get the result
  * \return unsigned
  * @todo Test if this function can be resolved at compile time
  */
-template <enum cudaFuncCache sm3XCacheConfig = cudaFuncCachePreferNone>
+/*
+template <enum hipFuncCache_t sm3XCacheConfig = hipFuncCachePreferNone>
 inline constexpr unsigned sm_max_shared_memory_bytes(
     compute_capability_t capability) {
   unsigned sm3XConfiguredSmem =
-      (sm3XCacheConfig == cudaFuncCachePreferNone)     ? 48 * KiB
-      : (sm3XCacheConfig == cudaFuncCachePreferShared) ? 48 * KiB
-      : (sm3XCacheConfig == cudaFuncCachePreferL1)     ? 16 * KiB
-      : (sm3XCacheConfig == cudaFuncCachePreferEqual)  ? 32 * KiB
+      (sm3XCacheConfig == hipFuncCachePreferNone)     ? 48 * KiB
+      : (sm3XCacheConfig == hipFuncCachePreferShared) ? 48 * KiB
+      : (sm3XCacheConfig == hipFuncCachePreferL1)     ? 16 * KiB
+      : (sm3XCacheConfig == hipFuncCachePreferEqual)  ? 32 * KiB
                                                        : 48 * KiB;
 
   return (capability >= 86) ? 100 * KiB :  // SM86+
@@ -185,7 +186,7 @@ inline constexpr unsigned sm_max_shared_memory_bytes(
                                 :  // SM37
              sm3XConfiguredSmem;   // SM30-SM35
 }
-
+*/
 /**
  * @brief Number of shared memory banks.
  * \return unsigned
@@ -196,22 +197,23 @@ inline constexpr unsigned shared_memory_banks() {
 
 /**
  * @brief Stride length (number of bytes per word) of shared memory in bytes.
- * @tparam sm3XSmemConfig cudaSharedMemConfig enum representing the shared
+ * @tparam sm3XSmemConfig hipSharedMemConfig enum representing the shared
  *                        memory bank size (stride) used when called on compute
  *                        capability 3.x
  * \return unsigned
  */
+/*
 template <
-    enum cudaSharedMemConfig sm3XSmemConfig = cudaSharedMemBankSizeDefault>
+    enum hipSharedMemConfig sm3XSmemConfig = hipSharedMemBankSizeDefault>
 inline constexpr unsigned shared_memory_bank_stride() {
   // The default config on 3.x is the same constant value for later archs
   // Only let 3.x be configurable if stride later becomes dependent on arch
-  return (sm3XSmemConfig == cudaSharedMemBankSizeDefault)     ? 1 << 2
-         : (sm3XSmemConfig == cudaSharedMemBankSizeFourByte)  ? 1 << 2
-         : (sm3XSmemConfig == cudaSharedMemBankSizeEightByte) ? 1 << 3
+  return (sm3XSmemConfig == hipSharedMemBankSizeDefault)     ? 1 << 2
+         : (sm3XSmemConfig == hipSharedMemBankSizeFourByte)  ? 1 << 2
+         : (sm3XSmemConfig == hipSharedMemBankSizeEightByte) ? 1 << 3
                                                               : 1 << 2;
 }
-
+*/
 inline constexpr unsigned clock_rate(device_properties_t& prop) {
   return prop.clockRate;
 }
@@ -222,13 +224,13 @@ inline constexpr unsigned compute_version(device_properties_t& prop) {
 
 unsigned device_count() {
   int device_count;
-  cudaGetDeviceCount(&device_count);
+  hipGetDeviceCount(&device_count);
   return device_count;
 }
 
 unsigned driver_version() {
   int driver_version;
-  cudaDriverGetVersion(&driver_version);
+  hipDriverGetVersion(&driver_version);
   return driver_version;
 }
 
@@ -250,14 +252,14 @@ inline constexpr unsigned multi_processor_count(device_properties_t& prop) {
 
 unsigned runtime_version() {
   int runtime_version;
-  cudaRuntimeGetVersion(&runtime_version);
+  hipRuntimeGetVersion(&runtime_version);
   return runtime_version;
 }
 
 void set_device_properties(device_properties_t* prop) {
   device_id_t ordinal;
-  cudaGetDevice(&ordinal);
-  cudaGetDeviceProperties(prop, ordinal);
+  hipGetDevice(&ordinal);
+  hipGetDeviceProperties(prop, ordinal);
 }
 
 inline constexpr unsigned total_global_memory(device_properties_t& prop) {
@@ -272,10 +274,10 @@ inline int get_max_grid_dimension_x(device_id_t device) {
 
 void print(device_properties_t& prop) {
   device_id_t ordinal;
-  cudaGetDevice(&ordinal);
+  hipGetDevice(&ordinal);
 
   size_t freeMem, totalMem;
-  error::error_t status = cudaMemGetInfo(&freeMem, &totalMem);
+  error::error_t status = hipMemGetInfo(&freeMem, &totalMem);
   error::throw_if_exception(status);
 
   double memBandwidth =

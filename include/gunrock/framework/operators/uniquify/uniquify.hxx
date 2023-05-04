@@ -30,13 +30,13 @@ void execute(frontier_t* input,
         input->sort(sort::order_t::ascending, single_context->stream());
       unique_copy::execute(input, output, *single_context);
     } else {
-      error::throw_if_exception(cudaErrorUnknown, "Unqiue type not supported.");
+      error::throw_if_exception(hipErrorUnknown, "Unqiue type not supported.");
     }
   }
 
   // Multi-GPU not supported.
   else {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "`context.size() != 1` not supported");
   }
 }
@@ -51,7 +51,7 @@ void execute(enactor_type* E,
   if (!best_effort_uniquification)
     if (uniquification_percent < 0 || uniquification_percent > 100)
       error::throw_if_exception(
-          cudaErrorUnknown,
+          hipErrorUnknown,
           "Uniquification percentage must be a +ve float between 0 and 100.");
 
   execute<type>(E->get_input_frontier(),     // input frontier
