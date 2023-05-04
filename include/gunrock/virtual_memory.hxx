@@ -64,7 +64,7 @@ struct physical_memory_t {
       // get the minnimum granularity for residentDevices[idx]
       prop.location.id = resident_devices[idx];
       hipMemGetAllocationGranularity(&_granularity, &prop,
-                                    hipMemAllocationGranularityMinimum);
+                                     hipMemAllocationGranularityMinimum);
       if (granularity < _granularity)
         granularity = _granularity;
     }
@@ -109,8 +109,8 @@ struct virtual_memory_t {
 
   virtual_memory_t(std::size_t padded_size)
       : size(padded_size), alignment(0), addr(0), flags(0) {
-    hipMemAddressReserve((hipDeviceptr_t*)&ptr, size, alignment, (hipDeviceptr_t)addr,
-                        flags);
+    hipMemAddressReserve((hipDeviceptr_t*)&ptr, size, alignment,
+                         (hipDeviceptr_t)addr, flags);
   }
 
   ~virtual_memory_t() { hipMemAddressFree((hipDeviceptr_t)ptr, size); }
@@ -161,8 +161,8 @@ class striped_memory_mapper_t {
     const size_t stripe_size = phys.stripe_size;
 
     for (auto& device : phys.resident_devices)
-      hipMemMap((hipDeviceptr_t)virt.ptr + (stripe_size * device), stripe_size, 0,
-               phys.alloc_handle[device], 0);
+      hipMemMap((hipDeviceptr_t)virt.ptr + (stripe_size * device), stripe_size,
+                0, phys.alloc_handle[device], 0);
 
     std::vector<hipMemAccessDesc> access_descriptors(mapping_devices.size());
 
@@ -190,12 +190,15 @@ class striped_memory_mapper_t {
           access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_MAX;
       }
 
-      hipMemSetAccess((hipDeviceptr_t)virt.ptr + (stripe_size * local), stripe_size,
-                     access_descriptors.data(), access_descriptors.size());
+      hipMemSetAccess((hipDeviceptr_t)virt.ptr + (stripe_size * local),
+                      stripe_size, access_descriptors.data(),
+                      access_descriptors.size());
     }
   }
 
-  ~striped_memory_mapper_t() { hipMemUnmap((hipDeviceptr_t)virt.ptr, virt.size); }
+  ~striped_memory_mapper_t() {
+    hipMemUnmap((hipDeviceptr_t)virt.ptr, virt.size);
+  }
 
   type_t* data() { return virt.ptr; }
   std::size_t elements_per_partition() {

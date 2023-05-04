@@ -30,14 +30,13 @@ using namespace memory;
  *       for those Node IDs are filled as invalids.
  */
 
-template<typename label_type> bool is_label_valid(label_type value){
- if (std::is_integral<label_type>::value)
+template <typename label_type>
+bool is_label_valid(label_type value) {
+  if (std::is_integral<label_type>::value)
     return (value != gunrock::numeric_limits<label_type>::invalid());
   else
     return isnan(static_cast<double>(value)) ? false : true;
 }
-
-
 
 void read_coordinates_file(std::string filename,
                            geo::coordinates_t* coordinates) {
@@ -56,9 +55,8 @@ void read_coordinates_file(std::string filename,
       }
     }  // -> if
 
-    else if (!is_label_valid(
-                 labels_read)) {  // Problem description-> First line
-                                  // with nodes and labels info
+    else if (!is_label_valid(labels_read)) {  // Problem description-> First
+                                              // line with nodes and labels info
       long long ll_nodes, ll_label_x, ll_label_y;
       int items_scanned =
           sscanf(line, "%lld %lld %lld", &ll_nodes, &ll_label_x, &ll_label_y);

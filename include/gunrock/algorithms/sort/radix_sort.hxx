@@ -43,25 +43,22 @@ void sort_keys(type_t* keys,
                gcuda::stream_t stream = 0) {
   if (order == order_t::ascending)
     thrust::sort(
-    #if HIP_BACKEND == 1
-    thrust::cuda::par.on(stream),
-    #else
-    thrust::hip::par.on(stream), 
-    #endif
-    keys, keys + num_items,
-                 thrust::less<type_t>());
+#if HIP_BACKEND == 1
+        thrust::cuda::par.on(stream),
+#else
+        thrust::hip::par.on(stream),
+#endif
+        keys, keys + num_items, thrust::less<type_t>());
   else
     thrust::sort(
-    //thrust::hip::par.on(stream), 
-      #if HIP_BACKEND == 1
-      thrust::cuda::par.on(stream),
-      #else
-      thrust::hip::par.on(stream),
-      #endif
+    // thrust::hip::par.on(stream),
+#if HIP_BACKEND == 1
+        thrust::cuda::par.on(stream),
+#else
+        thrust::hip::par.on(stream),
+#endif
 
-
-    keys, keys + num_items,
-                 thrust::greater<type_t>());
+        keys, keys + num_items, thrust::greater<type_t>());
 }
 
 }  // namespace radix

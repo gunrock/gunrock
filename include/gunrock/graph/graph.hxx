@@ -399,15 +399,15 @@ void build_degree_histogram(graph_type const& G,
 
   // Initialize histogram array to 0s.
   thrust::fill(
-//thrust::hip::par.on(stream),
+// thrust::hip::par.on(stream),
 #if HIP_BACKEND == 1
-  thrust::cuda::par.on(stream),
-  #else
-  thrust::hip::par.on(stream),
-  #endif  
-             histogram + 0,       // iterator begin()
-               histogram + length,  // iterator end()
-               0                    // fill value
+      thrust::cuda::par.on(stream),
+#else
+      thrust::hip::par.on(stream),
+#endif
+      histogram + 0,       // iterator begin()
+      histogram + length,  // iterator end()
+      0                    // fill value
   );
 
   // Build the histogram count.
@@ -424,17 +424,17 @@ void build_degree_histogram(graph_type const& G,
   // the operation called build_histogram. Ignore output, as
   // we are interested in what goes in the pointer histogram.
   thrust::for_each(
-		//thrust::hip::par.on(stream),
-		#if HIP_BACKEND == 1
-  		thrust::cuda::par.on(stream),
-  		#else	
-  		thrust::hip::par.on(stream),
-  		#endif                   
+// thrust::hip::par.on(stream),
+#if HIP_BACKEND == 1
+      thrust::cuda::par.on(stream),
+#else
+      thrust::hip::par.on(stream),
+#endif
 
-		   thrust::make_counting_iterator<vertex_t>(0),  // Begin: 0
-                   thrust::make_counting_iterator<vertex_t>(
-                       G.get_number_of_vertices()),  // End: # of Vertices
-                   build_histogram                   // Unary operation
+      thrust::make_counting_iterator<vertex_t>(0),  // Begin: 0
+      thrust::make_counting_iterator<vertex_t>(
+          G.get_number_of_vertices()),  // End: # of Vertices
+      build_histogram                   // Unary operation
   );
 }
 

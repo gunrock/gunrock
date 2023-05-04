@@ -15,7 +15,7 @@
 #include <numeric>
 #include <utility>
 #include <iostream>
-//#include <execution>
+// #include <execution>
 namespace gunrock {
 namespace util {
 namespace stats {
@@ -116,8 +116,8 @@ void get_performance_stats(std::vector<int>& edges_visited,
   std::vector<float> filtered_run_times;
 
   // Get average run time
-  avg_run_time =
-      std::accumulate(run_times.begin(), run_times.end(), 0.0) / run_times.size();
+  avg_run_time = std::accumulate(run_times.begin(), run_times.end(), 0.0) /
+                 run_times.size();
 
   // Get run time standard deviation
   float sq_sum = std::inner_product(run_times.begin(), run_times.end(),
@@ -138,9 +138,9 @@ void get_performance_stats(std::vector<int>& edges_visited,
   }
 
   if (filtered_run_times.size() != run_times.size()) {
-    avg_run_time =
-        std::accumulate(filtered_run_times.begin(), filtered_run_times.end(), 0.0) /
-        filtered_run_times.size();
+    avg_run_time = std::accumulate(filtered_run_times.begin(),
+                                   filtered_run_times.end(), 0.0) /
+                   filtered_run_times.size();
 
     // Get run time standard deviation
     sq_sum =
@@ -158,7 +158,7 @@ void get_performance_stats(std::vector<int>& edges_visited,
 
   // Get average search depth
   avg_search_depth = std::accumulate(filtered_search_depths.begin(),
-                                 filtered_search_depths.end(), 0.0) /
+                                     filtered_search_depths.end(), 0.0) /
                      filtered_search_depths.size();
 
   // Get min and max search depths

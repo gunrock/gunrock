@@ -71,7 +71,7 @@ class vector_frontier_t {
    */
   __device__ __host__ vector_frontier_t(const vector_frontier_t& rhs) {
 #ifdef __HIP_DEVICE_COMPILE__
-//#ifdef __CUDA_ARCH__
+    // #ifdef __CUDA_ARCH__
     raw_ptr = rhs.raw_ptr;
 #else
     p_storage = rhs.p_storage;
@@ -214,14 +214,13 @@ class vector_frontier_t {
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
     thrust::fill(
-	//thrust::hip::par.on(stream), 
-	#if HIP_BACKEND == 1
-  	thrust::cuda::par.on(stream),
-  	#else
-  	thrust::hip::par.on(stream),
-  	#endif
-	this->begin(),
-        this->end(), value);
+// thrust::hip::par.on(stream),
+#if HIP_BACKEND == 1
+        thrust::cuda::par.on(stream),
+#else
+        thrust::hip::par.on(stream),
+#endif
+        this->begin(), this->end(), value);
   }
 
   /**
@@ -245,14 +244,13 @@ class vector_frontier_t {
     this->set_number_of_elements(size);
 
     thrust::sequence(
-	//thrust::hip::par.on(stream), 
-	#if HIP_BACKEND == 1
-  	thrust::cuda::par.on(stream),
-  	#else
-  	thrust::hip::par.on(stream),
-  	#endif
-	this->begin(),
-        this->end(), initial_value);
+// thrust::hip::par.on(stream),
+#if HIP_BACKEND == 1
+        thrust::cuda::par.on(stream),
+#else
+        thrust::hip::par.on(stream),
+#endif
+        this->begin(), this->end(), initial_value);
   }
 
   /**

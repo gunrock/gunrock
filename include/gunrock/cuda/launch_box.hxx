@@ -43,9 +43,9 @@ struct dimensions_t {
   __host__ __device__ operator dim3(void) const { return uint3{x, y, z}; }
 #else
   __host__ __device__ constexpr operator dim3(void) const {
-//    return uint3{x, y, z};
- return dim3{x, y, z};
- }
+    //    return uint3{x, y, z};
+    return dim3{x, y, z};
+  }
 #endif
 };
 

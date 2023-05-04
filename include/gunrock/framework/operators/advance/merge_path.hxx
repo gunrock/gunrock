@@ -16,9 +16,9 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 // XXX: Replace these later
-//#include <moderngpu/transform.hxx>
-//#include <moderngpu/kernel_scan.hxx>
-//#include <moderngpu/kernel_load_balance.hxx>
+// #include <moderngpu/transform.hxx>
+// #include <moderngpu/kernel_scan.hxx>
+// #include <moderngpu/kernel_load_balance.hxx>
 
 namespace gunrock {
 namespace operators {
