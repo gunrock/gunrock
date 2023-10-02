@@ -19,6 +19,7 @@
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/memory.hxx>
 #include <gunrock/error.hxx>
+#include <gunrock/graph/properties.hxx>
 
 namespace gunrock {
 namespace io {
@@ -95,7 +96,12 @@ struct matrix_market_t {
    * @param _filename input file name (.mtx)
    * @return coordinate sparse format
    */
-  auto load(std::string _filename) {
+  std::tuple<gunrock::graph::graph_properties_t,
+             format::coo_t<gunrock::memory::memory_space_t::host,
+                           vertex_t,
+                           edge_t,
+                           weight_t>>
+  load(std::string _filename) {
     filename = _filename;
     dataset = util::extract_dataset(util::extract_filename(filename));
 
@@ -133,9 +139,11 @@ struct matrix_market_t {
     error::throw_if_exception(
         num_nonzeros >= std::numeric_limits<edge_t>::max(), "edge_t overflow");
 
+    // return values
     // mtx are generally written as coordinate format
     format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo(
         (vertex_t)num_rows, (vertex_t)num_columns, (edge_t)num_nonzeros);
+    gunrock::graph::graph_properties_t properties;
 
     if (mm_is_coordinate(code))
       format = matrix_market_format_t::coordinate;
@@ -143,6 +151,7 @@ struct matrix_market_t {
       format = matrix_market_format_t::array;
 
     if (mm_is_pattern(code)) {
+      properties.weighted = false;
       data = matrix_market_data_t::pattern;
 
       // pattern matrix defines sparsity pattern, but not values
@@ -162,6 +171,7 @@ struct matrix_market_t {
             (weight_t)1.0;  // use value 1.0 for all nonzero entries
       }
     } else if (mm_is_real(code) || mm_is_integer(code)) {
+      properties.weighted = true;
       if (mm_is_real(code))
         data = matrix_market_data_t::real;
       else
@@ -191,6 +201,8 @@ struct matrix_market_t {
     }
 
     if (mm_is_symmetric(code)) {  // duplicate off diagonal entries
+      properties.symmetric = true;
+      properties.directed = false;
       scheme = matrix_market_storage_scheme_t::symmetric;
       vertex_t off_diagonals = 0;
       for (vertex_t i = 0; i < coo.number_of_nonzeros; ++i) {
@@ -232,10 +244,13 @@ struct matrix_market_t {
       coo.nonzero_values = new_V;
       coo.number_of_nonzeros = _nonzeros;
     }  // end symmetric case
-
+    else {
+      properties.symmetric = false;
+      properties.directed = true;
+    }
     fclose(file);
 
-    return coo;
+    return {properties, coo};
   }
 };
 

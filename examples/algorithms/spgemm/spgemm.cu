@@ -19,33 +19,45 @@ void test_spmv(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
+  constexpr memory_space_t space = memory_space_t::device;
+  using csr_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
+  using csc_t = format::csc_t<space, vertex_t, edge_t, weight_t>;
 
+  // Load A
   // Filename to be read
   std::string filename_a = argument_array[1];
-  constexpr memory_space_t space = memory_space_t::device;
 
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  using csr_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
   csr_t a_csr;
-  a_csr.from_coo(mm.load(filename_a));
 
-  auto A = graph::build::from_csr<space, graph::view_t::csr>(
-      a_csr.number_of_rows, a_csr.number_of_columns, a_csr.number_of_nonzeros,
-      a_csr.row_offsets.data().get(), a_csr.column_indices.data().get(),
-      a_csr.nonzero_values.data().get());
+  auto [a_properties, a_coo] = mm.load(filename_a);
+  a_csr.from_coo(a_coo);
 
+  // --
+  // Build graph for A
+  auto A = graph::build<memory_space_t::device>(a_properties, a_csr);
+
+  // Load B
+  // Filename to be read
   std::string filename_b = argument_array[2];
-  csr_t b_csr;
-  b_csr.from_coo(mm.load(filename_b));
 
+  /// Load the matrix-market dataset into csr format.
+  /// See `format` to see other supported formats.
+  csr_t b_csr;
+  csc_t b_csc;
+
+  auto [b_properties, b_coo] = mm.load(filename_b);
+
+  b_csr.from_coo(b_coo);
+  b_csc.from_csr(b_csr);
+
+  // --
+  // Build graph for B
   /// For now, we are using the transpose of CSR-matrix A as the second operand
   /// for our spgemm.
-  auto B = graph::build::from_csr<space, graph::view_t::csr>(
-      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
-      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
-      b_csr.nonzero_values.data().get());
+  auto B = graph::build<memory_space_t::device>(b_properties, b_csc, b_csr);
 
   /// Let's use CSR representation
   csr_t C;

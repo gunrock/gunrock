@@ -14,10 +14,13 @@
 // #include "experiments/shared_ptr.cuh"
 
 // #include "formats/format.cuh"
-// #include "formats/csc.cuh"
 // #include "formats/coo.cuh"
-// #include "formats/csr.cuh"
+// #include "formats/coocsc.cuh"
+#include "formats/coocsccsr.cuh"
 // #include "formats/coocsr.cuh"
+// #include "formats/csc.cuh"
+// #include "formats/csccsr.cuh"
+// #include "formats/csr.cuh"
 
 // #include "graph/src_vertex.cuh"
 // #include "graph/graph_load.cuh"
@@ -27,7 +30,7 @@
 // #include "memory/memory.cuh"
 
 // #include "framework/problem.cuh"
-#include "framework/operators/for.cuh"
+// #include "framework/operators/for.cuh"
 
 // #include "utils/type_limits.cuh"
 
@@ -35,10 +38,10 @@
 // #include "cuda/context.cuh"
 // #include "cuda/device_properties.cuh"
 
-#include "containers/array.cuh"
+// #include "containers/array.cuh"
 
 // #include "io/matrix_market.cuh"
-#include "io/smtx.cuh"
+// #include "io/smtx.cuh"
 // #include "io/mtxbin.cuh"
 
-#include "algorithms/tc.cuh"
+// #include "algorithms/tc.cuh"

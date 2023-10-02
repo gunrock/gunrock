@@ -17,6 +17,7 @@
 #include <gunrock/graph/coo.hxx>
 #include <gunrock/graph/csc.hxx>
 #include <gunrock/graph/csr.hxx>
+#include <gunrock/formats/formats.hxx>
 
 namespace gunrock {
 namespace graph {
@@ -38,8 +39,8 @@ struct empty_graph_t {};
  * | scan          | O(n^2)           | O(m) | O(m+n)       | O(m+n)  |
  * | get neighbors | O(n)             | O(m) | O(d)         | O(d)    |
  * | is edge       | O(1)             | O(m) | O(d)         | O(d)    |
- * | insert edge   | O(1)             | O(1) | O(1) or O(d) | O(m+n)  | (x)
- * | delete edge   | O(1)             | O(m) | O(d)         | O(m+n)  | (x)
+ * | insert edge   | O(1)             | O(1) | O(1) or O(d) | O(m+n)  |
+ * | delete edge   | O(1)             | O(m) | O(d)         | O(m+n)  |
  *
  *
  * @tparam space memory space to use for the graph (device or host).
@@ -80,14 +81,25 @@ class graph_t : public graph_view_t... {
       graph_t<space, vertex_type, edge_type, weight_type, graph_view_t...>;
 
   /// Different supported graph representation views.
-  using graph_csr_view_t = graph_csr_t<vertex_type, edge_type, weight_type>;
-  using graph_csc_view_t = graph_csc_t<vertex_type, edge_type, weight_type>;
-  using graph_coo_view_t = graph_coo_t<vertex_type, edge_type, weight_type>;
+  using graph_csr_view_t =
+      graph_csr_t<space, vertex_type, edge_type, weight_type>;
+  using graph_csc_view_t =
+      graph_csc_t<space, vertex_type, edge_type, weight_type>;
+  using graph_coo_view_t =
+      graph_coo_t<space, vertex_type, edge_type, weight_type>;
 
   /**
    * @brief Default constructor for the graph.
    */
   __host__ __device__ graph_t() : properties(), graph_view_t()... {}
+
+  /**
+   * @brief Construct graph with properties.
+   */
+  __host__ __device__ graph_t(graph::graph_properties_t prop)
+      : properties(), graph_view_t()... {
+    properties = prop;
+  }
 
   /**
    * @brief Get the number of vertices in the graph. Callable from both host and
@@ -120,6 +132,22 @@ class graph_t : public graph_view_t... {
    * @return false
    */
   bool is_directed() { return properties.directed; }
+
+  /**
+   * @brief Returns if the constructed graph is symmetric or not.
+   *
+   * @return true
+   * @return false
+   */
+  bool is_symmetric() { return properties.symmetric; }
+
+  /**
+   * @brief Returns if the constructed graph is weighted or not.
+   *
+   * @return true
+   * @return false
+   */
+  bool is_weighted() { return properties.weighted; }
 
   /**
    * @brief Number of valid graph representations inherited. Does not include
@@ -163,32 +191,26 @@ class graph_t : public graph_view_t... {
    * graph class. Note, this is important because this graph object does NOT own
    * the data. The data is passed to the graph_view_t objects by the user. So,
    * the user is responsible of creating the csr/csc/coo (for example) matrices,
-   * passing the data pointers and sizes to the appropriate input graph_view_t
-   * objects, and after the use is done, the user is responsible of freeing the
-   * data.
+   * passing these to the appropriate input graph_view_t objects, and after the
+   * user is done, the user is responsible of freeing the data.
    *
    * An example usage is:
    * \code
    *  // Create a graph object and set the data pointers and sizes.
    *  using view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
+   *  using format_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
    *  using graph_t = graph::graph_t<space, vertex_t, edge_t, weight_t, view_t>;
    *  graph_t G;
-   *  G.template set<view_t>(r, nnz, row_offsets, column_indices, values);
+   *  G.template set<view_t, format_t>(csr);
    * \endcode
    *
    * @tparam input_view_t input graph view to set.
-   * @tparam args_t Type of data pointers.
-   * @param _number_of_vertices number of vertices in the graph.
-   * @param _number_of_edges number of edges in the graph.
-   * @param args data pointers of the view to set csr = (row_offsets,
-   * column_indices, values), csc = (column_offsets, row_indices, values), coo =
-   * (row_indices, column_indices, values).
+   * @tparam input_format_t input format type to use.
+   * @param format an object of type input_format_t that holds the graph data.
    */
-  template <class input_view_t = default_view_t, typename... args_t>
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               args_t... args) {
-    input_view_t::set(_number_of_vertices, _number_of_edges, args...);
+  template <class input_view_t = default_view_t, typename input_format_t>
+  void set(input_format_t& format) {
+    input_view_t::set(format);
   }
 
   /**
@@ -314,7 +336,7 @@ class graph_t : public graph_view_t... {
 
   graph_properties_t properties;
 
-};  // namespace graph
+};  // class graph_t
 
 /**
  * @brief Get the average degree of a graph.
@@ -412,7 +434,9 @@ void build_degree_histogram(graph_type const& G,
  * @param G graph to remove self-loops.
  */
 template <typename graph_type>
-void remove_self_loops(graph_type& G) {}
+void remove_self_loops(graph_type& G) {
+  error::throw_if_exception(true, "Remove Self-Loops not yet implemented.");
+}
 
 }  // namespace graph
 }  // namespace gunrock

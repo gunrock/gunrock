@@ -54,7 +54,7 @@ namespace filter {
  * \endcode
  *
  *
- * @tparam alg_type The filter algorithm to use (@see filter_algorithm_t).
+ * @tparam alg_type The filter algorithm to use.
  * @tparam graph_t The graph type.
  * @tparam operator_t The operator type.
  * @tparam frontier_t The frontier type.
@@ -65,6 +65,8 @@ namespace filter {
  * for in-place filter operation).
  * @param context a `gcuda::multi_context_t` that contains GPU contexts for the
  * available CUDA devices. Used to launch the filter kernels.
+ *
+ * @see gunrock::operators::filter_algorithm_t
  */
 template <filter_algorithm_t alg_type,
           typename graph_t,
@@ -124,7 +126,7 @@ void execute(graph_t& G,
  * \endcode
  *
  *
- * @tparam alg_type The filter algorithm to use (@see filter_algorithm_t).
+ * @tparam alg_type The filter algorithm to use.
  * @tparam graph_t The graph type.
  * @tparam enactor_type The enactor type.
  * @tparam operator_t The operator type.
@@ -134,6 +136,8 @@ void execute(graph_t& G,
  * @param E Enactor struct containing input and output frontiers.
  * @param context a `gcuda::multi_context_t` that contains GPU contexts for the
  * available CUDA devices. Used to launch the filter kernels.
+ *
+ * @see gunrock::operators::filter_algorithm_t
  */
 template <filter_algorithm_t alg_type,
           typename graph_t,

@@ -1,6 +1,7 @@
 /**
  * @file spgemm.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @author Marjerie Suresh (msuresh@ucdavis.edu)
  * @brief Sparse-Matrix-Matrix multiplication.
  * @date 2022-01-04
  *
@@ -19,11 +20,11 @@
 namespace gunrock {
 namespace spgemm {
 
-template <typename graph_t>
+template <typename a_graph_t, typename b_graph_t>
 struct param_t {
-  graph_t& A;
-  graph_t& B;
-  param_t(graph_t& _A, graph_t& _B) : A(_A), B(_B) {}
+  a_graph_t& A;
+  b_graph_t& B;
+  param_t(a_graph_t& _A, b_graph_t& _B) : A(_A), B(_B) {}
 };
 
 template <typename csr_t>
@@ -87,6 +88,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
 
+  using csr_v_t = graph::
+      graph_csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csc_v_t = graph::
+      graph_csc_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>;
+
   void loop(gcuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -118,7 +124,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 weight_t const& nz     // weight (nonzero).
                                 ) -> bool {
       // Compute number of nonzeros of the sparse-matrix C for each row.
-      math::atomic::add(&(estimated_nz_ptr[m]), B.get_number_of_neighbors(k));
+      math::atomic::add(&(estimated_nz_ptr[m]),
+                        B.template get_number_of_neighbors<csr_v_t>(k));
       return false;
     };
 
@@ -130,12 +137,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     /// Step X. Calculate upperbound of C's row-offsets.
     thrust::exclusive_scan(policy, P->estimated_nz_per_row.begin(),
-                           P->estimated_nz_per_row.end(), row_offsets.begin(),
-                           edge_t(0), thrust::plus<edge_t>());
-
-    thrust::copy(row_offsets.begin() + A.get_number_of_vertices() - 1,
-                 row_offsets.begin() + A.get_number_of_vertices(),
-                 row_offsets.begin() + A.get_number_of_vertices());
+                           P->estimated_nz_per_row.end() + 1,
+                           row_offsets.begin(), edge_t(0),
+                           thrust::plus<edge_t>());
 
     /// Step X. Calculate the upperbound of total number of nonzeros in the
     /// sparse-matrix C.
@@ -154,40 +158,64 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     weight_t* nz_vals = nonzero_values.data().get();
 
     /// Step X. Calculate C's column indices and values.
-    auto gustavsons =
-        [=] __host__ __device__(
-            vertex_t const& m,  // ... source (A: row index)
-            vertex_t const& k,  // neighbor (A: column index or B: row index)
-            edge_t const& a_nz_idx,  // edge (A: row ↦ column)
-            weight_t const& a_nz     // weight (A: nonzero).
-            ) -> bool {
-      // Get the number of nonzeros in row k of sparse-matrix B.
-      auto offset = B.get_starting_edge(k);
-      auto nnz = B.get_number_of_neighbors(k);
-      auto c_offset = thread::load(&row_off[m]);
+    auto naive_spgemm = [=] __host__ __device__(vertex_t const& row) -> bool {
+      // Get the number of nonzeros in row of sparse-matrix A.
+      auto a_offset = A.get_starting_edge(row);
+      auto a_nnz = A.get_number_of_neighbors(row);
+      auto c_offset = thread::load(&row_off[row]);
+      auto n = 0;
+      bool increment = false;
 
-      // Loop over all the nonzeros in row k of sparse-matrix B.
-      for (edge_t b_nz_idx = offset; b_nz_idx < (offset + nnz); ++b_nz_idx) {
-        auto n = B.get_destination_vertex(b_nz_idx);
-        auto b_nz = B.get_edge_weight(b_nz_idx);
+      // Iterate over the columns of B.
+      for (edge_t b_col = 0;
+           b_col < B.template get_number_of_vertices<csc_v_t>(); ++b_col) {
+        // Get the number of nonzeros in column of sparse-matrix B.
+        auto b_offset = B.template get_starting_edge<csc_v_t>(b_col);
+        auto b_nnz = B.template get_number_of_neighbors<csc_v_t>(b_col);
+        auto b_nz_idx = b_offset;
+        auto a_nz_idx = a_offset;
 
-        // Calculate c's nonzero index.
-        std::size_t c_nz_idx = c_offset + n;
+        // For the row in A, multiple with corresponding element in B.
+        while ((a_nz_idx < (a_offset + a_nnz)) &&
+               (b_nz_idx < (b_offset + b_nnz))) {
+          auto a_col = A.get_destination_vertex(a_nz_idx);
+          auto b_row = B.template get_source_vertex<csc_v_t>(b_nz_idx);
 
-        // Assign column index.
-        thread::store(&col_ind[c_nz_idx], n);
+          //  Multiply if the column of A equals row of B.
+          if (a_col == b_row) {
+            auto a_nz = A.get_edge_weight(a_nz_idx);
+            auto b_nz = B.template get_edge_weight<csc_v_t>(b_nz_idx);
 
-        // Accumulate the nonzero value.
-        math::atomic::add(nz_vals + c_nz_idx, a_nz * b_nz);
+            // Calculate  C's nonzero index.
+            std::size_t c_nz_idx = c_offset + n;
+            assert(c_nz_idx < estimated_nzs);
+
+            // Assign column index.
+            thread::store(&col_ind[c_nz_idx], n);
+
+            // Accumulate the nonzero value.
+            nz_vals[c_nz_idx] += a_nz * b_nz;
+
+            a_nz_idx++;
+            b_nz_idx++;
+
+            increment = true;
+          } else if (a_col < b_row)
+            a_nz_idx++;
+          else
+            b_nz_idx++;
+        }
+        // A non zero element was stored in C, so we increment n.
+        if (increment) {
+          n++;
+          increment = false;
+        }
       }
       return false;
     };
 
-    operators::advance::execute<operators::load_balance_t::block_mapped,
-                                operators::advance_direction_t::forward,
-                                operators::advance_io_type_t::graph,
-                                operators::advance_io_type_t::none>(
-        A, E, gustavsons, context);
+    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+        A, naive_spgemm, context);
 
     /// Step X. Fix-up, i.e., remove overestimated nonzeros and rellocate the
     /// storage as necessary.
@@ -255,21 +283,21 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
-template <typename graph_t, typename csr_t>
-float run(graph_t& A,
-          graph_t& B,
+template <typename a_graph_t, typename b_graph_t, typename csr_t>
+float run(a_graph_t& A,
+          b_graph_t& B,
           csr_t& C,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
 ) {
-  using param_type = param_t<graph_t>;
+  using param_type = param_t<a_graph_t, b_graph_t>;
   using result_type = result_t<csr_t>;
 
   param_type param(A, B);
   result_type result(C);
 
-  using problem_type = problem_t<graph_t, param_type, result_type>;
+  using problem_type = problem_t<a_graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
   problem_type problem(A, param, result, context);

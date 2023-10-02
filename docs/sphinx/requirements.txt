@@ -1,10 +1,10 @@
-sphinx==4.5.0
-sphinxcontrib-bibtex<2.0.0
-jinja2-highlight
-myst-parser
-sphinx_copybutton
-breathe==4.34.0
+sphinx==5.3.0
+breathe
 exhale
+sphinxcontrib-bibtex==2.5.0
+jinja2-highlight==0.6.1
+myst-parser==0.18.1
+sphinx-copybutton
 sphinx-book-theme
 sphinx-rtd-theme
 sphinx-toolbox

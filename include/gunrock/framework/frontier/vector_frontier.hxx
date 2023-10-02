@@ -57,10 +57,18 @@ class vector_frontier_t {
     raw_ptr = p_storage.get()->data().get();
   }
 
-  // Empty Destructor, this is important on kernel-exit.
+  /**
+   * @brief Destroy the vector frontier object.
+   *
+   */
   ~vector_frontier_t() {}
 
-  // Copy Constructor
+  /**
+   * @brief Specialized copy-constructor that allows the datastructure to work
+   * on device-side.
+   *
+   * @param rhs vector_frontier_t object
+   */
   __device__ __host__ vector_frontier_t(const vector_frontier_t& rhs) {
 #ifdef __CUDA_ARCH__
     raw_ptr = rhs.raw_ptr;
@@ -90,21 +98,27 @@ class vector_frontier_t {
   /**
    * @brief Get the resizing factor used to scale the frontier size.
    *
-   * @return float
+   * @return resizing factor for the frontier.
    */
   float get_resizing_factor() const { return resizing_factor; }
 
   /**
-   * @brief Get the element at the specified index.
+   * @brief Get the element (const) at the specified index.
    *
-   * @param idx
-   * @return type_t
+   * @param idx the index at which the element should be returned.
+   * @return const type_t element to return.
    */
   __device__ __forceinline__ constexpr const type_t get_element_at(
       std::size_t const& idx) const noexcept {
     return thread::load(this->get() + idx);
   }
 
+  /**
+   * @brief Get the element at object
+   *
+   * @param idx the index at which the element should be returned.
+   * @return type_t element to return.
+   */
   __device__ __forceinline__ constexpr type_t get_element_at(
       std::size_t const& idx) noexcept {
     return thread::load(this->get() + idx);
@@ -113,8 +127,8 @@ class vector_frontier_t {
   /**
    * @brief Set the element at the specified index.
    *
-   * @param idx
-   * @param element
+   * @param idx index at which the new element is placed.
+   * @param element element to place at a given index.
    */
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
@@ -128,7 +142,7 @@ class vector_frontier_t {
    * multiply the `reserve` size to scale it a bit higher every time to avoid
    * reallocations.
    *
-   * @param factor
+   * @param factor a float defining the resizing factor, 1.0f means no scaling.
    */
   void set_resizing_factor(float factor) { resizing_factor = factor; }
 
@@ -138,7 +152,7 @@ class vector_frontier_t {
    * later on as well. We require users (gunrock devs), to set the number of
    * elements after figuring it out.
    *
-   * @param elements
+   * @param elements Number of elements of the frontier.
    */
   void set_number_of_elements(std::size_t const& elements) {
     num_elements = elements;
@@ -151,15 +165,40 @@ class vector_frontier_t {
     return raw_ptr;
   }
 
+  /**
+   * @brief Access to the underlying data, works only on host.
+   *
+   * @return type_t* data pointer.
+   */
   auto data() { return raw_pointer_cast(p_storage.get()->data()); }
+
+  /**
+   * @brief Access to the begin pointer of the frontier.
+   *
+   * @return type_t* begin pointer.
+   */
   auto begin() { return this->data(); }
+
+  /**
+   * @brief Access to the end pointer of the frontier.
+   *
+   * @return type_t* end pointer.
+   */
   auto end() { return this->begin() + this->get_number_of_elements(); }
+
+  /**
+   * @brief Checks if the frontier is empty.
+   *
+   * @return true
+   * @return false
+   */
   bool is_empty() const { return (this->get_number_of_elements() == 0); }
 
   /**
-   * @brief (vertex-like) push back a value to the frontier.
+   * @brief (vertex-like) push back a value to the frontier. Can only be done on
+   * host and not in GPU code.
    *
-   * @param value
+   * @param value value to be pushed back on the frontier.
    */
   void push_back(type_t const& value) {
     p_storage.get()->push_back(value);
@@ -167,10 +206,10 @@ class vector_frontier_t {
   }
 
   /**
-   * @brief Fill the entire frontier with a user-specified value.
+   * @brief Fill the entire frontier with a user-specified value. (host only)
    *
-   * @param value
-   * @param stream
+   * @param value Value to set the frontier to.
+   * @param stream GPU stream at which this operation should occur.
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
     thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),
@@ -208,7 +247,7 @@ class vector_frontier_t {
    *
    * @param size number of elements used to resize the frontier (count not
    * bytes).
-   * @param default_value
+   * @param default_value While resizing, set a default value.
    */
   void resize(
       std::size_t const& size,
@@ -230,8 +269,8 @@ class vector_frontier_t {
   /**
    * @brief Parallel sort the frontier.
    *
-   * @param order see sort::order_t
-   * @param stream see gcuda::stream
+   * @param order @see sort::order_t
+   * @param stream @see gcuda::stream_t
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             gcuda::stream_t stream = 0) {
@@ -239,6 +278,10 @@ class vector_frontier_t {
                            this->get_number_of_elements(), order, stream);
   }
 
+  /**
+   * @brief Print the frontier to console.
+   *
+   */
   void print() {
     std::cout << "Frontier = ";
     thrust::copy(p_storage.get()->begin(),
