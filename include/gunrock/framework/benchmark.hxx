@@ -25,9 +25,7 @@ class benchmark_t {
       : edges_visited(1),
         vertices_visited(1),
         search_depth(0),
-        number_of_iterations(0),
-        time_per_iteration(),
-        real_runtime_collected(false) {}
+        total_runtime() {}
 
   thrust::device_vector<unsigned int> edges_visited;
   thrust::device_vector<unsigned int> vertices_visited;
@@ -36,10 +34,7 @@ class benchmark_t {
   thrust::host_vector<unsigned int> h_vertices_visited;
 
   std::size_t search_depth;
-  std::size_t number_of_iterations;  // usually the same as search_depth.
-  std::vector<double> time_per_iteration;
   double total_runtime;
-  bool real_runtime_collected;
 };
 
 struct device_benchmark_t {
@@ -54,7 +49,14 @@ __device__ void LOG_EDGE_VISITED() {
   math::atomic::add(BXXX.d_edges_visited, static_cast<unsigned int>(1));
 }
 
+__device__ void LOG_VERTEX_VISITED(size_t vertices) {
+  math::atomic::add(BXXX.d_vertices_visited, static_cast<unsigned int>(vertices));
+}
+
 void INIT_BENCH() {
+  thrust::fill(____.edges_visited.begin(), ____.edges_visited.end(), 0);
+  thrust::fill(____.vertices_visited.begin(), ____.vertices_visited.end(), 0);
+  
   BXXX.d_edges_visited = ____.edges_visited.data().get();
   BXXX.d_vertices_visited = ____.vertices_visited.data().get();
 }

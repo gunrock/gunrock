@@ -137,8 +137,11 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
 
+    #if (ESSENTIALS_COLLECT_METRICS)
     benchmark::LOG_EDGE_VISITED();
-
+    benchmark::LOG_VERTEX_VISITED(2);
+    #endif
+    
     // Use-defined advance condition.
     bool cond = op(v, n, e, w);
 
@@ -163,8 +166,6 @@ void execute(graph_t& G,
              gcuda::standard_context_t& context) {
   if constexpr (output_type != advance_io_type_t::none) {
     auto size_of_output = compute_output_length(G, input, context);
-
-    benchmark::INIT_BENCH();
 
     // If output frontier is empty, resize and return.
     if (size_of_output <= 0) {
@@ -208,8 +209,6 @@ void execute(graph_t& G,
   launch_box.launch(context, kernel, G, op, input.data(), output.data(),
                     num_elements, block_offsets.data().get());
   context.synchronize();
-
-  benchmark::DESTROY_BENCH();
 }
 
 }  // namespace block_mapped
