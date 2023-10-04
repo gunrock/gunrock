@@ -101,6 +101,12 @@ void execute(graph_t& G,
     auto e = start_edge + rank;
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
+
+#if (ESSENTIALS_COLLECT_METRICS)
+    benchmark::LOG_EDGE_VISITED(1);
+    benchmark::LOG_VERTEX_VISITED(2);
+#endif
+
     bool cond = op(v, n, e, w);
 
     if (output_type != advance_io_type_t::none)

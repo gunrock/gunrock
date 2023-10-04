@@ -81,8 +81,8 @@ void get_gpu_info(nlohmann::json* jsn) {
 
 void get_performance_stats(std::vector<int>& edges_visited,
                            std::vector<int>& nodes_visited,
-                           edge_t edges,
-                           vertex_t vertices,
+                           size_t edges,
+                           size_t vertices,
                            std::vector<int>& search_depths,
                            std::vector<float>& run_times,
                            std::string primitive,

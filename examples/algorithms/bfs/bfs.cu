@@ -44,8 +44,8 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  vertex_t n_vertices = G.get_number_of_vertices();
-  vertex_t n_edges = G.get_number_of_edges();
+  size_t n_vertices = G.get_number_of_vertices();
+  size_t n_edges = G.get_number_of_edges();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
 

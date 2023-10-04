@@ -45,8 +45,8 @@ struct device_benchmark_t {
 benchmark_t ____;
 __managed__ device_benchmark_t BXXX;
 
-__device__ void LOG_EDGE_VISITED() {
-  math::atomic::add(BXXX.d_edges_visited, static_cast<unsigned int>(1));
+__device__ void LOG_EDGE_VISITED(size_t edges) {
+  math::atomic::add(BXXX.d_edges_visited, static_cast<unsigned int>(edges));
 }
 
 __device__ void LOG_VERTEX_VISITED(size_t vertices) {

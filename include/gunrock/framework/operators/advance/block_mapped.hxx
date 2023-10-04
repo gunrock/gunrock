@@ -137,11 +137,11 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
 
-    #if (ESSENTIALS_COLLECT_METRICS)
-    benchmark::LOG_EDGE_VISITED();
+#if (ESSENTIALS_COLLECT_METRICS)
+    benchmark::LOG_EDGE_VISITED(1);
     benchmark::LOG_VERTEX_VISITED(2);
-    #endif
-    
+#endif
+
     // Use-defined advance condition.
     bool cond = op(v, n, e, w);
 

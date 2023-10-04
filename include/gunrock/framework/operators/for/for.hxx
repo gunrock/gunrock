@@ -81,6 +81,11 @@ execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
           thrust::make_counting_iterator<index_t>(size),  // End: # of V/E
           [=] __device__(index_t const& x) {
             op(G.get_edge_weight(x));
+
+#if (ESSENTIALS_COLLECT_METRICS)
+            benchmark::LOG_EDGE_VISITED(1);
+            benchmark::LOG_VERTEX_VISITED(2);
+#endif
           }  // Unary Operator
       );
       break;
@@ -89,7 +94,18 @@ execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
           single_context->execution_policy(),
           thrust::make_counting_iterator<index_t>(0),     // Begin: 0
           thrust::make_counting_iterator<index_t>(size),  // End: # of V/E
-          [=] __device__(index_t const& x) { op(x); }     // Unary Operator
+          [=] __device__(index_t const& x) {
+            op(x);
+
+#if (ESSENTIALS_COLLECT_METRICS)
+            if (type == parallel_for_each_t::vertex) {
+              benchmark::LOG_VERTEX_VISITED(1);
+            } else {
+              benchmark::LOG_EDGE_VISITED(1);
+              benchmark::LOG_VERTEX_VISITED(2);
+            }
+#endif
+          }  // Unary Operator
       );
       break;
   }
