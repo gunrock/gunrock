@@ -2,7 +2,6 @@
  * @file bc.hxx
  * @author Ben Johnson (bkj.322@gmail.com)
  * @brief Betweeness Centrality
- * @version 0.1
  * @date 2021-04
  *
  * @copyright Copyright (c) 2021

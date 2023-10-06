@@ -2,7 +2,6 @@
  * @file pr.hxx
  * @author Ben Johnson (bkj.322@gmail.com)
  * @brief PageRank
- * @version 0.1
  * @date 2021-04-01
  *
  * @copyright Copyright (c) 2021
@@ -136,20 +135,36 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // thrust::fill_n(policy,
     //   p, n_vertices, (1 - alpha) / n_vertices);
     // <<
-
-    auto spread_op = [p, plast, iweights] __host__ __device__(
-                         vertex_t const& src, vertex_t const& dst,
-                         edge_t const& edge, weight_t const& weight) -> bool {
+    auto spread_coo_op = [=] __device__(edge_t const& e) -> void {
+      auto src = G.get_source_vertex(e);
+      auto dst = G.get_destination_vertex(e);
+      weight_t weight = G.get_edge_weight(e);
       weight_t update = plast[src] * iweights[src] * weight;
       math::atomic::add(p + dst, update);
-      return false;
     };
 
-    operators::advance::execute<operators::load_balance_t::block_mapped,
-                                operators::advance_direction_t::forward,
-                                operators::advance_io_type_t::graph,
-                                operators::advance_io_type_t::none>(
-        G, E, spread_op, context);
+    operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
+        G,              // graph
+        spread_coo_op,  // lambda function
+        context         // context
+    );
+
+    // -- OR --
+    // You can do the following with advance operator instead:
+    // auto spread_op = [=] __host__ __device__(
+    //                      vertex_t const& src, vertex_t const& dst,
+    //                      edge_t const& edge, weight_t const& weight) -> bool
+    // {
+    //   weight_t update = plast[src] * iweights[src] * weight;
+    //   math::atomic::add(p + dst, update);
+    //   return false;
+    // };
+    // operators::advance::execute<operators::load_balance_t::block_mapped,
+    //                             operators::advance_direction_t::forward,
+    //                             operators::advance_io_type_t::graph,
+    //                             operators::advance_io_type_t::none>(
+    //     G, E, spread_op, context);
+    // <<
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) {
