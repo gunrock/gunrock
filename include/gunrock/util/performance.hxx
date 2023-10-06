@@ -109,20 +109,28 @@ void export_performance_stats(std::vector<int>& edges_visited,
   std::string json_dir_file;
   std::string command_line_call;
 
-  // Get average run time
-  avg_run_time =
-      std::reduce(run_times.begin(), run_times.end(), 0.0) / run_times.size();
+  if (run_times.size() == 1) {
+    avg_run_time = run_times[0];
+    stdev_run_times = 0;
+    min_run_time = avg_run_time;
+    max_run_time = avg_run_time;
+  } else {
+    // Get average run time
+    avg_run_time = std::accumulate(run_times.begin(), run_times.end(), 0.0) /
+                   run_times.size();
 
-  // Get run time standard deviation
-  float sq_sum = std::inner_product(run_times.begin(), run_times.end(),
-                                    run_times.begin(), 0.0);
-  stdev_run_times =
-      std::sqrt(sq_sum / (run_times.size() - 1) - avg_run_time * avg_run_time);
+    // Get run time standard deviation
+    std::vector<double> diff(run_times.size());
+    std::transform(run_times.begin(), run_times.end(), diff.begin(),
+                   [avg_run_time](double x) { return x - avg_run_time; });
+    double sq_sum =
+        std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+    stdev_run_times = std::sqrt(sq_sum / run_times.size());
 
-  // Get min and max run times
-  min_run_time = *std::min_element(run_times.begin(), run_times.end());
-  max_run_time = *std::max_element(run_times.begin(), run_times.end());
-
+    // Get min and max run times
+    min_run_time = *std::min_element(run_times.begin(), run_times.end());
+    max_run_time = *std::max_element(run_times.begin(), run_times.end());
+  }
   // Get time info
   time_t rawtime;
   struct tm* timeinfo;
@@ -177,7 +185,7 @@ void export_performance_stats(std::vector<int>& edges_visited,
       "compiler", gunrock::util::stats::compiler));
   jsn.push_back(nlohmann::json::object_t::value_type(
       "compiler_version", gunrock::util::stats::compiler_version));
-  
+
   // Include additional stats if this is a full performance run
   if (search_depths.size() > 0 && edges_visited.size() > 0 &&
       nodes_visited.size() > 0) {
