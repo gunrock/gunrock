@@ -72,16 +72,23 @@ void test_sssp(int num_arguments, char** argument_array) {
   // std::shared_ptr<vertex_t> predecessors(
   //     allocate<vertex_t>(n_vertices * sizeof(vertex_t)),
   //     deleter_t<vertex_t>());
-  
+
   uint n_runs = source_vect.size();
   std::vector<float> run_times;
 
-#if !(ESSENTIALS_COLLECT_METRICS) 
+#if !(ESSENTIALS_COLLECT_METRICS)
   // Standard run
   for (int i = 0; i < n_runs; i++) {
     run_times.push_back(gunrock::sssp::run(
-        G, source_vect[i], distances.data().get(),
-        predecessors.data().get()));
+        G, source_vect[i], distances.data().get(), predecessors.data().get()));
+  }
+  // Export metrics (runtimes only)
+  if (params.export_metrics) {
+    std::vector<int> empty_vector;
+    gunrock::util::stats::export_performance_stats(
+        empty_vector, empty_vector, n_edges, n_vertices, empty_vector,
+        run_times, "sssp", params.filename, "market", params.json_dir,
+        params.json_file, source_vect, tag_vect, num_arguments, argument_array);
   }
 #else
   // Run with performance evaluation
@@ -93,8 +100,7 @@ void test_sssp(int num_arguments, char** argument_array) {
     benchmark::INIT_BENCH();
 
     run_times.push_back(gunrock::sssp::run(
-        G, source_vect[i], distances.data().get(),
-        predecessors.data().get()));
+        G, source_vect[i], distances.data().get(), predecessors.data().get()));
 
     thrust::host_vector<int> h_edges_visited = benchmark::____.edges_visited;
     thrust::host_vector<int> h_vertices_visited =
@@ -108,11 +114,13 @@ void test_sssp(int num_arguments, char** argument_array) {
   }
 
   // Export metrics
-  gunrock::util::stats::get_performance_stats(
-      edges_visited_vect, vertices_visited_vect, n_edges, n_vertices,
-      search_depth_vect, run_times, "sssp", params.filename, "market",
-      params.json_dir, params.json_file, source_vect, tag_vect, 
-      num_arguments, argument_array);
+  if (params.export_metrics) {
+    gunrock::util::stats::export_performance_stats(
+        edges_visited_vect, vertices_visited_vect, n_edges, n_vertices,
+        search_depth_vect, run_times, "sssp", params.filename, "market",
+        params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
+        argument_array);
+  }
 #endif
 
   // --

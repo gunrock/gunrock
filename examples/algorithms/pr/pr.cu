@@ -56,14 +56,22 @@ void test_pr(int num_arguments, char** argument_array) {
 
   // --
   // GPU Run
-  
+
   std::vector<float> run_times;
 
-#if !(ESSENTIALS_COLLECT_METRICS) 
+#if !(ESSENTIALS_COLLECT_METRICS)
   // Standard run
   for (int i = 0; i < params.num_runs; i++) {
-    run_times.push_back(
-        gunrock::pr::run(G, alpha, tol, p.data().get()));
+    run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
+  }
+  // Export metrics (runtimes only)
+  if (params.export_metrics) {
+    std::vector<int> empty_vector;
+    gunrock::util::stats::export_performance_stats(
+        empty_vector, empty_vector, n_edges, n_vertices, empty_vector,
+        run_times, "pr", params.filename, "market", params.json_dir,
+        params.json_file, empty_vector, tag_vect, num_arguments,
+        argument_array);
   }
 #else
   // Run with performance evaluation
@@ -74,8 +82,7 @@ void test_pr(int num_arguments, char** argument_array) {
   for (int i = 0; i < params.num_runs; i++) {
     benchmark::INIT_BENCH();
 
-    run_times.push_back(
-        gunrock::pr::run(G, alpha, tol, p.data().get()));
+    run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
 
     thrust::host_vector<int> h_edges_visited = benchmark::____.edges_visited;
     thrust::host_vector<int> h_vertices_visited =
@@ -90,15 +97,16 @@ void test_pr(int num_arguments, char** argument_array) {
 
   // Placeholder since PR does not use sources
   std::vector<int> src_placeholder;
-  
-  // Export metrics
-  gunrock::util::stats::get_performance_stats(
-      edges_visited_vect, vertices_visited_vect, n_edges, n_vertices,
-      search_depth_vect, run_times, "pr", params.filename, "market",
-      params.json_dir, params.json_file, src_placeholder, tag_vect, 
-      num_arguments, argument_array);
-#endif
 
+  // Export metrics
+  if (params.export_metrics) {
+    gunrock::util::stats::export_performance_stats(
+        edges_visited_vect, vertices_visited_vect, n_edges, n_vertices,
+        search_depth_vect, run_times, "pr", params.filename, "market",
+        params.json_dir, params.json_file, src_placeholder, tag_vect,
+        num_arguments, argument_array);
+  }
+#endif
 
   // Log
 

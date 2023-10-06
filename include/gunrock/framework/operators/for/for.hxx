@@ -95,7 +95,6 @@ execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
           thrust::make_counting_iterator<index_t>(0),     // Begin: 0
           thrust::make_counting_iterator<index_t>(size),  // End: # of V/E
           [=] __device__(index_t const& x) {
-            op(x);
 
 #if (ESSENTIALS_COLLECT_METRICS)
             if (type == parallel_for_each_t::vertex) {
@@ -105,6 +104,8 @@ execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
               benchmark::LOG_VERTEX_VISITED(2);
             }
 #endif
+
+            op(x);
           }  // Unary Operator
       );
       break;
