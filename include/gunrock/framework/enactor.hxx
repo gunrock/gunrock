@@ -250,12 +250,11 @@ struct enactor_t {
       ++iteration;
     }
     finalize(*context);
-    auto runtime = timer.end();
     #if (ESSENTIALS_COLLECT_METRICS)
     benchmark::____.search_depth = iteration;
     benchmark::____.total_runtime = runtime;
     #endif
-    return runtime;
+    return timer.end();
   }
 
   /**

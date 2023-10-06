@@ -94,6 +94,20 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                       edge_t const& edge,        // edge
                       weight_t const& weight     // weight (tuple).
                       ) -> bool {
+      // If the neighbor is not visited, update the distance. Returning false
+      // here means that the neighbor is not added to the output frontier, and
+      // instead an invalid vertex is added in its place. These invalides (-1 in
+      // most cases) can be removed using a filter operator or uniquify.
+
+      // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
+      //   return false;
+      // else
+      //   return (math::atomic::cas(
+      //               &distances[neighbor],
+      //               std::numeric_limits<vertex_t>::max(), iteration + 1) ==
+      //               std::numeric_limits<vertex_t>::max());
+
+      // Simpler logic for the above.
       auto old_distance =
           math::atomic::min(&distances[neighbor], iteration + 1);
       return (iteration + 1 < old_distance);
