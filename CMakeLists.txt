@@ -215,6 +215,21 @@ target_compile_options(essentials INTERFACE
 )
 
 ####################################################
+################# COLLECT METRICS ##################
+####################################################
+option(ESSENTIALS_COLLECT_METRICS
+  "If on, builds Essentials with metrics collection enabled."
+  OFF)
+
+if(ESSENTIALS_COLLECT_METRICS)
+  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=1)
+  set(ESSENTIALS_BUILD_TESTS OFF)
+  set(ESSENTIALS_BUILD_BENCHMARKS OFF)
+else()
+  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=0)
+endif(ESSENTIALS_COLLECT_METRICS)
+
+####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
 ####################################################
 option(ESSENTIALS_BUILD_EXAMPLES
@@ -253,16 +268,3 @@ if(ESSENTIALS_BUILD_BENCHMARKS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
   add_subdirectory(benchmarks)
 endif(ESSENTIALS_BUILD_BENCHMARKS)
-
-####################################################
-################# COLLECT METRICS ##################
-####################################################
-option(ESSENTIALS_COLLECT_METRICS
-  "If on, builds Essentials with metrics collection enabled."
-  OFF)
-
-if(ESSENTIALS_COLLECT_METRICS)
-  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=1)
-else()
-  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=0)
-endif(ESSENTIALS_COLLECT_METRICS)
