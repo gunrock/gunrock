@@ -88,7 +88,6 @@ void pr_bench(nvbench::state& state) {
 
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
-  int search_depth = 0;
 
   // --
   // Run PR with NVBench

@@ -88,9 +88,6 @@ void sssp_bench(nvbench::state& state) {
 
   thrust::device_vector<weight_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
-  thrust::device_vector<int> edges_visited(1);
-  thrust::device_vector<int> vertices_visited(1);
-  int search_depth = 0;
 
   // --
   // Run SSSP with NVBench
