@@ -93,7 +93,7 @@ void pr_bench(nvbench::state& state) {
   // --
   // Run PR with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::pr::run(G, alpha, tol, false, p.data().get(), &search_depth);
+    gunrock::pr::run(G, alpha, tol, p.data().get());
   });
 }
 

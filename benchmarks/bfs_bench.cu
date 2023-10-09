@@ -92,9 +92,8 @@ void bfs_bench(nvbench::state& state) {
   // --
   // Run BFS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::bfs::run(G, single_source, false, distances.data().get(),
-                      predecessors.data().get(), edges_visited.data().get(),
-                      &search_depth);
+    gunrock::bfs::run(G, single_source, distances.data().get(),
+                      predecessors.data().get());
   });
 }
 

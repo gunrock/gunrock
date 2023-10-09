@@ -95,9 +95,8 @@ void sssp_bench(nvbench::state& state) {
   // --
   // Run SSSP with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::sssp::run(G, single_source, false, distances.data().get(),
-                       predecessors.data().get(), edges_visited.data().get(),
-                       vertices_visited.data().get(), &search_depth);
+    gunrock::sssp::run(G, single_source, distances.data().get(),
+                       predecessors.data().get());
   });
 }
 
