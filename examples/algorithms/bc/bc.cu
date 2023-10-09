@@ -53,7 +53,7 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  uint n_runs = source_vect.size();
+  size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
 #if !(ESSENTIALS_COLLECT_METRICS)

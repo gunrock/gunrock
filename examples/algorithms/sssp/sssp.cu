@@ -73,7 +73,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   //     allocate<vertex_t>(n_vertices * sizeof(vertex_t)),
   //     deleter_t<vertex_t>());
 
-  uint n_runs = source_vect.size();
+  size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
 #if !(ESSENTIALS_COLLECT_METRICS)

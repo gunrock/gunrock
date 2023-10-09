@@ -60,7 +60,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Run problem
 
-  uint n_runs = source_vect.size();
+  size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
 #if !(ESSENTIALS_COLLECT_METRICS)
