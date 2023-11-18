@@ -59,38 +59,15 @@ void test_pr(int num_arguments, char** argument_array) {
 
   std::vector<float> run_times;
 
-#if !(ESSENTIALS_COLLECT_METRICS)
-  // Standard run
-  for (int i = 0; i < params.num_runs; i++) {
-    run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
-  }
-  // Export metrics (runtimes only)
-  if (params.export_metrics) {
-    std::vector<int> empty_vector;
-    gunrock::util::stats::export_performance_stats(
-        empty_vector, empty_vector, n_edges, n_vertices, empty_vector,
-        run_times, "pr", params.filename, "market", params.json_dir,
-        params.json_file, empty_vector, tag_vect, num_arguments,
-        argument_array);
-  }
-#else
-  // Run with performance evaluation
-  std::vector<int> edges_visited_vect(params.num_runs);
-  std::vector<int> search_depth_vect(params.num_runs);
-  std::vector<int> vertices_visited_vect(params.num_runs);
-
+  auto benchmark_metrics =
+      std::vector<benchmark::host_benchmark_t>(params.num_runs);
   for (int i = 0; i < params.num_runs; i++) {
     benchmark::INIT_BENCH();
 
     run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
 
-    thrust::host_vector<int> h_edges_visited = benchmark::____.edges_visited;
-    thrust::host_vector<int> h_vertices_visited =
-        benchmark::____.vertices_visited;
-
-    edges_visited_vect[i] = h_edges_visited[0];
-    vertices_visited_vect[i] = h_vertices_visited[0];
-    search_depth_vect[i] = benchmark::____.search_depth;
+    benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
+    benchmark_metrics[i] = metrics;
 
     benchmark::DESTROY_BENCH();
   }
@@ -101,12 +78,10 @@ void test_pr(int num_arguments, char** argument_array) {
   // Export metrics
   if (params.export_metrics) {
     gunrock::util::stats::export_performance_stats(
-        edges_visited_vect, vertices_visited_vect, n_edges, n_vertices,
-        search_depth_vect, run_times, "pr", params.filename, "market",
-        params.json_dir, params.json_file, src_placeholder, tag_vect,
-        num_arguments, argument_array);
+        benchmark_metrics, n_edges, n_vertices, run_times, "pr",
+        params.filename, "market", params.json_dir, params.json_file,
+        src_placeholder, tag_vect, num_arguments, argument_array);
   }
-#endif
 
   // Log
 

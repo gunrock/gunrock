@@ -79,31 +79,24 @@ void get_gpu_info(nlohmann::json* jsn) {
   jsn->push_back(nlohmann::json::object_t::value_type("gpuinfo", gpuinfo));
 }
 
-void export_performance_stats(std::vector<int>& edges_visited,
-                              std::vector<int>& nodes_visited,
-                              size_t edges,
-                              size_t vertices,
-                              std::vector<int>& search_depths,
-                              std::vector<float>& run_times,
-                              std::string primitive,
-                              std::string filename,
-                              std::string graph_type,
-                              std::string json_dir,
-                              std::string json_file,
-                              std::vector<int>& sources,
-                              std::vector<std::string>& tags,
-                              int argc,
-                              char** argv) {
+void export_performance_stats(
+    std::vector<benchmark::host_benchmark_t>& benchmark_metrics,
+    size_t edges,
+    size_t vertices,
+    std::vector<float>& run_times,
+    std::string primitive,
+    std::string filename,
+    std::string graph_type,
+    std::string json_dir,
+    std::string json_file,
+    std::vector<int>& sources,
+    std::vector<std::string>& tags,
+    int argc,
+    char** argv) {
   float avg_run_time;
   float stdev_run_times;
   float min_run_time;
   float max_run_time;
-  int avg_search_depth;
-  int min_search_depth;
-  int max_search_depth;
-  float avg_mteps;
-  float min_mteps;
-  float max_mteps;
   std::string time_s;
   nlohmann::json jsn;
   std::string json_dir_file;
@@ -187,48 +180,76 @@ void export_performance_stats(std::vector<int>& edges_visited,
       "compiler_version", gunrock::util::stats::compiler_version));
 
   // Include additional stats if this is a full performance run
-  if (search_depths.size() > 0 && edges_visited.size() > 0 &&
-      nodes_visited.size() > 0) {
-    // Get average search depth
-    avg_search_depth =
-        std::reduce(search_depths.begin(), search_depths.end(), 0.0) /
-        search_depths.size();
+  std::vector<int> search_depths;
+  std::vector<unsigned int> nodes_visited;
+  std::vector<unsigned int> edges_visited;
+  
+#if ESSENTIALS_COLLECT_METRICS
+  int avg_search_depth;
+  int min_search_depth;
+  int max_search_depth;
+  float avg_mteps;
+  float min_mteps;
+  float max_mteps;
+  
+  std::transform(benchmark_metrics.begin(), benchmark_metrics.end(),
+                 std::back_inserter(search_depths),
+                 [](benchmark::host_benchmark_t const& b) -> int {
+                   return b.search_depth;
+                 });
+  
+  std::transform(benchmark_metrics.begin(), benchmark_metrics.end(),
+                 std::back_inserter(nodes_visited),
+                 [](benchmark::host_benchmark_t const& b) -> unsigned int {
+                   return b.vertices_visited;
+                 });
+  
+  std::transform(benchmark_metrics.begin(), benchmark_metrics.end(),
+                 std::back_inserter(edges_visited),
+                 [](benchmark::host_benchmark_t const& b) -> unsigned int {
+                   return b.edges_visited;
+                 });
+  
+  // Get average search depth
+  avg_search_depth =
+      std::reduce(search_depths.begin(), search_depths.end(), 0.0) /
+      search_depths.size();
 
-    // Get min and max search depths
-    min_search_depth =
-        *std::min_element(search_depths.begin(), search_depths.end());
-    max_search_depth =
-        *std::max_element(search_depths.begin(), search_depths.end());
+  // Get min and max search depths
+  min_search_depth =
+      *std::min_element(search_depths.begin(), search_depths.end());
+  max_search_depth =
+      *std::max_element(search_depths.begin(), search_depths.end());
 
-    // Get MTEPS
-    std::vector<float> mteps(edges_visited.size());
-    std::transform(edges_visited.begin(), edges_visited.end(),
-                   run_times.begin(), mteps.begin(), std::divides<float>());
-    std::transform(mteps.begin(), mteps.end(), mteps.begin(),
-                   [](auto& c) { return c / 1000; });
+  // Get MTEPS
+  std::vector<float> mteps(edges_visited.size());
+  std::transform(edges_visited.begin(), edges_visited.end(),
+                 run_times.begin(), mteps.begin(), std::divides<float>());
+  std::transform(mteps.begin(), mteps.end(), mteps.begin(),
+                 [](auto& c) { return c / 1000; });
 
-    avg_mteps = std::reduce(mteps.begin(), mteps.end(), 0.0) / mteps.size();
+  avg_mteps = std::reduce(mteps.begin(), mteps.end(), 0.0) / mteps.size();
 
-    min_mteps = *std::min_element(mteps.begin(), mteps.end());
-    max_mteps = *std::max_element(mteps.begin(), mteps.end());
+  min_mteps = *std::min_element(mteps.begin(), mteps.end());
+  max_mteps = *std::max_element(mteps.begin(), mteps.end());
 
-    jsn.push_back(
-        nlohmann::json::object_t::value_type("edges_visited", edges_visited));
-    jsn.push_back(
-        nlohmann::json::object_t::value_type("nodes_visited", nodes_visited));
-    jsn.push_back(
-        nlohmann::json::object_t::value_type("search_depths", search_depths));
-    jsn.push_back(nlohmann::json::object_t::value_type("avg_search_depth",
-                                                       avg_search_depth));
-    jsn.push_back(nlohmann::json::object_t::value_type("min_search_depth",
-                                                       min_search_depth));
-    jsn.push_back(nlohmann::json::object_t::value_type("max_search_depth",
-                                                       max_search_depth));
-    jsn.push_back(nlohmann::json::object_t::value_type("mteps", mteps));
-    jsn.push_back(nlohmann::json::object_t::value_type("avg_mteps", avg_mteps));
-    jsn.push_back(nlohmann::json::object_t::value_type("min_mteps", min_mteps));
-    jsn.push_back(nlohmann::json::object_t::value_type("max_mteps", max_mteps));
-  }
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("edges_visited", edges_visited));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("nodes_visited", nodes_visited));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("search_depths", search_depths));
+  jsn.push_back(nlohmann::json::object_t::value_type("avg_search_depth",
+                                                     avg_search_depth));
+  jsn.push_back(nlohmann::json::object_t::value_type("min_search_depth",
+                                                     min_search_depth));
+  jsn.push_back(nlohmann::json::object_t::value_type("max_search_depth",
+                                                     max_search_depth));
+  jsn.push_back(nlohmann::json::object_t::value_type("mteps", mteps));
+  jsn.push_back(nlohmann::json::object_t::value_type("avg_mteps", avg_mteps));
+  jsn.push_back(nlohmann::json::object_t::value_type("min_mteps", min_mteps));
+  jsn.push_back(nlohmann::json::object_t::value_type("max_mteps", max_mteps));
+#endif
 
   // Get GPU info
   get_gpu_info(&jsn);
