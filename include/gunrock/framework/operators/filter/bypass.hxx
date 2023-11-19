@@ -35,10 +35,10 @@ void execute(graph_t& G,
       return gunrock::numeric_limits<type_t>::invalid();  // exit early
 
 #if (ESSENTIALS_COLLECT_METRICS)
-    if (input->get_kind() == gunrock::frontier::frontier_kind_t::vertex_frontier) {
-        benchmark::LOG_VERTEX_VISITED(1);
-    }
-    else {
+    if (input->get_kind() ==
+        gunrock::frontier::frontier_kind_t::vertex_frontier) {
+      benchmark::LOG_VERTEX_VISITED(1);
+    } else {
       benchmark::LOG_EDGE_VISITED(1);
       benchmark::LOG_VERTEX_VISITED(2);
     }

@@ -35,14 +35,13 @@ class benchmark_t {
 
   std::size_t search_depth;
   double total_runtime;
-
 };
 
 struct device_benchmark_t {
   unsigned int* d_edges_visited;
   unsigned int* d_vertices_visited;
 };
-  
+
 struct host_benchmark_t {
   unsigned int edges_visited = 0;
   unsigned int vertices_visited = 0;
@@ -58,14 +57,15 @@ __device__ void LOG_EDGE_VISITED(size_t edges) {
 }
 
 __device__ void LOG_VERTEX_VISITED(size_t vertices) {
-  math::atomic::add(BXXX.d_vertices_visited, static_cast<unsigned int>(vertices));
+  math::atomic::add(BXXX.d_vertices_visited,
+                    static_cast<unsigned int>(vertices));
 }
 
 void INIT_BENCH() {
 #if ESSENTIALS_COLLECT_METRICS
   thrust::fill(____.edges_visited.begin(), ____.edges_visited.end(), 0);
   thrust::fill(____.vertices_visited.begin(), ____.vertices_visited.end(), 0);
-  
+
   BXXX.d_edges_visited = ____.edges_visited.data().get();
   BXXX.d_vertices_visited = ____.vertices_visited.data().get();
 #endif

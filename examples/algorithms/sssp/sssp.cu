@@ -76,8 +76,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
-  auto benchmark_metrics =
-      std::vector<benchmark::host_benchmark_t>(n_runs);
+  auto benchmark_metrics = std::vector<benchmark::host_benchmark_t>(n_runs);
   for (int i = 0; i < n_runs; i++) {
     benchmark::INIT_BENCH();
 

@@ -214,7 +214,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     bool converged = (!forward && !backward) ? true : false;
     if (converged) {
       this->get_enactor()->iteration = this->search_depth;
-    } 
+    }
     return converged;
   }
 };  // struct enactor_t

@@ -183,7 +183,7 @@ void export_performance_stats(
   std::vector<int> search_depths;
   std::vector<unsigned int> nodes_visited;
   std::vector<unsigned int> edges_visited;
-  
+
 #if ESSENTIALS_COLLECT_METRICS
   int avg_search_depth;
   int min_search_depth;
@@ -191,25 +191,25 @@ void export_performance_stats(
   float avg_mteps;
   float min_mteps;
   float max_mteps;
-  
+
   std::transform(benchmark_metrics.begin(), benchmark_metrics.end(),
                  std::back_inserter(search_depths),
                  [](benchmark::host_benchmark_t const& b) -> int {
                    return b.search_depth;
                  });
-  
+
   std::transform(benchmark_metrics.begin(), benchmark_metrics.end(),
                  std::back_inserter(nodes_visited),
                  [](benchmark::host_benchmark_t const& b) -> unsigned int {
                    return b.vertices_visited;
                  });
-  
+
   std::transform(benchmark_metrics.begin(), benchmark_metrics.end(),
                  std::back_inserter(edges_visited),
                  [](benchmark::host_benchmark_t const& b) -> unsigned int {
                    return b.edges_visited;
                  });
-  
+
   // Get average search depth
   avg_search_depth =
       std::reduce(search_depths.begin(), search_depths.end(), 0.0) /
@@ -223,8 +223,8 @@ void export_performance_stats(
 
   // Get MTEPS
   std::vector<float> mteps(edges_visited.size());
-  std::transform(edges_visited.begin(), edges_visited.end(),
-                 run_times.begin(), mteps.begin(), std::divides<float>());
+  std::transform(edges_visited.begin(), edges_visited.end(), run_times.begin(),
+                 mteps.begin(), std::divides<float>());
   std::transform(mteps.begin(), mteps.end(), mteps.begin(),
                  [](auto& c) { return c / 1000; });
 
