@@ -1,6 +1,8 @@
 # begin /* Add experiments' executables */
 # Note, that this is not at all required for essentials.
 # These are just simple experiments conducted that support essentials development.
+if (NOT ESSENTIALS_COLLECT_METRICS)
+
 set(EXPERIMENTS_SOURCES
   copy_ctor.cu
   diamond.cu
@@ -21,4 +23,6 @@ foreach(SOURCE IN LISTS EXPERIMENTS_SOURCES)
         CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
   message(STATUS "Example Added: ${EXPERIMENT}")
 endforeach()
+
+endif (NOT ESSENTIALS_COLLECT_METRICS)
 # end /* Add experiments' executables */

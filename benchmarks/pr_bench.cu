@@ -88,12 +88,11 @@ void pr_bench(nvbench::state& state) {
 
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
-  int search_depth = 0;
 
   // --
   // Run PR with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::pr::run(G, alpha, tol, false, p.data().get(), &search_depth);
+    gunrock::pr::run(G, alpha, tol, p.data().get());
   });
 }
 

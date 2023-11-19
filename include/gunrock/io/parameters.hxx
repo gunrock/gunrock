@@ -12,7 +12,7 @@ struct parameters_t {
   std::string tag_string = "";
   int num_runs = 1;
   cxxopts::Options options;
-  bool collect_metrics = false;
+  bool export_metrics = false;
   bool validate = false;
   bool binary = false;
 
@@ -26,8 +26,8 @@ struct parameters_t {
       : options(argv[0], algorithm + " example") {
     // Add command line options
     options.add_options()("help", "Print help")  // help
-        ("collect_metrics",
-         "collect performance analysis metrics")  // performance evaluation
+        ("export_metrics",
+         "export performance analysis metrics")  // performance evaluation
         ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
         ("d,json_dir", "JSON output directory",
          cxxopts::value<std::string>())  // json output directory
@@ -80,8 +80,8 @@ struct parameters_t {
       validate = true;
     }
 
-    if (result.count("collect_metrics") == 1) {
-      collect_metrics = true;
+    if (result.count("export_metrics") == 1) {
+      export_metrics = true;
     }
 
     if (result.count("num_runs") == 1) {

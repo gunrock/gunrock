@@ -14,6 +14,7 @@
 
 #include <gunrock/framework/frontier/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
+#include <gunrock/framework/benchmark.hxx>
 
 #pragma once
 
@@ -249,7 +250,12 @@ struct enactor_t {
       ++iteration;
     }
     finalize(*context);
-    return timer.end();
+    auto runtime = timer.end();
+    #if (ESSENTIALS_COLLECT_METRICS)
+    benchmark::____.search_depth = iteration;
+    benchmark::____.total_runtime = runtime;
+    #endif
+    return runtime;
   }
 
   /**

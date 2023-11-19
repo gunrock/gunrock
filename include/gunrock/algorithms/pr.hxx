@@ -20,18 +20,14 @@ template <typename weight_t>
 struct param_t {
   weight_t alpha;
   weight_t tol;
-  bool collect_metrics;
 
-  param_t(weight_t _alpha, weight_t _tol, bool _collect_metrics)
-      : alpha(_alpha), tol(_tol), collect_metrics(_collect_metrics) {}
+  param_t(weight_t _alpha, weight_t _tol) : alpha(_alpha), tol(_tol) {}
 };
 
 template <typename weight_t>
 struct result_t {
   weight_t* p;
-  int* search_depth;
-  result_t(weight_t* _p, int* _search_depth)
-      : p(_p), search_depth(_search_depth) {}
+  result_t(weight_t* _p) : p(_p) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -92,8 +88,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::transform(policy, thrust::counting_iterator<vertex_t>(0),
                       thrust::counting_iterator<vertex_t>(n_vertices),
                       iweights.begin(), get_weight);
-
-    *(this->result.search_depth) = 0;
   }
 };
 
@@ -122,10 +116,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto policy = this->context->get_context(0)->execution_policy();
 
-    auto search_depth = P->result.search_depth;
-
-    auto collect_metrics = P->param.collect_metrics;
-
     thrust::copy_n(policy, p, n_vertices, plast);
 
     // >> handle "dangling nodes" (nodes w/ zero outdegree)
@@ -145,7 +135,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // thrust::fill_n(policy,
     //   p, n_vertices, (1 - alpha) / n_vertices);
     // <<
-
     auto spread_coo_op = [=] __device__(edge_t const& e) -> void {
       auto src = G.get_source_vertex(e);
       auto dst = G.get_destination_vertex(e);
@@ -176,10 +165,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     //                             operators::advance_io_type_t::none>(
     //     G, E, spread_op, context);
     // <<
-
-    if (collect_metrics) {
-      *search_depth = this->iteration;
-    }
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) {
@@ -213,9 +198,7 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::weight_type alpha,
           typename graph_t::weight_type tol,
-          bool collect_metrics,
           typename graph_t::weight_type* p,  // Output
-          int* search_depth,                 // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -227,8 +210,8 @@ float run(graph_t& G,
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(alpha, tol, collect_metrics);
-  result_type result(p, search_depth);
+  param_type param(alpha, tol);
+  result_type result(p);
   // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
