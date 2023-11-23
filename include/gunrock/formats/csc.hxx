@@ -75,6 +75,8 @@ struct csc_t {
     row_indices.resize(number_of_nonzeros);
     nonzero_values.resize(number_of_nonzeros);
 
+    nonzero_values = csr.nonzero_values;
+
     // Convert row offsets to indices
     gunrock::graph::convert::offsets_to_indices<space>(
         memory::raw_pointer_cast(csr.row_offsets.data()),
