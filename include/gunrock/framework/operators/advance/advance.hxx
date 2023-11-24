@@ -1,8 +1,7 @@
 /**
  * @file advance.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief
- * @version 0.1
+ * @brief Advance operator's header-file.
  * @date 2020-10-07
  *
  * @copyright Copyright (c) 2020
@@ -19,10 +18,10 @@
 
 #include <gunrock/framework/operators/advance/helpers.hxx>
 #include <gunrock/framework/operators/advance/merge_path.hxx>
-#include <gunrock/framework/operators/advance/merge_path_v2.hxx>
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/bucketing.hxx>
+#include <gunrock/framework/operators/advance/merge_path_v2.hxx>
 
 namespace gunrock {
 namespace operators {

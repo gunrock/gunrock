@@ -2,7 +2,6 @@
  * @file bfs.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Breadth-First Search algorithm.
- * @version 0.1
  * @date 2020-11-23
  *
  * @copyright Copyright (c) 2020
@@ -99,6 +98,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
+
       // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
       //   return false;
       // else

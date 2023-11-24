@@ -1,6 +1,8 @@
 #pragma once
 
 #include <gunrock/memory.hxx>
+#include <gunrock/error.hxx>
+
 #include <gunrock/container/vector.hxx>
 #include <gunrock/formats/formats.hxx>
 
@@ -91,29 +93,13 @@ struct csr_t {
     // index_t* Aj;
     // value_t* Ax;
 
-    if (space == memory_space_t::device) {
-      assert(space == memory_space_t::device);
-      // If returning csr_t on device, allocate temporary host vectors, build on
-      // host and move to device.
-      Ap.resize(number_of_rows + 1);
-      Aj.resize(number_of_nonzeros);
-      Ax.resize(number_of_nonzeros);
+    Ap.resize(number_of_rows + 1);
+    Aj.resize(number_of_nonzeros);
+    Ax.resize(number_of_nonzeros);
 
-      // Ap = _Ap.data();
-      // Aj = _Aj.data();
-      // Ax = _Ax.data();
-
-    } else {
-      assert(space == memory_space_t::host);
-      // If returning csr_t on host, use it's internal memory to build from COO.
-      row_offsets.resize(number_of_rows + 1);
-      column_indices.resize(number_of_nonzeros);
-      nonzero_values.resize(number_of_nonzeros);
-
-      // Ap = raw_pointer_cast(row_offsets.data());
-      // Aj = raw_pointer_cast(column_indices.data());
-      // Ax = raw_pointer_cast(nonzero_values.data());
-    }
+    // Ap = _Ap.data();
+    // Aj = _Aj.data();
+    // Ax = _Ax.data();
 
     // compute number of non-zero entries per row of A.
     for (offset_t n = 0; n < number_of_nonzeros; ++n) {
@@ -146,12 +132,9 @@ struct csr_t {
       last = temp;
     }
 
-    // If returning a device csr_t, move coverted data to device.
-    if (space == memory_space_t::device) {
-      row_offsets = Ap;
-      column_indices = Aj;
-      nonzero_values = Ax;
-    }
+    row_offsets = Ap;
+    column_indices = Aj;
+    nonzero_values = Ax;
 
     return *this;  // CSR representation (with possible duplicates)
   }
@@ -160,9 +143,12 @@ struct csr_t {
     FILE* file = fopen(filename.c_str(), "rb");
 
     // Read metadata
-    assert(fread(&number_of_rows, sizeof(index_t), 1, file) != 0);
-    assert(fread(&number_of_columns, sizeof(index_t), 1, file) != 0);
-    assert(fread(&number_of_nonzeros, sizeof(offset_t), 1, file) != 0);
+    error::throw_if_exception(
+        fread(&number_of_rows, sizeof(index_t), 1, file) != 0);
+    error::throw_if_exception(
+        fread(&number_of_columns, sizeof(index_t), 1, file) != 0);
+    error::throw_if_exception(
+        fread(&number_of_nonzeros, sizeof(offset_t), 1, file) != 0);
 
     row_offsets.resize(number_of_rows + 1);
     column_indices.resize(number_of_nonzeros);
@@ -175,12 +161,15 @@ struct csr_t {
       thrust::host_vector<index_t> h_column_indices(number_of_nonzeros);
       thrust::host_vector<value_t> h_nonzero_values(number_of_nonzeros);
 
-      assert(fread(memory::raw_pointer_cast(h_row_offsets.data()),
-                   sizeof(offset_t), number_of_rows + 1, file) != 0);
-      assert(fread(memory::raw_pointer_cast(h_column_indices.data()),
-                   sizeof(index_t), number_of_nonzeros, file) != 0);
-      assert(fread(memory::raw_pointer_cast(h_nonzero_values.data()),
-                   sizeof(value_t), number_of_nonzeros, file) != 0);
+      error::throw_if_exception(
+          fread(memory::raw_pointer_cast(h_row_offsets.data()),
+                sizeof(offset_t), number_of_rows + 1, file) != 0);
+      error::throw_if_exception(
+          fread(memory::raw_pointer_cast(h_column_indices.data()),
+                sizeof(index_t), number_of_nonzeros, file) != 0);
+      error::throw_if_exception(
+          fread(memory::raw_pointer_cast(h_nonzero_values.data()),
+                sizeof(value_t), number_of_nonzeros, file) != 0);
 
       // Copy data from host to device
       row_offsets = h_row_offsets;
@@ -190,12 +179,15 @@ struct csr_t {
     } else {
       assert(space == memory_space_t::host);
 
-      assert(fread(memory::raw_pointer_cast(row_offsets.data()),
-                   sizeof(offset_t), number_of_rows + 1, file) != 0);
-      assert(fread(memory::raw_pointer_cast(column_indices.data()),
-                   sizeof(index_t), number_of_nonzeros, file) != 0);
-      assert(fread(memory::raw_pointer_cast(nonzero_values.data()),
-                   sizeof(value_t), number_of_nonzeros, file) != 0);
+      error::throw_if_exception(
+          fread(memory::raw_pointer_cast(row_offsets.data()), sizeof(offset_t),
+                number_of_rows + 1, file) != 0);
+      error::throw_if_exception(
+          fread(memory::raw_pointer_cast(column_indices.data()),
+                sizeof(index_t), number_of_nonzeros, file) != 0);
+      error::throw_if_exception(
+          fread(memory::raw_pointer_cast(nonzero_values.data()),
+                sizeof(value_t), number_of_nonzeros, file) != 0);
     }
   }
 

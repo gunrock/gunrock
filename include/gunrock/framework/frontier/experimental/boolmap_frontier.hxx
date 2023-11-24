@@ -2,7 +2,6 @@
  * @file boolmap_frontier.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Boolmap-based frontier implementation.
- * @version 0.1
  * @date 2021-03-12
  *
  * @copyright Copyright (c) 2021
@@ -13,7 +12,6 @@
 
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/container/vector.hxx>
-#include <gunrock/algorithms/sort/radix_sort.hxx>
 #include <thrust/sequence.h>
 
 namespace gunrock {
@@ -58,8 +56,8 @@ class boolmap_frontier_t {
 #ifdef __CUDA_ARCH__
     num_elements = thrust::reduce(thrust::seq, this->begin(), this->end(), 0);
 #else
-    num_elements = thrust::reduce(thrust::cuda::par.on(stream), this->begin(),
-                                  this->end(), 0);
+    num_elements = thrust::reduce(thrust::cuda::par_nosync.on(stream),
+                                  this->begin(), this->end(), 0);
 #endif
 
     return num_elements;
@@ -148,8 +146,8 @@ class boolmap_frontier_t {
       error::throw_if_exception(cudaErrorUnknown,
                                 "Boolmap only supports 1 or 0 as fill value.");
 
-    thrust::fill(thrust::cuda::par.on(stream), this->begin(), this->end(),
-                 value);
+    thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),
+                 this->end(), value);
   }
 
   /**

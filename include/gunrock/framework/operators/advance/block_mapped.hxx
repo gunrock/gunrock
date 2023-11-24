@@ -2,7 +2,6 @@
  * @file block_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-20
  *
  * @copyright Copyright (c) 2020
@@ -15,6 +14,7 @@
 #include <gunrock/cuda/cuda.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
+#include <gunrock/framework/benchmark.hxx>
 
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
@@ -118,7 +118,9 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
        i += gcuda::block::size::x()     // increment by blockDim.x
   ) {
     // Binary search to find which vertex id to work on.
-    int id = search::binary::rightmost(degrees, i, length);
+    // int id = search::binary::rightmost(degrees, i, length);
+    auto it = thrust::upper_bound(thrust::seq, degrees, degrees + length, i);
+    vertex_t id = thrust::distance(degrees, it) - 1;
 
     // If the id is greater than the width of the block or the input size, we
     // exit.
@@ -134,6 +136,11 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     auto e = sedges[id] + i - degrees[id];
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
+
+#if (ESSENTIALS_COLLECT_METRICS)
+    benchmark::LOG_EDGE_VISITED(1);
+    benchmark::LOG_VERTEX_VISITED(2);
+#endif
 
     // Use-defined advance condition.
     bool cond = op(v, n, e, w);

@@ -2,7 +2,6 @@
  * @file bc.hxx
  * @author Ben Johnson (bkj.322@gmail.com)
  * @brief Betweeness Centrality
- * @version 0.1
  * @date 2021-04
  *
  * @copyright Copyright (c) 2021
@@ -94,6 +93,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   bool forward = true;
   bool backward = true;
   std::size_t depth = 0;
+  std::size_t search_depth = 1;
 
   void prepare_frontier(frontier_t* f,
                         gcuda::multi_context_t& context) override {
@@ -145,6 +145,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
             context);
 
         this->depth++;
+        this->search_depth++;
         if (is_forward_converged(context))
           break;
       }
@@ -182,6 +183,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
             context);
 
         this->depth--;
+        this->search_depth++;
         if (is_backward_converged(context))
           break;
       }
@@ -209,7 +211,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) {
-    return (!forward && !backward) ? true : false;
+    bool converged = (!forward && !backward) ? true : false;
+    if (converged) {
+      this->get_enactor()->iteration = this->search_depth;
+    }
+    return converged;
   }
 };  // struct enactor_t
 

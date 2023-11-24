@@ -1,8 +1,7 @@
 /**
  * @file merge_path.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief
- * @version 0.1
+ * @brief Merge-Path load-balancing based Advance.
  * @date 2020-10-20
  *
  * @copyright Copyright (c) 2020
@@ -38,6 +37,7 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              gcuda::standard_context_t& context) {
+#if 0
   if constexpr (direction == advance_direction_t::optimized) {
     error::throw_if_exception(cudaErrorUnknown,
                               "Direction-optimized not yet implemented.");
@@ -55,10 +55,12 @@ void execute(graph_t& G,
     }
   }
 
-  using type_t = typename frontier_t::type_t;
   using view_t = std::conditional_t<direction == advance_direction_t::forward,
                                     typename graph_t::graph_csr_view_t,
                                     typename graph_t::graph_csc_view_t>;
+#endif
+
+  using type_t = typename frontier_t::type_t;
 
   auto size_of_output = compute_output_offsets(
       G, input, segments, context,
@@ -95,10 +97,16 @@ void execute(graph_t& G,
     if (!gunrock::util::limits::is_valid(v))
       return;
 
-    auto start_edge = G.template get_starting_edge<view_t>(v);
+    auto start_edge = G.get_starting_edge(v);
     auto e = start_edge + rank;
-    auto n = G.template get_destination_vertex<view_t>(e);
-    auto w = G.template get_edge_weight<view_t>(e);
+    auto n = G.get_destination_vertex(e);
+    auto w = G.get_edge_weight(e);
+
+#if (ESSENTIALS_COLLECT_METRICS)
+    benchmark::LOG_EDGE_VISITED(1);
+    benchmark::LOG_VERTEX_VISITED(2);
+#endif
+
     bool cond = op(v, n, e, w);
 
     if (output_type != advance_io_type_t::none)

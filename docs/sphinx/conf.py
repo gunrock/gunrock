@@ -104,6 +104,7 @@ html_css_files = [
 html_theme_options = {
     "repository_url": "https://github.com/gunrock/gunrock",
     "use_repository_button": True,
+    "extra_footer": "<div>Gunrock © 2023 The Regents of the University of California.</div>"
     # "show_nav_level": 3
     # "home_page_in_toc": True,
     # "show_navbar_depth": 3,

@@ -3,6 +3,8 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/tc.hxx>
 
+#include "benchmarks.hxx"
+
 using namespace gunrock;
 using namespace memory;
 
@@ -71,34 +73,21 @@ void tc_bench(nvbench::state& state) {
   state.collect_stores_efficiency();
 
   // --
-  // Define types
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-
-  // --
   // Build graph + metadata
-  csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto mmatrix = mm.load(filename_);
-  if (!mm_is_symmetric(mm.code)) {
+  auto [properties, coo] = mm.load(filename_);
+  if (!properties.symmetric) {
     std::cerr << "Error: input matrix must be symmetric" << std::endl;
     exit(1);
   }
-  csr.from_coo(mmatrix);
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  csr.from_coo(coo);
 
-  auto G = graph::build::from_csr<memory_space_t::device,
-                                  graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
+  // --
+  // Build graph
+
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation
@@ -123,24 +112,10 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without TC options to pass to NVBench.
-    char* args[argc];
-    int j = 0;
-    int num_tc_arguments = 0;
-    for (int i = 0; i < argc; i++) {
-      if (strcmp(argv[i], "--market") == 0 || strcmp(argv[i], "-m") == 0) {
-        num_tc_arguments += 2;
-        i++;
-        continue;
-      }
-      if (strcmp(argv[i], "--reduce") == 0 || strcmp(argv[i], "-r") == 0) {
-        num_tc_arguments += 1;
-        continue;
-      }
-      args[j] = argv[i];
-      j++;
-    }
+    // Remove all gunrock parameters and pass to nvbench.
+    auto args = filtered_argv(argc, argv, "--market", "-m", "--reduce", "-r",
+                              filename_, "true", "false");
     NVBENCH_BENCH(tc_bench);
-    NVBENCH_MAIN_BODY(argc - num_tc_arguments, args);
+    NVBENCH_MAIN_BODY(args.size(), args.data());
   }
 }

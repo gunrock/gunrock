@@ -1,15 +1,14 @@
 #include <gunrock/algorithms/bfs.hxx>
+#include <gunrock/util/performance.hxx>
+#include <gunrock/io/parameters.hxx>
+#include <gunrock/framework/benchmark.hxx>
+
 #include "bfs_cpu.hxx"  // Reference implementation
 
 using namespace gunrock;
 using namespace memory;
 
 void test_bfs(int num_arguments, char** argument_array) {
-  if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
-    exit(1);
-  }
-
   // --
   // Define types
 
@@ -23,75 +22,92 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  csr_t csr;
-  std::string filename = argument_array[1];
+  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+                                        "Breadth First Search");
 
-  if (util::is_market(filename)) {
-    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(mm.load(filename));
-  } else if (util::is_binary_csr(filename)) {
-    csr.read_binary(filename);
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto [properties, coo] = mm.load(params.filename);
+
+  csr_t csr;
+
+  if (params.binary) {
+    csr.read_binary(params.filename);
   } else {
-    std::cerr << "Unknown file format: " << filename << std::endl;
-    exit(1);
+    csr.from_coo(coo);
   }
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
-
   // --
-  // Build graph + metadata
+  // Build graph
 
-  auto G =
-      graph::build::from_csr<memory_space_t::device,
-                             graph::view_t::csr /* | graph::view_t::csc */>(
-          csr.number_of_rows,               // rows
-          csr.number_of_columns,            // columns
-          csr.number_of_nonzeros,           // nonzeros
-          csr.row_offsets.data().get(),     // row_offsets
-          csr.column_indices.data().get(),  // column_indices
-          csr.nonzero_values.data().get(),  // values
-          row_indices.data().get(),         // row_indices
-          column_offsets.data().get()       // column_offsets
-      );
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation
 
-  vertex_t single_source = 0;
-
-  vertex_t n_vertices = G.get_number_of_vertices();
+  size_t n_vertices = G.get_number_of_vertices();
+  size_t n_edges = G.get_number_of_edges();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
+
+  // Parse sources
+  std::vector<int> source_vect;
+  gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
+                                        n_vertices, params.num_runs);
+  // Parse tags
+  std::vector<std::string> tag_vect;
+  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
 
   // --
   // Run problem
 
-  float gpu_elapsed = gunrock::bfs::run(
-      G, single_source, distances.data().get(), predecessors.data().get());
+  size_t n_runs = source_vect.size();
+  std::vector<float> run_times;
+
+  auto benchmark_metrics = std::vector<benchmark::host_benchmark_t>(n_runs);
+  for (int i = 0; i < n_runs; i++) {
+    benchmark::INIT_BENCH();
+
+    run_times.push_back(gunrock::bfs::run(
+        G, source_vect[i], distances.data().get(), predecessors.data().get()));
+
+    benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
+    benchmark_metrics[i] = metrics;
+
+    benchmark::DESTROY_BENCH();
+  }
+
+  // Export metrics
+  if (params.export_metrics) {
+    gunrock::util::stats::export_performance_stats(
+        benchmark_metrics, n_edges, n_vertices, run_times, "bfs",
+        params.filename, "market", params.json_dir, params.json_file,
+        source_vect, tag_vect, num_arguments, argument_array);
+  }
+
+  // Print info for last run
+  std::cout << "Source : " << source_vect.back() << "\n";
+  print::head(distances, 40, "GPU distances");
+  std::cout << "GPU Elapsed Time : " << run_times[n_runs - 1] << " (ms)"
+            << std::endl;
 
   // --
   // CPU Run
 
-  thrust::host_vector<vertex_t> h_distances(n_vertices);
-  thrust::host_vector<vertex_t> h_predecessors(n_vertices);
+  if (params.validate) {
+    thrust::host_vector<vertex_t> h_distances(n_vertices);
+    thrust::host_vector<vertex_t> h_predecessors(n_vertices);
 
-  float cpu_elapsed = bfs_cpu::run<csr_t, vertex_t, edge_t>(
-      csr, single_source, h_distances.data(), h_predecessors.data());
+    // Validate with last source in source vector
+    float cpu_elapsed = bfs_cpu::run<csr_t, vertex_t, edge_t>(
+        csr, source_vect.back(), h_distances.data(), h_predecessors.data());
 
-  int n_errors =
-      util::compare(distances.data().get(), h_distances.data(), n_vertices);
+    int n_errors =
+        util::compare(distances.data().get(), h_distances.data(), n_vertices);
+    print::head(h_distances, 40, "CPU Distances");
 
-  // --
-  // Log
-
-  print::head(distances, 40, "GPU distances");
-  print::head(h_distances, 40, "CPU Distances");
-
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
-  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-  std::cout << "Number of errors : " << n_errors << std::endl;
+    std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+    std::cout << "Number of errors : " << n_errors << std::endl;
+  }
 }
 
 int main(int argc, char** argv) {

@@ -14,11 +14,11 @@
 # ./cmake-[x.xx.x]-linux-x86_64.sh
 # sudo mv cmake-[x.xx.x]-linux-x86_64 /opt/cmake
 # sudo ln -s /opt/cmake/bin/* /usr/local/bin/
-cmake_minimum_required(VERSION 3.20.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
 # begin /* Update Essentials version */
 set(ESSENTIALS_VERSION_MAJOR 2)
-set(ESSENTIALS_VERSION_MINOR 0)
+set(ESSENTIALS_VERSION_MINOR 1)
 set(ESSENTIALS_VERSION_PATCH 0)
 # end /* Update Essentials version */
 
@@ -63,9 +63,8 @@ if(NOT CMAKE_CUDA_ARCHITECTURES)
   set(CMAKE_CUDA_ARCHITECTURES 75)
   message(STATUS "Using default GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
 else()
-  message(STATUS "GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
+  message(STATUS "GPU Architecture (-DCMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
-
 
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
@@ -76,6 +75,8 @@ include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchThreads.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -114,6 +115,11 @@ set_target_properties(essentials
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
+# Add GIT SHA-1 definition
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
@@ -121,6 +127,7 @@ target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
+    GIT_SHA1="${GIT_SHA1}"
 )
 
 ####################################################
@@ -141,9 +148,9 @@ target_include_directories(essentials
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
-  # INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+  INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
 
 ####################################################
@@ -153,6 +160,7 @@ target_link_libraries(essentials
   INTERFACE curand
   INTERFACE cuda
   INTERFACE cusparse
+  INTERFACE ${CMAKE_THREAD_LIBS_INIT}
 )
 
 ####################################################
@@ -207,6 +215,21 @@ target_compile_options(essentials INTERFACE
 )
 
 ####################################################
+################# COLLECT METRICS ##################
+####################################################
+option(ESSENTIALS_COLLECT_METRICS
+  "If on, builds Essentials with metrics collection enabled."
+  OFF)
+
+if(ESSENTIALS_COLLECT_METRICS)
+  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=1)
+  set(ESSENTIALS_BUILD_TESTS OFF)
+  set(ESSENTIALS_BUILD_BENCHMARKS OFF)
+else()
+  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=0)
+endif(ESSENTIALS_COLLECT_METRICS)
+
+####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
 ####################################################
 option(ESSENTIALS_BUILD_EXAMPLES
@@ -236,10 +259,9 @@ endif(ESSENTIALS_BUILD_TESTS)
 ################ BUILD BENCHMARKS  #################
 ####################################################
 option(ESSENTIALS_BUILD_BENCHMARKS
-  "If on, builds essentials with benchmarking support."
-  OFF)
+  "If on, builds Essentials with NVBench benchmarking support."
+  ON)
 
-# Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_BENCHMARKS)
   # ... see https://github.com/NVIDIA/nvbench/issues/66
   set(NVBench_ENABLE_NVML OFF)

@@ -3,7 +3,6 @@
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @author Marjerie Suresh (msuresh@ucdavis.edu)
  * @brief Sparse-Matrix-Matrix multiplication.
- * @version 0.1
  * @date 2022-01-04
  *
  * @copyright Copyright (c) 2022
@@ -21,13 +20,11 @@
 namespace gunrock {
 namespace spgemm {
 
-template <typename graph_t, typename graph_type>
+template <typename a_graph_t, typename b_graph_t>
 struct param_t {
-  graph_t& A;
-  graph_t& B_csr;
-  graph_type& B;
-  param_t(graph_t& _A, graph_t& _B_csr, graph_type& _B)
-      : A(_A), B_csr(_B_csr), B(_B) {}
+  a_graph_t& A;
+  b_graph_t& B;
+  param_t(a_graph_t& _A, b_graph_t& _B) : A(_A), B(_B) {}
 };
 
 template <typename csr_t>
@@ -91,6 +88,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
 
+  using csr_v_t = graph::
+      graph_csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csc_v_t = graph::
+      graph_csc_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>;
+
   void loop(gcuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -98,7 +100,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto policy = this->context->get_context(0)->execution_policy();
 
     auto& A = P->param.A;
-    auto& B_csr = P->param.B_csr;
     auto& B = P->param.B;
     auto& C = P->result.C;
 
@@ -124,7 +125,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 ) -> bool {
       // Compute number of nonzeros of the sparse-matrix C for each row.
       math::atomic::add(&(estimated_nz_ptr[m]),
-                        B_csr.get_number_of_neighbors(k));
+                        B.template get_number_of_neighbors<csr_v_t>(k));
       return false;
     };
 
@@ -166,10 +167,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       bool increment = false;
 
       // Iterate over the columns of B.
-      for (edge_t b_col = 0; b_col < B.get_number_of_vertices(); ++b_col) {
+      for (edge_t b_col = 0;
+           b_col < B.template get_number_of_vertices<csc_v_t>(); ++b_col) {
         // Get the number of nonzeros in column of sparse-matrix B.
-        auto b_offset = B.get_starting_edge(b_col);
-        auto b_nnz = B.get_number_of_neighbors(b_col);
+        auto b_offset = B.template get_starting_edge<csc_v_t>(b_col);
+        auto b_nnz = B.template get_number_of_neighbors<csc_v_t>(b_col);
         auto b_nz_idx = b_offset;
         auto a_nz_idx = a_offset;
 
@@ -177,12 +179,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         while ((a_nz_idx < (a_offset + a_nnz)) &&
                (b_nz_idx < (b_offset + b_nnz))) {
           auto a_col = A.get_destination_vertex(a_nz_idx);
-          auto b_row = B.get_source_vertex(b_nz_idx);
+          auto b_row = B.template get_source_vertex<csc_v_t>(b_nz_idx);
 
           //  Multiply if the column of A equals row of B.
           if (a_col == b_row) {
             auto a_nz = A.get_edge_weight(a_nz_idx);
-            auto b_nz = B.get_edge_weight(b_nz_idx);
+            auto b_nz = B.template get_edge_weight<csc_v_t>(b_nz_idx);
 
             // Calculate  C's nonzero index.
             std::size_t c_nz_idx = c_offset + n;
@@ -281,22 +283,21 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
-template <typename graph_t, typename graph_type, typename csr_t>
-float run(graph_t& A,
-          graph_t& B_csr,
-          graph_type& B,
+template <typename a_graph_t, typename b_graph_t, typename csr_t>
+float run(a_graph_t& A,
+          b_graph_t& B,
           csr_t& C,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
 ) {
-  using param_type = param_t<graph_t, graph_type>;
+  using param_type = param_t<a_graph_t, b_graph_t>;
   using result_type = result_t<csr_t>;
 
-  param_type param(A, B_csr, B);
+  param_type param(A, B);
   result_type result(C);
 
-  using problem_type = problem_t<graph_t, param_type, result_type>;
+  using problem_type = problem_t<a_graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
   problem_type problem(A, param, result, context);

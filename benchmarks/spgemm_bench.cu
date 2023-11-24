@@ -3,6 +3,8 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/spgemm.hxx>
 
+#include "benchmarks.hxx"
+
 using namespace gunrock;
 using namespace memory;
 
@@ -85,43 +87,34 @@ void spgemm_bench(nvbench::state& state) {
   // Define types
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csc_t =
+      format::csc_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
   // --
   // Build graphs + metadata
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   csr_t a_csr;
-  a_csr.from_coo(mm.load(filename_a));
+  auto [a_properties, a_coo] = mm.load(filename_a);
+  a_csr.from_coo(a_coo);
 
-  auto A = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      a_csr.number_of_rows, a_csr.number_of_columns, a_csr.number_of_nonzeros,
-      a_csr.row_offsets.data().get(), a_csr.column_indices.data().get(),
-      a_csr.nonzero_values.data().get());
+  auto A = graph::build<memory_space_t::device>(a_properties, a_csr);
 
   csr_t b_csr;
-  b_csr.from_coo(mm.load(filename_b));
+  csc_t b_csc;
 
-  auto B_csr =
-      graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-          b_csr.number_of_rows, b_csr.number_of_columns,
-          b_csr.number_of_nonzeros, b_csr.row_offsets.data().get(),
-          b_csr.column_indices.data().get(), b_csr.nonzero_values.data().get());
+  auto [b_properties, b_coo] = mm.load(filename_b);
 
-  thrust::device_vector<vertex_t> row_indices(b_csr.number_of_nonzeros);
-  thrust::device_vector<edge_t> column_offsets(b_csr.number_of_columns + 1);
+  b_csr.from_coo(b_coo);
+  b_csc.from_csr(b_csr);
 
-  auto B = graph::build::from_csr<memory_space_t::device, graph::view_t::csc>(
-      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
-      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
-      b_csr.nonzero_values.data().get(), row_indices.data().get(),
-      column_offsets.data().get());
+  auto B = graph::build<memory_space_t::device>(b_properties, b_csc, b_csr);
 
   csr_t C;
 
   // --
   // Run SPGEMM with NVBench
-  state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::spgemm::run(A, B_csr, B, C);
-  });
+  state.exec(nvbench::exec_tag::sync,
+             [&](nvbench::launch& launch) { gunrock::spgemm::run(A, B, C); });
 }
 
 int main(int argc, char** argv) {
@@ -134,20 +127,10 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without matrix filenames to pass to NVBench.
-    char* args[argc - 4];
-    int j = 0;
-    for (int i = 0; i < argc; i++) {
-      if (strcmp(argv[i], "--amatrix") == 0 || strcmp(argv[i], "-a") == 0 ||
-          strcmp(argv[i], "--bmatrix") == 0 || strcmp(argv[i], "-b") == 0) {
-        i++;
-        continue;
-      }
-      args[j] = argv[i];
-      j++;
-    }
-
+    // Remove all gunrock parameters and pass to nvbench.
+    auto args = filtered_argv(argc, argv, "--amatrix", "-a", "--bmatrix", "-b",
+                              filename_a, filename_b);
     NVBENCH_BENCH(spgemm_bench);
-    NVBENCH_MAIN_BODY(argc - 4, args);
+    NVBENCH_MAIN_BODY(args.size(), args.data());
   }
 }

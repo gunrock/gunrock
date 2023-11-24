@@ -1,75 +1,72 @@
 #include <gunrock/algorithms/algorithms.hxx>
 
-using namespace gunrock;
-using namespace memory;
-
 void test_coo(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
+    std::cerr << "usage: ./<program-name> filename.mtx" << std::endl;
     exit(1);
   }
 
-  // --
-  // Define types
+  std::string filename = argument_array[1];
+
+  using namespace gunrock;
+  using namespace memory;
 
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
 
-  // --
-  // IO
-
-  std::string filename = argument_array[1];
-
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto [properties, coo_load] = mm.load(filename);
 
-  using csr_t = format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-  csr.from_coo(mm.load(filename));
+  // Test COO
+  format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo;
+  format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t> csr;
+  csr.from_coo(coo_load);
+  coo.from_csr(csr);
 
-  // --
-  // Build graph
+  // COO
+  std::cout << "Row indices: ";
+  for (auto i : coo.row_indices)
+    std::cout << i << " ";
+  std::cout << std::endl;
 
-  thrust::host_vector<vertex_t> row_indices(csr.number_of_nonzeros);
+  std::cout << "Column Indices: ";
+  for (auto j : coo.column_indices)
+    std::cout << j << " ";
+  std::cout << std::endl;
 
-  auto G = graph::build::from_csr<memory_space_t::host, graph::view_t::coo>(
-      csr.number_of_rows,         // rows
-      csr.number_of_columns,      // columns
-      csr.number_of_nonzeros,     // nonzeros
-      csr.row_offsets.data(),     // row_offsets
-      csr.column_indices.data(),  // column_indices
-      csr.nonzero_values.data(),  // values
-      row_indices.data());  // supports row_indices and column_offsets (default
-                            // = nullptr)
+  std::cout << "Nonzero Values: ";
+  for (auto nz : coo.nonzero_values)
+    std::cout << nz << " ";
+  std::cout << std::endl;
 
-  // >>
-  std::cout << "G.get_number_of_vertices()\t: " << G.get_number_of_vertices()
-            << std::endl;
-  std::cout << "G.get_number_of_edges()\t: " << G.get_number_of_edges()
-            << std::endl;
-  std::cout << "G.number_of_graph_representations()\t: "
-            << G.number_of_graph_representations() << std::endl;
+  // Use COO view
+  auto G = graph::build<memory_space_t::host>(properties, coo);
 
-  gunrock::print::head(G.get_row_indices(), G.get_number_of_edges(),
-                       G.get_number_of_edges());
-  gunrock::print::head(G.get_column_indices(), G.get_number_of_edges(),
-                       G.get_number_of_edges());
-  gunrock::print::head(G.get_nonzero_values(), G.get_number_of_edges(),
-                       G.get_number_of_edges());
+  // Test graph properties
+  std::cout << "Directed: " << G.is_directed() << "\n";
+  std::cout << "Symmetric: " << G.is_symmetric() << "\n";
+  std::cout << "Weighted: " << G.is_weighted() << "\n";
 
-  for (vertex_t i = 0; i < G.get_number_of_vertices(); i++)
-    std::cout << i << " " << G.get_starting_edge(i) << std::endl;
+  // Test COO view
+  using coo_v_t =
+      graph::graph_coo_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
-  std::cout << "-------" << std::endl;
+  // COO number of vertices
+  std::cout << "G.get_number_of_vertices<coo_v_t>() : "
+            << G.template get_number_of_vertices<coo_v_t>() << std::endl;
+  // COO number of edges
+  std::cout << "G.get_number_of_edges<coo_v_t>()    : "
+            << G.template get_number_of_edges<coo_v_t>() << std::endl;
 
-  for (vertex_t i = 0; i < G.get_number_of_vertices(); i++)
-    std::cout << i << " " << G.get_number_of_neighbors(i) << std::endl;
+  for (vertex_t i = 0; i < G.template get_number_of_edges<coo_v_t>(); i++) {
+    // Print COO edge i
+    std::cout << i << " " << G.template get_source_vertex<coo_v_t>(i) << " "
+              << G.template get_destination_vertex<coo_v_t>(i) << std::endl;
+  }
 
-  std::cout << "-------" << std::endl;
-
-  std::cout << G.get_edge(0, 6) << std::endl;
-  std::cout << G.get_edge(0, 7) << std::endl;
-  std::cout << G.get_edge(38, 32) << std::endl;
+  // Print COO edge index for edge from 6 -> 0
+  std::cout << G.template get_edge<coo_v_t>(6, 0) << std::endl;
 }
 
 int main(int argc, char** argv) {

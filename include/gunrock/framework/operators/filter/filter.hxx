@@ -1,3 +1,13 @@
+/**
+ * @file filter.hxx
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief Filter operator's header-file.
+ * @date 2020-10-07
+ *
+ * @copyright Copyright (c) 2020
+ *
+ */
+
 #pragma once
 
 #include <gunrock/cuda/context.hxx>

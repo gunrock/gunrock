@@ -27,12 +27,19 @@ jobs:
     runs-on: ${{matrix.os}}
 
     steps:
+      - name: Free up space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.8
+        uses: Jimver/cuda-toolkit@v0.2.10
         id: cuda-toolkit
         with:
-          cuda: '11.7.0'
+          cuda: '12.1.0'
           linux-local-args: '["--toolkit"]'
 
       - name: Check nvcc version

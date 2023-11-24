@@ -2,7 +2,6 @@
  * @file kcore.hxx
  * @author Afton Geil (angeil@ucdavis.edu)
  * @brief Vertex k-core decomposition algorithm.
- * @version 0.1
  * @date 2021-05-03
  *
  * @copyright Copyright (c) 2021

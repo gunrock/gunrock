@@ -5,9 +5,11 @@
 #include <iterator>
 
 #include <gunrock/memory.hxx>
+#include <gunrock/util/load_store.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
+#include <gunrock/formats/formats.hxx>
 
 namespace gunrock {
 namespace graph {
@@ -16,7 +18,10 @@ using namespace memory;
 
 struct empty_coo_t {};
 
-template <typename vertex_t, typename edge_t, typename weight_t>
+template <memory_space_t space,
+          typename vertex_t,
+          typename edge_t,
+          typename weight_t>
 class graph_coo_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -47,27 +52,25 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ vertex_type
   get_source_vertex(const edge_type& e) const {
-    return row_indices[e];
+    return thread::load(&row_indices[e]);
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_destination_vertex(const edge_type& e) const {
-    return column_indices[e];
+  get_destination_vertex(edge_type const& e) const {
+    return thread::load(&column_indices[e]);
   }
 
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const {
-    auto row_indices = get_row_indices();
-
+    auto ptr_row_indices = row_indices;
     // Returns `it` such that everything to the left is < `v`
     // This will be the offset of `v`
     auto it = thrust::lower_bound(
-        thrust::seq,  // ??? Is this right policy?
-        thrust::counting_iterator<edge_t>(0),
+        thrust::seq, thrust::counting_iterator<edge_t>(0),
         thrust::counting_iterator<edge_t>(this->number_of_edges), v,
-        [row_indices] __host__ __device__(const vertex_type& pivot,
-                                          const vertex_type& key) {
-          return row_indices[pivot] < key;
+        [ptr_row_indices] __host__ __device__(const vertex_type& pivot,
+                                              const vertex_type& key) {
+          return ptr_row_indices[pivot] < key;
         });
 
     return (*it);
@@ -114,17 +117,14 @@ class graph_coo_t {
   }
 
  protected:
-  __host__ __device__ void set(vertex_type const& _number_of_vertices,
-                               edge_type const& _number_of_edges,
-                               vertex_type* _row_indices,
-                               vertex_type* _column_indices,
-                               weight_type* _values) {
-    this->number_of_vertices = _number_of_vertices;
-    this->number_of_edges = _number_of_edges;
+  __host__ void set(
+      gunrock::format::coo_t<space, vertex_t, edge_t, weight_t>& coo) {
+    this->number_of_vertices = coo.number_of_rows;
+    this->number_of_edges = coo.number_of_nonzeros;
     // Set raw pointers
-    row_indices = raw_pointer_cast<edge_type>(_row_indices);
-    column_indices = raw_pointer_cast<vertex_type>(_column_indices);
-    values = raw_pointer_cast<weight_type>(_values);
+    row_indices = raw_pointer_cast(coo.row_indices.data());
+    column_indices = raw_pointer_cast(coo.column_indices.data());
+    values = raw_pointer_cast(coo.nonzero_values.data());
   }
 
  private:

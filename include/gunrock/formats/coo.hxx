@@ -2,6 +2,7 @@
 
 #include <gunrock/memory.hxx>
 #include <gunrock/container/vector.hxx>
+#include <gunrock/graph/conversions/convert.hxx>
 
 namespace gunrock {
 namespace format {
@@ -45,6 +46,39 @@ struct coo_t {
         nonzero_values(nnz) {}
 
   ~coo_t() {}
+
+  /**
+   * @brief Convert CSR format into COO
+   * Format.
+   *
+   * @tparam index_t
+   * @tparam index_t
+   * @tparam value_t
+   * @param csr
+   * @return coo_t<space, index_t, index_t, value_t>&
+   */
+  // TODO: fix index_t -> offset_t
+  coo_t<space, index_t, index_t, value_t> from_csr(
+      const csr_t<memory_space_t::host, index_t, index_t, value_t>& csr) {
+    number_of_rows = csr.number_of_rows;
+    number_of_columns = csr.number_of_columns;
+    number_of_nonzeros = csr.number_of_nonzeros;
+
+    row_indices.resize(number_of_nonzeros);
+    column_indices.resize(number_of_nonzeros);
+    nonzero_values.resize(number_of_nonzeros);
+
+    // Convert offsets to indices
+    gunrock::graph::convert::offsets_to_indices<memory_space_t::host>(
+        memory::raw_pointer_cast(csr.row_offsets.data()),
+        csr.number_of_rows + 1, memory::raw_pointer_cast(row_indices.data()),
+        number_of_nonzeros);
+
+    column_indices = csr.column_indices;
+    nonzero_values = csr.nonzero_values;
+
+    return *this;  // COO representation
+  }
 
 };  // struct coo_t
 

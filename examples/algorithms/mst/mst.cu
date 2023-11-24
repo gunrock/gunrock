@@ -60,6 +60,7 @@ void test_mst(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
+
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
@@ -70,20 +71,19 @@ void test_mst(int num_arguments, char** argument_array) {
   parameters_t params(num_arguments, argument_array);
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto mmatrix = mm.load(params.filename);
-  if (!mm_is_symmetric(mm.code)) {
+  auto [properties, coo] = mm.load(params.filename);
+
+  if (!properties.symmetric) {
     printf("Error: input matrix must be symmetric\n");
     exit(1);
   }
-  csr.from_coo(mmatrix);
+
+  csr.from_coo(coo);
 
   // --
   // Build graph
 
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows, csr.number_of_columns, csr.number_of_nonzeros,
-      csr.row_offsets.data().get(), csr.column_indices.data().get(),
-      csr.nonzero_values.data().get());
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   // --
   // Params and memory allocation

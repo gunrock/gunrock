@@ -2,7 +2,6 @@
  * @file device_properties.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
- * @version 0.1
  * @date 2020-10-05
  *
  * @copyright Copyright (c) 2020
@@ -211,6 +210,64 @@ inline constexpr unsigned shared_memory_bank_stride() {
          : (sm3XSmemConfig == cudaSharedMemBankSizeFourByte)  ? 1 << 2
          : (sm3XSmemConfig == cudaSharedMemBankSizeEightByte) ? 1 << 3
                                                               : 1 << 2;
+}
+
+inline constexpr unsigned clock_rate(device_properties_t& prop) {
+  return prop.clockRate;
+}
+
+inline constexpr unsigned compute_version(device_properties_t& prop) {
+  return prop.major * 10 + prop.minor;
+}
+
+unsigned device_count() {
+  int device_count;
+  cudaGetDeviceCount(&device_count);
+  return device_count;
+}
+
+unsigned driver_version() {
+  int driver_version;
+  cudaDriverGetVersion(&driver_version);
+  return driver_version;
+}
+
+inline std::string gpu_name(device_properties_t& prop) {
+  return prop.name;
+}
+
+inline constexpr unsigned sm_major(device_properties_t& prop) {
+  return prop.major;
+}
+
+inline constexpr unsigned sm_minor(device_properties_t& prop) {
+  return prop.minor;
+}
+
+inline constexpr unsigned multi_processor_count(device_properties_t& prop) {
+  return prop.multiProcessorCount;
+}
+
+unsigned runtime_version() {
+  int runtime_version;
+  cudaRuntimeGetVersion(&runtime_version);
+  return runtime_version;
+}
+
+void set_device_properties(device_properties_t* prop) {
+  device_id_t ordinal;
+  cudaGetDevice(&ordinal);
+  cudaGetDeviceProperties(prop, ordinal);
+}
+
+inline constexpr unsigned total_global_memory(device_properties_t& prop) {
+  return prop.totalGlobalMem;
+}
+
+inline int get_max_grid_dimension_x(device_id_t device) {
+  int max_dim_x;
+  cudaDeviceGetAttribute(&max_dim_x, cudaDevAttrMaxGridDimX, device);
+  return max_dim_x;
 }
 
 void print(device_properties_t& prop) {
