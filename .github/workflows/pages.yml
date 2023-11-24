@@ -34,10 +34,10 @@ jobs:
 
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.8
+        uses: Jimver/cuda-toolkit@v0.2.11
         id: cuda-toolkit
         with:
-          cuda: '11.7.0'
+          cuda: '12.1.0'
           linux-local-args: '["--toolkit"]'
       
       - name: Configure cmake for Doxygen
