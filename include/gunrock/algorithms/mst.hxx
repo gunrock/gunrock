@@ -235,6 +235,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         add_to_mst,  // lambda function
         context      // context
     );
+    
+    // Need to sync before checking the value of not_decremented
+    cudaDeviceSynchronize();
 
     // Throw an exception if the number of super vertices has not been
     // decremented
