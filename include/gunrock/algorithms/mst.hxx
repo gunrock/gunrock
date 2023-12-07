@@ -235,7 +235,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         add_to_mst,  // lambda function
         context      // context
     );
-    
+
     // Need to sync before checking the value of not_decremented
     cudaDeviceSynchronize();
 
