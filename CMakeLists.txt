@@ -44,6 +44,9 @@ else()
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release")
 endif()
 
+set(CMAKE_CUDA_COMPILER "/usr/local/cuda-12.1/bin/nvcc")
+set(CMAKE_CUDA_ARCHITECTURES 61)
+
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
   LANGUAGES CXX C CUDA
@@ -59,16 +62,21 @@ project(essentials
 ## Can be used for applications by extracting the
 ## CUDA_ARCHITECTURES property from the project.
 ## see cmake's get_target_properties()
-if(NOT CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 75)
-  message(STATUS "Using default GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
-else()
-  message(STATUS "GPU Architecture (-DCMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
-endif()
+
+
+
+# if(NOT CMAKE_CUDA_ARCHITECTURES)
+#   set(CMAKE_CUDA_ARCHITECTURES 75)
+#   message(STATUS "Using default GPU Architecture: ${CMAKE_CUDA_ARCHITECTURES}")
+# else()
+#   message(STATUS "GPU Architecture (-DCMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+# endif()
 
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
+
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
 # begin /* Include cmake modules */
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
@@ -266,5 +274,5 @@ if(ESSENTIALS_BUILD_BENCHMARKS)
   # ... see https://github.com/NVIDIA/nvbench/issues/66
   set(NVBench_ENABLE_NVML OFF)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
-  add_subdirectory(benchmarks)
+  # add_subdirectory(benchmarks)
 endif(ESSENTIALS_BUILD_BENCHMARKS)
