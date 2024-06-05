@@ -18,7 +18,7 @@ namespace util {
 
 namespace detail {
 auto default_comparator = [](auto& a, auto& b) -> bool { return a != b; };
-}
+}  // namespace detail
 
 /**
  * @brief Compares values between a device pointer and a host pointer of same
