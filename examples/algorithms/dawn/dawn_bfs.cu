@@ -21,8 +21,7 @@ void test_dawn_bfs(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
-                                        "Breadth First Search");
+  gunrock::io::cli::parameters_t params(num_arguments, argument_array, "DAWN");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(params.filename);
@@ -61,7 +60,6 @@ void test_dawn_bfs(int num_arguments, char** argument_array) {
 
   size_t n_runs = source_vect.size();
   std::vector<float> run_times;
-  std::vector<float> run_times_bfs;
 
   auto benchmark_metrics = std::vector<benchmark::host_benchmark_t>(n_runs);
   for (int i = 0; i < n_runs; i++) {
@@ -79,7 +77,7 @@ void test_dawn_bfs(int num_arguments, char** argument_array) {
   // Export metrics
   if (params.export_metrics) {
     gunrock::util::stats::export_performance_stats(
-        benchmark_metrics, n_edges, n_vertices, run_times, "dawn_bfs",
+        benchmark_metrics, n_edges, n_vertices, run_times, "dawn",
         params.filename, "market", params.json_dir, params.json_file,
         source_vect, tag_vect, num_arguments, argument_array);
   }
@@ -87,35 +85,8 @@ void test_dawn_bfs(int num_arguments, char** argument_array) {
   // Print info for last run
   std::cout << "Source : " << source_vect.back() << "\n";
   print::head(distances, 40, "GPU distances");
-  std::cout << "[DAWN BFS Advance] GPU Elapsed Time : " << run_times[n_runs - 1]
-            << " (ms)" << std::endl;
-
-  auto benchmark_metrics_bfs = std::vector<benchmark::host_benchmark_t>(n_runs);
-  for (int i = 0; i < n_runs; i++) {
-    benchmark::INIT_BENCH();
-
-    run_times_bfs.push_back(gunrock::bfs::run(
-        G, source_vect[i], distances.data().get(), predecessors.data().get()));
-
-    benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
-    benchmark_metrics_bfs[i] = metrics;
-
-    benchmark::DESTROY_BENCH();
-  }
-
-  // Export metrics
-  if (params.export_metrics) {
-    gunrock::util::stats::export_performance_stats(
-        benchmark_metrics_bfs, n_edges, n_vertices, run_times_bfs, "bfs",
-        params.filename, "market", params.json_dir, params.json_file,
-        source_vect, tag_vect, num_arguments, argument_array);
-  }
-
-  // Print info for last run
-  std::cout << "Source : " << source_vect.back() << "\n";
-  print::head(distances, 40, "GPU distances");
-  std::cout << "[BFS] GPU Elapsed Time : " << run_times_bfs[n_runs - 1]
-            << " (ms)" << std::endl;
+  std::cout << "[DAWN] GPU Elapsed Time : " << run_times[n_runs - 1] << " (ms)"
+            << std::endl;
 }
 
 int main(int argc, char** argv) {

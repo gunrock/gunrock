@@ -93,7 +93,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 /**
- * @brief Run DAWN algorithm on a given graph, G, starting from
+ * @brief Run DAWN algorithm on a given unweighted graph, G, starting from
  * the source node, single_source. The resulting distances are stored in the
  * distances pointer. All data must be allocated by the user, on the device
  * (GPU) and passed in to this function.
