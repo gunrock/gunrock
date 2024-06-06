@@ -260,7 +260,7 @@ endif(ESSENTIALS_BUILD_TESTS)
 ####################################################
 option(ESSENTIALS_BUILD_BENCHMARKS
   "If on, builds Essentials with NVBench benchmarking support."
-  ON)
+  OFF)
 
 if(ESSENTIALS_BUILD_BENCHMARKS)
   # ... see https://github.com/NVIDIA/nvbench/issues/66
