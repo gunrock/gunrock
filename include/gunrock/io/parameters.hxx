@@ -39,7 +39,7 @@ struct parameters_t {
     // Algorithms with sources
     if (algorithm == "Betweenness Centrality" ||
         algorithm == "Breadth First Search" ||
-        algorithm == "Single Source Shortest Path") {
+        algorithm == "Single Source Shortest Path" || algorithm == "DAWN") {
       options.add_options()("s,src",
                             "Source(s) (random if omitted); "
                             "comma-separated string of ints",
@@ -47,7 +47,7 @@ struct parameters_t {
           ("n,num_runs", "Number of runs (ignored if multiple sources passed)",
            cxxopts::value<int>());  // runs
       if (algorithm == "Breadth First Search" ||
-          algorithm == "Single Source Shortest Path") {
+          algorithm == "Single Source Shortest Path" || algorithm == "DAWN") {
         options.add_options()("validate", "CPU validation");  // validate
       }
     } else {
@@ -127,15 +127,13 @@ void parse_source_string(std::string source_str,
       try {
         source_int = std::stoi(source);
       } catch (...) {
-        std::cout << "Error: Invalid source"
-                  << "\n";
+        std::cout << "Error: Invalid source" << "\n";
         exit(1);
       }
       if (source_int >= 0 && source_int < n_vertices) {
         source_vect->push_back(source_int);
       } else {
-        std::cout << "Error: Invalid source"
-                  << "\n";
+        std::cout << "Error: Invalid source" << "\n";
         exit(1);
       }
     }
