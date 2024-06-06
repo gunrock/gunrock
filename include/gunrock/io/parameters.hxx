@@ -127,13 +127,15 @@ void parse_source_string(std::string source_str,
       try {
         source_int = std::stoi(source);
       } catch (...) {
-        std::cout << "Error: Invalid source" << "\n";
+        std::cout << "Error: Invalid source"
+                  << "\n";
         exit(1);
       }
       if (source_int >= 0 && source_int < n_vertices) {
         source_vect->push_back(source_int);
       } else {
-        std::cout << "Error: Invalid source" << "\n";
+        std::cout << "Error: Invalid source"
+                  << "\n";
         exit(1);
       }
     }
