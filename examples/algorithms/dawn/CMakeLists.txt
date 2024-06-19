@@ -1,5 +1,5 @@
 # begin /* Set the application name. */
-set(APPLICATION_NAME dawn_bfs)
+set(APPLICATION_NAME dawn)
 # end /* Set the application name. */
 
 # begin /* Add CUDA executables */

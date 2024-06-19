@@ -21,7 +21,7 @@ void test_bfs(int num_arguments, char** argument_array) {
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
   std::string DEFAULT_BFS_ALGORITHMS =
-      "DAWN";  // Using 'BFS' here will call the original BFS
+      "DAWN";  // Using 'Breadth First Search' here will call the original BFS
   // --
   // IO
 
@@ -88,7 +88,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   if (params.export_metrics) {
     if (DEFAULT_BFS_ALGORITHMS == "DAWN")
       gunrock::util::stats::export_performance_stats(
-          benchmark_metrics, n_edges, n_vertices, run_times, "dawn",
+          benchmark_metrics, n_edges, n_vertices, run_times, "dawn_bfs",
           params.filename, "market", params.json_dir, params.json_file,
           source_vect, tag_vect, num_arguments, argument_array);
     else
