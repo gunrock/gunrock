@@ -57,6 +57,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.7' 
+
+      - name: Checkout
+        uses: actions/checkout@v4
         
       # Install requirements
       # Note: doxygen is not visible in $PATH until the subsequent actions.
@@ -73,9 +76,6 @@ jobs:
           doxygen --version
           cd ${{github.workspace}}/docs/sphinx
           pip install -r requirements.txt
-
-      - name: Checkout
-        uses: actions/checkout@v4
 
       # Build Sphinx documentation
       - name: Build Documentation
