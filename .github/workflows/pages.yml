@@ -44,6 +44,9 @@ jobs:
         with:
           cuda: '12.5.0'
           linux-local-args: '["--toolkit"]'
+
+      - name: Checkout
+        uses: actions/checkout@v4
       
       - name: Configure cmake for Doxygen
         run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
@@ -56,10 +59,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.7' 
-
-      - name: Checkout
-        uses: actions/checkout@v4
+          python-version: '3.7'
         
       # Install requirements
       # Note: doxygen is not visible in $PATH until the subsequent actions.
