@@ -94,7 +94,7 @@ void read_coordinates_file(std::string filename,
       coordinates[ll_node].longitude = ll_label_b;
 
     }  // -> else
-  }    // -> while
+  }  // -> while
 
   if (labels_read) {
     std::cout << "Valid coordinates read: " << labels_read << std::endl;

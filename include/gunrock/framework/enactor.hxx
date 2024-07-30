@@ -280,7 +280,7 @@ struct enactor_t {
    * @param context `gunrock::gcuda::multi_context_t`.
    */
   virtual void prepare_frontier(frontier_t* f,
-                                gcuda::multi_context_t& context){};
+                                gcuda::multi_context_t& context) {};
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if
