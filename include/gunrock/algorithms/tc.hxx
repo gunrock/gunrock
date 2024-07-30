@@ -119,7 +119,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       *P->result.total_triangles_count = thrust::transform_reduce(
           policy, P->result.vertex_triangles_count,
           P->result.vertex_triangles_count + G.get_number_of_vertices(),
-          [] __device__(const vertex_t& vertex_triangles) {
+          [] __host__ __device__(const vertex_t& vertex_triangles) {
             return static_cast<std::size_t>(vertex_triangles);
           },
           std::size_t{0}, thrust::plus<std::size_t>());
