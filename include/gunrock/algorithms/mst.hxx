@@ -237,7 +237,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     );
 
     // Need to sync before checking the value of not_decremented
-    cudaDeviceSynchronize();
+    context->get_context(0)->synchronize();
 
     // Throw an exception if the number of super vertices has not been
     // decremented
