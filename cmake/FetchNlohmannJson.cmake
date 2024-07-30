@@ -9,12 +9,12 @@ set(FETCHCONTENT_BASE_DIR ${FC_BASE})
 FetchContent_Declare(
   json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v3.10.5
+    GIT_TAG        develop
 )
 
 FetchContent_GetProperties(json)
 if(NOT json_POPULATED)
-  FetchContent_Populate(
+  FetchContent_MakeAvailable(
     json
   )
 endif()

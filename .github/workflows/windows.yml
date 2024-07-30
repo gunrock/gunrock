@@ -14,13 +14,13 @@ on:
 
 env:
   BUILD_TYPE: Release
-  ARCHITECTURES: 75
+  ARCHITECTURES: 90
   
 jobs:
   build:
     strategy:
       matrix:
-        os: [windows-2022, windows-2019]
+        os: [windows-2022]
         
     # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
     if: "!contains(github.event.commits[0].message, '[skip windows]')"
@@ -29,19 +29,19 @@ jobs:
     steps:
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.11
+        uses: Jimver/cuda-toolkit@v0.2.16
         id: cuda-toolkit
         with:
-          cuda: '12.1.0'
+          cuda: '12.5.0'
           linux-local-args: '["--toolkit"]'
 
       - name: Check nvcc version
         run: nvcc -V
         
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} # -DESSENTIALS_BUILD_BENCHMARKS=ON
+        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
         
       - name: Build all applications
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
