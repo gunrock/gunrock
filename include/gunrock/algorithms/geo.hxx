@@ -310,7 +310,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
      *        if points == 2; center = midpoint;
      *        if points > 2; center = spatial median;
      */
-    auto spatial_center_op = [=] __host__ __device__(vertex_t const& v) -> void {
+    auto spatial_center_op =
+        [=] __host__ __device__(vertex_t const& v) -> void {
       if (gunrock::util::limits::is_valid(coordinates[v].latitude) &&
           gunrock::util::limits::is_valid(coordinates[v].longitude))
         return;
