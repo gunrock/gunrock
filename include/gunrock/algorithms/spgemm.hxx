@@ -252,13 +252,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto itc = thrust::copy_if(
         policy, column_indices.begin(), column_indices.end(),
         column_indices.begin(),
-        [] __device__(const vertex_t& x) -> bool { return x != -1; });
+        [] __host__ __device__(const vertex_t& x) -> bool { return x != -1; });
 
-    auto itv = thrust::copy_if(policy, nonzero_values.begin(),
-                               nonzero_values.end(), nonzero_values.begin(),
-                               [] __device__(const weight_t& nz) -> bool {
-                                 return nz != weight_t(0);
-                               });
+    auto itv =
+        thrust::copy_if(policy, nonzero_values.begin(), nonzero_values.end(),
+                        nonzero_values.begin(),
+                        [] __host__ __device__(const weight_t& nz) -> bool {
+                          return nz != weight_t(0);
+                        });
 
     auto idx_nnz = thrust::distance(column_indices.begin(), itc);
     auto nz_nnz = thrust::distance(nonzero_values.begin(), itv);

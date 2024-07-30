@@ -73,7 +73,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     thrust::fill_n(policy, plast.begin(), n_vertices, 0);
 
-    auto get_weight = [=] __device__(const int& i) -> weight_t {
+    auto get_weight = [=] __host__ __device__(const int& i) -> weight_t {
       weight_t val = 0;
 
       edge_t start = g.get_starting_edge(i);
@@ -120,7 +120,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // >> handle "dangling nodes" (nodes w/ zero outdegree)
     // could skip this if no nodes have sero outdegree
-    auto compute_dangling = [=] __device__(const int& i) -> weight_t {
+    auto compute_dangling = [=] __host__ __device__(const int& i) -> weight_t {
       return iweights[i] == 0 ? alpha * p[i] : 0;
     };
 
@@ -135,7 +135,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // thrust::fill_n(policy,
     //   p, n_vertices, (1 - alpha) / n_vertices);
     // <<
-    auto spread_coo_op = [=] __device__(edge_t const& e) -> void {
+    auto spread_coo_op = [=] __host__ __device__(edge_t const& e) -> void {
       auto src = G.get_source_vertex(e);
       auto dst = G.get_destination_vertex(e);
       weight_t weight = G.get_edge_weight(e);
@@ -179,7 +179,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto p = P->result.p;
     auto plast = P->plast.data().get();
 
-    auto abs_diff = [=] __device__(const int& i) -> weight_t {
+    auto abs_diff = [=] __host__ __device__(const int& i) -> weight_t {
       return abs(p[i] - plast[i]);
     };
 

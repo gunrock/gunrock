@@ -14,7 +14,7 @@ FetchContent_Declare(
 
 FetchContent_GetProperties(cxxopts)
 if(NOT cxxopts_POPULATED)
-  FetchContent_Populate(
+  FetchContent_MakeAvailable(
     cxxopts
   )
 endif()
