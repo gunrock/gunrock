@@ -14,8 +14,16 @@ FetchContent_Declare(
 
 FetchContent_GetProperties(json)
 if(NOT json_POPULATED)
-  FetchContent_Populate(
-    json
-  )
+  # Check if source directory already exists and use it
+  set(JSON_SRC_DIR "${FETCHCONTENT_BASE_DIR}/json-src")
+  if(EXISTS "${JSON_SRC_DIR}/include")
+    message(STATUS "Using existing json directory: ${JSON_SRC_DIR}")
+    set(json_SOURCE_DIR "${JSON_SRC_DIR}")
+    set(json_POPULATED TRUE)
+  else()
+    FetchContent_Populate(
+      json
+    )
+  endif()
 endif()
 set(NHLOMANN_JSON_INCLUDE_DIR "${json_SOURCE_DIR}/include")
