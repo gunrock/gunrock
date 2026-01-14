@@ -74,7 +74,7 @@ if(${ESSENTIALS_NVIDIA_BACKEND})
     ON)
   option(ESSENTIALS_BUILD_BENCHMARKS
     "If on, builds essentials with benchmarking support."
-    ON)
+    OFF)
 else()
   # Benchmarking and testing not supported w/ AMD.
   option(ESSENTIALS_BUILD_TESTS
