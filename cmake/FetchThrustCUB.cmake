@@ -52,10 +52,12 @@ if(DEFINED ROCM_PATH)
     endif()
     
     if(NOT rocthrust_FOUND)
-      set(THRUST_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocthrust/thrust")
-      if(NOT EXISTS "${THRUST_INCLUDE_DIR}")
+      # Thrust include path should point to the parent directory so that
+      # #include <thrust/...> works correctly
+      set(THRUST_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocthrust")
+      if(NOT EXISTS "${THRUST_INCLUDE_DIR}/thrust")
         # Fallback: try alternative path structure
-        set(THRUST_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocthrust/include/thrust")
+        set(THRUST_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocthrust/include")
       endif()
     endif()
     
