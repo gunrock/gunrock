@@ -256,6 +256,14 @@ else()
     INTERFACE ${CUB_INCLUDE_DIR}
     INTERFACE ${LIBCUDACXX_INCLUDE_DIR}
   )
+  # Add rocPRIM include directory if using sparse-checkout fallback
+  # rocThrust depends on rocPRIM, so we need its include path
+  if(DEFINED ROCPRIM_INCLUDE_DIR AND ROCPRIM_INCLUDE_DIR)
+    target_include_directories(essentials
+      INTERFACE ${ROCPRIM_INCLUDE_DIR}
+    )
+    message(STATUS "Added rocPRIM include directory: ${ROCPRIM_INCLUDE_DIR}")
+  endif()
 endif()
 
 ####################################################

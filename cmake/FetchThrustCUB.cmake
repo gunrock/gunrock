@@ -43,13 +43,19 @@ if(DEFINED ROCM_PATH)
     endif()
     
     # Set include directories based on rocm-libraries structure
-    if(NOT rocprim_FOUND)
-      set(ROCPRIM_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocprim/rocprim/include")
-      if(NOT EXISTS "${ROCPRIM_INCLUDE_DIR}")
-        # Fallback: try alternative path structure
-        set(ROCPRIM_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocprim/include")
-      endif()
+    # rocPRIM is needed because rocThrust depends on it
+    # Always set ROCPRIM_INCLUDE_DIR when using sparse-checkout fallback
+    # Unset any existing value (from find_package or cache) and set to sparse-checkout path
+    unset(ROCPRIM_INCLUDE_DIR CACHE)
+    unset(ROCPRIM_INCLUDE_DIR)
+    set(ROCPRIM_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocprim/rocprim/include")
+    if(NOT EXISTS "${ROCPRIM_INCLUDE_DIR}")
+      # Fallback: try alternative path structure
+      set(ROCPRIM_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocprim/include")
     endif()
+    # Set as cache variable to persist and override any future find_package calls
+    set(ROCPRIM_INCLUDE_DIR "${ROCPRIM_INCLUDE_DIR}" CACHE PATH "rocPRIM include directory" FORCE)
+    message(STATUS "rocPRIM include: ${ROCPRIM_INCLUDE_DIR}")
     
     if(NOT rocthrust_FOUND)
       # Thrust include path should point to the parent directory so that
