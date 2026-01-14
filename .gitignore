@@ -51,3 +51,5 @@ docs/sphinx/_build/
 docs/sphinx/_doxygen/
 docs/sphinx/_extensions/
 docs/sphinx/gunrock.wiki/
+build-amd/
+build/

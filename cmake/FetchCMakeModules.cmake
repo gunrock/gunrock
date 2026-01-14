@@ -14,8 +14,16 @@ FetchContent_Declare(
 
 FetchContent_GetProperties(cmake_modules)
 if(NOT cmake_modules_POPULATED)
-  FetchContent_Populate(
-    cmake_modules
-  )
+  # Check if source directory already exists and use it
+  set(CMAKE_MODULES_SRC_DIR "${FETCHCONTENT_BASE_DIR}/cmake_modules-src")
+  if(EXISTS "${CMAKE_MODULES_SRC_DIR}")
+    message(STATUS "Using existing cmake_modules directory: ${CMAKE_MODULES_SRC_DIR}")
+    set(cmake_modules_SOURCE_DIR "${CMAKE_MODULES_SRC_DIR}")
+    set(cmake_modules_POPULATED TRUE)
+  else()
+    FetchContent_Populate(
+      cmake_modules
+    )
+  endif()
 endif()
 set(CMAKE_MODULES_INCLUDE_DIR "${cmake_modules_SOURCE_DIR}")

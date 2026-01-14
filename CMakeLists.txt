@@ -243,9 +243,11 @@ set(ESSENTIALS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ####################################################
 target_include_directories(essentials
   INTERFACE ${ESSENTIALS_INCLUDE_DIR}
+  INTERFACE ${ESSENTIALS_INCLUDE_DIR}/gunrock/compat
   INTERFACE ${CXXOPTS_INCLUDE_DIR}
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
+  INTERFACE ${LIBCUDACXX_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
@@ -279,6 +281,10 @@ else()
     INTERFACE ${CMAKE_THREAD_LIBS_INIT}
     -lstdc++fs
   )
+  
+  if(TARGET roc::rocthrust)
+    target_link_libraries(essentials INTERFACE roc::rocthrust)
+  endif()
 endif()
 
 ####################################################
@@ -356,6 +362,19 @@ set(HIP_FLAGS
   -Wno-ignored-attributes
   "-Wno-\#pragma-messages"
 )
+
+# Add libcudacxx and HIP include paths for AMD backend
+if(${ESSENTIALS_AMD_BACKEND})
+  # Add HIP include paths for CUDA compatibility
+  if(DEFINED ROCM_PATH)
+    if(EXISTS "${ROCM_PATH}/include/hip")
+      list(APPEND HIP_FLAGS "-I${ROCM_PATH}/include/hip")
+    endif()
+    if(EXISTS "${ROCM_PATH}/hip/include")
+      list(APPEND HIP_FLAGS "-I${ROCM_PATH}/hip/include")
+    endif()
+  endif()
+endif()
 
 set(HIP_RELEASE_FLAGS
   ${HIP_FLAGS}
