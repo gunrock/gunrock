@@ -47,10 +47,10 @@ jobs:
       # Fetch CUDA toolkit for NVIDIA backend
       - name: Fetch CUDA toolkit
         if: matrix.backend == 'nvidia'
-        uses: Jimver/cuda-toolkit@v0.2.16
+        uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with:
-          cuda: '12.5.0'
+          cuda: '13.1.0'
           linux-local-args: '["--toolkit"]'
 
       - name: Check nvcc version
