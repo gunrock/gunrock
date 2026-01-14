@@ -241,7 +241,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::advance::execute<operators::load_balance_t::block_mapped>(
         G, E, govm, context);
   }
-  bool is_converged(gcuda::multi_context_t& context) override {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     auto G = this->get_problem()->get_graph();
     auto iteration = this->iteration;
     return (G.get_number_of_vertices() < iteration);

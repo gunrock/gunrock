@@ -101,10 +101,19 @@ __forceinline__ __device__ CounterT Queue<T, CounterT>::next() const {
                       total);  // Get + increment index to read from
   }
 
+  // AMD HIP requires 64-bit mask for __shfl_sync and __syncwarp
+#if defined(__HIP_PLATFORM_AMD__)
+  uint64_t mask64 = static_cast<uint64_t>(mask);
+  __syncwarp(mask64);  // Why do we need this?
+
+  alloc = __shfl_sync(
+      mask64, alloc, leader);  // Share starting index to read from among threads
+#else
   __syncwarp(mask);  // Why do we need this?
 
   alloc = __shfl_sync(
       mask, alloc, leader);  // Share starting index to read from among threads
+#endif
   return alloc + rank;       // Return index for current thread
 }
 
@@ -281,8 +290,15 @@ struct Queues {
                         total);  // Get + increment index to write to
     }
 
+    // AMD HIP requires 64-bit mask for __shfl_sync and __syncwarp
+#if defined(__HIP_PLATFORM_AMD__)
+    uint64_t mask64 = static_cast<uint64_t>(mask);
+    alloc =
+        __shfl_sync(mask64, alloc, leader);  // copy alloc to all active threads
+#else
     alloc =
         __shfl_sync(mask, alloc, leader);  // copy alloc to all active threads
+#endif
     assert(alloc + total <= capacity);
 
     queue[q_id * capacity + (alloc + rank)] =
@@ -308,7 +324,11 @@ struct Queues {
       }
       // >>
     }
+#if defined(__HIP_PLATFORM_AMD__)
+    __syncwarp(mask64);
+#else
     __syncwarp(mask);
+#endif
   }
 
   template <typename Functor>

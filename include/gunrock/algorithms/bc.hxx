@@ -210,7 +210,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     return false;
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     bool converged = (!forward && !backward) ? true : false;
     if (converged) {
       this->get_enactor()->iteration = this->search_depth;
