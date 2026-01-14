@@ -15,16 +15,16 @@ void test_hits(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+  gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
                                         "Hyperlink-Induced Topic Search");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto [properties, coo] = mm.load(params.filename);
+  auto [properties, coo] = mm.load(arguments.filename);
 
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
-  if (params.binary) {
-    csr.read_binary(params.filename);
+  if (arguments.binary) {
+    csr.read_binary(arguments.filename);
   } else {
     csr.from_coo(coo);
   }

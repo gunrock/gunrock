@@ -153,6 +153,40 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 };  // struct enactor_t
 
+/**
+ * @brief Run Personalized PageRank algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t).
+ * @param result Algorithm results (result_t).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          param_t<typename graph_t::vertex_type, typename graph_t::weight_type>& param,
+          result_t<typename graph_t::weight_type>& result,
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+  using param_type = param_t<vertex_t, weight_t>;
+  using result_type = result_t<weight_t>;
+
+  using problem_type = problem_t<graph_t, param_type, result_type>;
+  using enactor_type = enactor_t<problem_type>;
+
+  problem_type problem(G, param, result, context);
+  problem.init();
+  problem.reset();
+
+  enactor_type enactor(&problem, context);
+  return enactor.enact();
+}
+
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& seed,
@@ -164,7 +198,6 @@ float run(graph_t& G,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))) {
-  // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
@@ -173,18 +206,8 @@ float run(graph_t& G,
 
   param_type param(seed, alpha, epsilon, advance_load_balance, filter_algorithm);
   result_type result(p);
-  // </user-defined>
 
-  using problem_type = problem_t<graph_t, param_type, result_type>;
-  using enactor_type = enactor_t<problem_type>;
-
-  problem_type problem(G, param, result, context);
-  problem.init();
-  problem.reset();
-
-  enactor_type enactor(&problem, context);
-  return enactor.enact();
-  // </boiler-plate>
+  return run(G, param, result, context);
 }
 
 template <typename graph_t>

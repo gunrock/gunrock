@@ -209,27 +209,28 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 };  // struct enactor_t
 
+/**
+ * @brief Run PageRank algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t).
+ * @param result Algorithm results (result_t).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::weight_type alpha,
-          typename graph_t::weight_type tol,
-          bool collect_metrics,
-          typename graph_t::weight_type* p,  // Output
-          int* search_depth,                 // Output
+          param_t<typename graph_t::weight_type>& param,
+          result_t<typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
-
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
-
-  param_type param(alpha, tol, collect_metrics);
-  result_type result(p, search_depth);
-  // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -244,7 +245,28 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context, props);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::weight_type alpha,
+          typename graph_t::weight_type tol,
+          typename graph_t::weight_type* p,  // Output
+          int* search_depth,                 // Output
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
+) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  using param_type = param_t<weight_t>;
+  using result_type = result_t<weight_t>;
+
+  param_type param(alpha, tol, false);  // collect_metrics removed from simple API
+  result_type result(p, search_depth);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace pr

@@ -187,6 +187,40 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 /**
+ * @brief Run Breadth-First Search algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t).
+ * @param result Algorithm results (result_t).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::vertex_type>& result,
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
+) {
+  using vertex_t = typename graph_t::vertex_type;
+  using param_type = param_t<vertex_t>;
+  using result_type = result_t<vertex_t>;
+
+  using problem_type = problem_t<graph_t, param_type, result_type>;
+  using enactor_type = enactor_t<problem_type>;
+
+  problem_type problem(G, param, result, context);
+  problem.init();
+  problem.reset();
+
+  enactor_type enactor(&problem, context);
+  return enactor.enact();
+}
+
+/**
  * @brief Run Breadth-First Search algorithm on a given graph, G, starting from
  * the source node, single_source. The resulting distances are stored in the
  * distances pointer. All data must be allocated by the user, on the device
@@ -204,7 +238,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
-          bool collect_metrics,                          // Parameter
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
           int* edges_visited,                            // Output
@@ -217,18 +250,10 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
-  param_type param(single_source, collect_metrics);
+  param_type param(single_source, false);  // collect_metrics removed from simple API
   result_type result(distances, predecessors, edges_visited, search_depth);
 
-  using problem_type = problem_t<graph_t, param_type, result_type>;
-  using enactor_type = enactor_t<problem_type>;
-
-  problem_type problem(G, param, result, context);
-  problem.init();
-  problem.reset();
-
-  enactor_type enactor(&problem, context);
-  return enactor.enact();
+  return run(G, param, result, context);
 }
 
 }  // namespace bfs
