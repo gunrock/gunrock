@@ -17,7 +17,10 @@ namespace gunrock {
 namespace color {
 
 struct param_t {
-  // No parameters for this algorithm
+  operators::filter_algorithm_t filter_algorithm;
+  
+  param_t(operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::predicated)
+      : filter_algorithm(_filter_algorithm) {}
 };
 
 template <typename vertex_t>
@@ -145,9 +148,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       }
     };
 
-    // Execute filter operator on the provided lambda.
-    operators::filter::execute<operators::filter_algorithm_t::predicated>(
-        G, E, color_me_in, context);
+    // Execute filter operator on the provided lambda using runtime dispatch
+    auto filter_algorithm = P->param.filter_algorithm;
+    operators::filter::execute_runtime(G, E, color_me_in, filter_algorithm, context);
   }
 
 };  // struct enactor_t
@@ -155,6 +158,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type* colors,  // Output
+          operators::filter_algorithm_t filter_algorithm = operators::filter_algorithm_t::predicated,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -164,7 +168,7 @@ float run(graph_t& G,
   using param_type = param_t;
   using result_type = result_t<vertex_t>;
 
-  param_type param;
+  param_type param(filter_algorithm);
   result_type result(colors);
 
   using problem_type = problem_t<graph_t, param_type, result_type>;

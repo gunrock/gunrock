@@ -18,8 +18,20 @@ template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
   bool collect_metrics;
-  param_t(vertex_t _single_source, bool _collect_metrics)
-      : single_source(_single_source), collect_metrics(_collect_metrics) {}
+  operators::load_balance_t advance_load_balance;
+  operators::filter_algorithm_t filter_algorithm;
+  bool enable_filter;
+  
+  param_t(vertex_t _single_source, 
+          bool _collect_metrics,
+          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
+          operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::bypass,
+          bool _enable_filter = true)
+      : single_source(_single_source), 
+        collect_metrics(_collect_metrics),
+        advance_load_balance(_advance_load_balance),
+        filter_algorithm(_filter_algorithm),
+        enable_filter(_enable_filter) {}
 };
 
 template <typename vertex_t, typename weight_t>
@@ -125,13 +137,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     auto single_source = P->param.single_source;
+    auto collect_metrics = P->param.collect_metrics;
+    auto advance_load_balance = P->param.advance_load_balance;
+    auto filter_algorithm = P->param.filter_algorithm;
+    auto enable_filter = P->param.enable_filter;
     auto distances = P->result.distances;
     auto visited = P->visited.data().get();
 
     auto edges_visited = P->result.edges_visited;
     auto vertices_visited = P->result.vertices_visited;
     auto search_depth = P->result.search_depth;
-    auto collect_metrics = P->param.collect_metrics;
     auto iteration = this->iteration;
 
     auto shortest_path = [distances, single_source] __host__ __device__(
@@ -198,23 +213,27 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // Execute while collecting metrics if option is turned on
     if (collect_metrics) {
-      // Execute advance operator on the provided lambda
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, shortest_path_with_metrics, context);
+      // Execute advance operator on the provided lambda using runtime dispatch
+      operators::advance::execute_runtime(G, E, shortest_path_with_metrics, 
+                                          advance_load_balance, context);
 
-      // Execute filter operator on the provided lambda
-      operators::filter::execute<operators::filter_algorithm_t::bypass>(
-          G, E, remove_completed_paths_with_metrics, context);
+      // Execute filter operator on the provided lambda if enabled
+      if (enable_filter) {
+        operators::filter::execute_runtime(G, E, remove_completed_paths_with_metrics, 
+                                           filter_algorithm, context);
+      }
 
       *search_depth = iteration;
     } else {
-      // Execute advance operator on the provided lambda
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, shortest_path, context);
+      // Execute advance operator on the provided lambda using runtime dispatch
+      operators::advance::execute_runtime(G, E, shortest_path, 
+                                          advance_load_balance, context);
 
-      // Execute filter operator on the provided lambda
-      operators::filter::execute<operators::filter_algorithm_t::bypass>(
-          G, E, remove_completed_paths, context);
+      // Execute filter operator on the provided lambda if enabled
+      if (enable_filter) {
+        operators::filter::execute_runtime(G, E, remove_completed_paths, 
+                                           filter_algorithm, context);
+      }
     }
 
     /// @brief Execute uniquify operator to deduplicate the frontier

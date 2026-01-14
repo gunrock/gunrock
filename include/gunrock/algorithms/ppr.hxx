@@ -19,8 +19,15 @@ struct param_t {
   vertex_t seed;
   weight_t alpha;
   weight_t epsilon;
-  param_t(vertex_t _seed, weight_t _alpha, weight_t _epsilon)
-      : seed(_seed), alpha(_alpha), epsilon(_epsilon) {}
+  operators::load_balance_t advance_load_balance;
+  operators::filter_algorithm_t filter_algorithm;
+  
+  param_t(vertex_t _seed, weight_t _alpha, weight_t _epsilon,
+          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
+          operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::predicated)
+      : seed(_seed), alpha(_alpha), epsilon(_epsilon),
+        advance_load_balance(_advance_load_balance),
+        filter_algorithm(_filter_algorithm) {}
 };
 
 template <typename weight_t>
@@ -107,6 +114,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
 
+    auto advance_load_balance = P->param.advance_load_balance;
+    auto filter_algorithm = P->param.filter_algorithm;
     weight_t* p = P->result.p;
     weight_t* r = P->r.data().get();
     weight_t* r_prime = P->r_prime.data().get();
@@ -123,8 +132,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    operators::filter::execute<operators::filter_algorithm_t::predicated>(
-        G, E, filter_op, context);
+    operators::filter::execute_runtime(G, E, filter_op, filter_algorithm, context);
 
     auto advance_op = [G, r, r_prime, _1a1a, epsilon] __host__ __device__(
                           vertex_t const& src, vertex_t const& dst,
@@ -136,9 +144,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (oldval < thresh) && (newval >= thresh);
     };
 
-    // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped>(
-        G, E, advance_op, context);
+    // Execute advance operator on the provided lambda using runtime dispatch
+    operators::advance::execute_runtime(G, E, advance_op, advance_load_balance, context);
 
     auto policy = this->context->get_context(0)->execution_policy();
     thrust::copy_n(policy, r_prime, n_vertices, r);
@@ -152,6 +159,8 @@ float run(graph_t& G,
           typename graph_t::weight_type* p,
           typename graph_t::weight_type& alpha,
           typename graph_t::weight_type& epsilon,
+          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
+          operators::filter_algorithm_t filter_algorithm = operators::filter_algorithm_t::predicated,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))) {
@@ -162,7 +171,7 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t, weight_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(seed, alpha, epsilon);
+  param_type param(seed, alpha, epsilon, advance_load_balance, filter_algorithm);
   result_type result(p);
   // </user-defined>
 
