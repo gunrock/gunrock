@@ -17,8 +17,8 @@ on:
 env:
   # Customize the CMake build type here (Release, Debug)
   BUILD_TYPE: Release
-  ARCHITECTURES: 75
-
+  ARCHITECTURES: 90
+  
 jobs:
   analyze:
     name: Analyze
@@ -34,16 +34,23 @@ jobs:
         language: [ 'cpp' ]
 
     steps:
+      - name: Free up space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          
       # Fetch/Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.8
+        uses: Jimver/cuda-toolkit@v0.2.16
         id: cuda-toolkit
         with:
-          cuda: '11.7.0'
+          cuda: '12.5.0'
           linux-local-args: '["--toolkit"]'
           
       # Runs a single command using the runners shell
@@ -64,4 +71,4 @@ jobs:
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target sssp 
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3

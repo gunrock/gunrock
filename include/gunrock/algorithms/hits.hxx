@@ -153,7 +153,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                      thrust::square<weight_t>());
     sum = thrust::reduce(policy, auth.begin(), auth.end());
     thrust::for_each(policy, auth.begin(), auth.end(),
-                     [=] __device__(const weight_t& x) -> weight_t {
+                     [=] __host__ __device__(const weight_t& x) -> weight_t {
                        return sqrt(x / sum);
                      });
 
@@ -162,7 +162,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                      thrust::square<weight_t>());
     sum = thrust::reduce(policy, hub.begin(), hub.end());
     thrust::for_each(policy, hub.begin(), hub.end(),
-                     [=] __device__(const weight_t& x) -> weight_t {
+                     [=] __host__ __device__(const weight_t& x) -> weight_t {
                        return sqrt(x / sum);
                      });
 

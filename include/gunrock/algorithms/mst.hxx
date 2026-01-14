@@ -236,6 +236,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         context      // context
     );
 
+    // Need to sync before checking the value of not_decremented
+    context.get_context(0)->synchronize();
+
     // Throw an exception if the number of super vertices has not been
     // decremented
     thrust::host_vector<bool> h_not_dec = P->not_decremented;

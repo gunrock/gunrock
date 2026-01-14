@@ -1,7 +1,9 @@
 # begin /* Add experiments' executables */
 # Note, that this is not at all required for essentials.
 # These are just simple experiments conducted that support essentials development.
-set(SOURCES
+if (NOT ESSENTIALS_COLLECT_METRICS)
+
+set(EXPERIMENTS_SOURCES
   copy_ctor.cu
   diamond.cu
   shared_ptr.cu
@@ -10,12 +12,9 @@ set(SOURCES
   # enable_if.cu # [error]
 )
 
-foreach(SOURCE IN LISTS SOURCES)
-
+foreach(SOURCE IN LISTS EXPERIMENTS_SOURCES)
     get_filename_component(BINARY_NAME ${SOURCE} NAME_WLE)
     add_executable(${BINARY_NAME} ${SOURCE})
-
-    target_sources(${BINARY_NAME} PRIVATE ${SOURCE})
     target_link_libraries(${BINARY_NAME} PRIVATE essentials)
 
     if(${ESSENTIALS_NVIDIA_BACKEND})
@@ -37,4 +36,6 @@ foreach(SOURCE IN LISTS SOURCES)
 
     message(STATUS "Gunrock Experiment Added: ${BINARY_NAME}")
 endforeach()
+
+endif (NOT ESSENTIALS_COLLECT_METRICS)
 # end /* Add experiments' executables */

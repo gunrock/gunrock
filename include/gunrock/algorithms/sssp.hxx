@@ -17,41 +17,15 @@ namespace sssp {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  bool collect_metrics;
-  operators::load_balance_t advance_load_balance;
-  operators::filter_algorithm_t filter_algorithm;
-  bool enable_filter;
-  
-  param_t(vertex_t _single_source, 
-          bool _collect_metrics,
-          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
-          operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::bypass,
-          bool _enable_filter = true)
-      : single_source(_single_source), 
-        collect_metrics(_collect_metrics),
-        advance_load_balance(_advance_load_balance),
-        filter_algorithm(_filter_algorithm),
-        enable_filter(_enable_filter) {}
+  param_t(vertex_t _single_source) : single_source(_single_source) {}
 };
 
 template <typename vertex_t, typename weight_t>
 struct result_t {
   weight_t* distances;
   vertex_t* predecessors;
-  int* edges_visited;
-  int* vertices_visited;
-  int* search_depth;
-  result_t(weight_t* _distances,
-           vertex_t* _predecessors,
-           int* _edges_visited,
-           int* _vertices_visited,
-           int* _search_depth,
-           vertex_t n_vertices)
-      : distances(_distances),
-        predecessors(_predecessors),
-        edges_visited(_edges_visited),
-        vertices_visited(_vertices_visited),
-        search_depth(_search_depth) {}
+  result_t(weight_t* _distances, vertex_t* _predecessors, vertex_t n_vertices)
+      : distances(_distances), predecessors(_predecessors) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -92,24 +66,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     auto single_source = this->param.single_source;
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    auto d_edges_visited =
-        thrust::device_pointer_cast(this->result.edges_visited);
-    auto d_vertices_visited =
-        thrust::device_pointer_cast(this->result.vertices_visited);
-
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
     thrust::fill(policy, d_distances + single_source,
                  d_distances + single_source + 1, 0);
 
-    thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 0);
-    thrust::fill(thrust::device, d_vertices_visited, d_vertices_visited + 1, 0);
-
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
-
-    *(this->result.search_depth) = 0;
   }
 };
 
@@ -137,16 +101,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     auto single_source = P->param.single_source;
-    auto collect_metrics = P->param.collect_metrics;
-    auto advance_load_balance = P->param.advance_load_balance;
-    auto filter_algorithm = P->param.filter_algorithm;
-    auto enable_filter = P->param.enable_filter;
     auto distances = P->result.distances;
     auto visited = P->visited.data().get();
 
-    auto edges_visited = P->result.edges_visited;
-    auto vertices_visited = P->result.vertices_visited;
-    auto search_depth = P->result.search_depth;
     auto iteration = this->iteration;
 
     auto shortest_path = [distances, single_source] __host__ __device__(
@@ -155,26 +112,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                              edge_t const& edge,        // edge
                              weight_t const& weight     // weight (tuple).
                              ) -> bool {
-      weight_t source_distance = thread::load(&distances[source]);
-      weight_t distance_to_neighbor = source_distance + weight;
-
-      // Check if the destination node has been claimed as someone's child
-      weight_t recover_distance =
-          math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
-
-      return (distance_to_neighbor < recover_distance);
-    };
-
-    auto shortest_path_with_metrics =
-        [distances, single_source, edges_visited,
-         vertices_visited] __host__
-        __device__(vertex_t const& source,    // ... source
-                   vertex_t const& neighbor,  // neighbor
-                   edge_t const& edge,        // edge
-                   weight_t const& weight     // weight (tuple).
-                   ) -> bool {
-      math::atomic::add(&edges_visited[0], 1);
-      math::atomic::add(&vertices_visited[0], 2);
       weight_t source_distance = thread::load(&distances[source]);
       weight_t distance_to_neighbor = source_distance + weight;
 
@@ -197,44 +134,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    auto remove_completed_paths_with_metrics =
-        [G, visited, iteration, vertices_visited] __host__ __device__(
-            vertex_t const& vertex) -> bool {
-      math::atomic::add(&vertices_visited[0], 1);
-      if (visited[vertex] == iteration)
-        return false;
+    // Execute advance operator on the provided lambda
+    operators::advance::execute<operators::load_balance_t::block_mapped>(
+        G, E, shortest_path, context);
 
-      visited[vertex] = iteration;
-      /// @todo Confirm we do not need the following for bug
-      /// https://github.com/gunrock/essentials/issues/9 anymore.
-      // return G.get_number_of_neighbors(vertex) > 0;
-      return true;
-    };
-
-    // Execute while collecting metrics if option is turned on
-    if (collect_metrics) {
-      // Execute advance operator on the provided lambda using runtime dispatch
-      operators::advance::execute_runtime(G, E, shortest_path_with_metrics, 
-                                          advance_load_balance, context);
-
-      // Execute filter operator on the provided lambda if enabled
-      if (enable_filter) {
-        operators::filter::execute_runtime(G, E, remove_completed_paths_with_metrics, 
-                                           filter_algorithm, context);
-      }
-
-      *search_depth = iteration;
-    } else {
-      // Execute advance operator on the provided lambda using runtime dispatch
-      operators::advance::execute_runtime(G, E, shortest_path, 
-                                          advance_load_balance, context);
-
-      // Execute filter operator on the provided lambda if enabled
-      if (enable_filter) {
-        operators::filter::execute_runtime(G, E, remove_completed_paths, 
-                                           filter_algorithm, context);
-      }
-    }
+    // Execute filter operator on the provided lambda
+    operators::filter::execute<operators::filter_algorithm_t::bypass>(
+        G, E, remove_completed_paths, context);
 
     /// @brief Execute uniquify operator to deduplicate the frontier
     /// @note Not required.
@@ -245,29 +151,25 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 };  // struct enactor_t
 
-/**
- * @brief Run Single-Source Shortest Path algorithm on a given graph, G, with provided
- * parameters and results.
- *
- * @tparam graph_t Graph type.
- * @param G Graph object.
- * @param param Algorithm parameters (param_t).
- * @param result Algorithm results (result_t).
- * @param context Device context.
- * @return float Time taken to run the algorithm.
- */
 template <typename graph_t>
 float run(graph_t& G,
-          param_t<typename graph_t::vertex_type>& param,
-          result_t<typename graph_t::vertex_type, typename graph_t::weight_type>& result,
+          typename graph_t::vertex_type& single_source,  // Parameter
+          typename graph_t::weight_type* distances,      // Output
+          typename graph_t::vertex_type* predecessors,   // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
 ) {
+  // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
+
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t, weight_t>;
+
+  param_type param(single_source);
+  result_type result(distances, predecessors, G.get_number_of_vertices());
+  // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -278,31 +180,7 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context);
   return enactor.enact();
-}
-
-template <typename graph_t>
-float run(graph_t& G,
-          typename graph_t::vertex_type& single_source,  // Parameter
-          typename graph_t::weight_type* distances,      // Output
-          typename graph_t::vertex_type* predecessors,   // Output
-          int* edges_visited,                            // Output
-          int* vertices_visited,                         // Output
-          int* search_depth,                             // Output
-          std::shared_ptr<gcuda::multi_context_t> context =
-              std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  using vertex_t = typename graph_t::vertex_type;
-  using weight_t = typename graph_t::weight_type;
-
-  using param_type = param_t<vertex_t>;
-  using result_type = result_t<vertex_t, weight_t>;
-
-  param_type param(single_source, false);  // collect_metrics removed from simple API
-  result_type result(distances, predecessors, edges_visited, vertices_visited,
-                     search_depth, G.get_number_of_vertices());
-
-  return run(G, param, result, context);
+  // </boiler-plate>
 }
 
 }  // namespace sssp

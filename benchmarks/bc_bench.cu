@@ -83,14 +83,11 @@ void bc_bench(nvbench::state& state) {
   // Params and memory allocation
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> bc_values(n_vertices);
-  int edges_visited = 0;
-  int search_depth = 0;
 
   // --
   // Run BC with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::bc::run(G, false, bc_values.data().get(), &edges_visited,
-                     &search_depth);
+    gunrock::bc::run(G, bc_values.data().get());
   });
 }
 

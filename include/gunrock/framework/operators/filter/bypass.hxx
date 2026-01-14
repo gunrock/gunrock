@@ -1,6 +1,8 @@
 #pragma once
 
 #include <gunrock/framework/operators/configs.hxx>
+#include <gunrock/framework/benchmark.hxx>
+
 #include <thrust/transform.h>
 
 namespace gunrock {
@@ -28,8 +30,20 @@ void execute(graph_t& G,
   // Mark items as invalid instead of removing them (therefore, a "bypass").
   auto bypass = [=] __device__(std::size_t const& idx) {
     auto v = input_ptr[idx];
+
     if (!gunrock::util::limits::is_valid(v))
       return gunrock::numeric_limits<type_t>::invalid();  // exit early
+
+#if (ESSENTIALS_COLLECT_METRICS)
+    if (input->get_kind() ==
+        gunrock::frontier::frontier_kind_t::vertex_frontier) {
+      benchmark::LOG_VERTEX_VISITED(1);
+    } else {
+      benchmark::LOG_EDGE_VISITED(1);
+      benchmark::LOG_VERTEX_VISITED(2);
+    }
+#endif
+
     return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
   };
 

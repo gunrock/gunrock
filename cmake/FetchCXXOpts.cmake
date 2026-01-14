@@ -14,16 +14,8 @@ FetchContent_Declare(
 
 FetchContent_GetProperties(cxxopts)
 if(NOT cxxopts_POPULATED)
-  # Check if source directory already exists and use it
-  set(CXXOPTS_SRC_DIR "${FETCHCONTENT_BASE_DIR}/cxxopts-src")
-  if(EXISTS "${CXXOPTS_SRC_DIR}/include")
-    message(STATUS "Using existing cxxopts directory: ${CXXOPTS_SRC_DIR}")
-    set(cxxopts_SOURCE_DIR "${CXXOPTS_SRC_DIR}")
-    set(cxxopts_POPULATED TRUE)
-  else()
-    FetchContent_Populate(
-      cxxopts
-    )
-  endif()
+  FetchContent_MakeAvailable(
+    cxxopts
+  )
 endif()
 set(CXXOPTS_INCLUDE_DIR "${cxxopts_SOURCE_DIR}/include")

@@ -14,7 +14,7 @@ FetchContent_Declare(
 
 FetchContent_GetProperties(nvbench)
 if(NOT nvbench_POPULATED)
-  FetchContent_Populate(
+  FetchContent_MakeAvailable(
     nvbench
   )
 endif()
@@ -24,4 +24,4 @@ set(NVBENCH_INCLUDE_DIR "${nvbench_SOURCE_DIR}")
 set(NVBENCH_BUILD_DIR "${nvbench_BINARY_DIR}")
 
 # Add subdirectory ::nvbench
-add_subdirectory(${NVBENCH_INCLUDE_DIR} ${NVBENCH_BUILD_DIR})
+# add_subdirectory(${NVBENCH_INCLUDE_DIR} ${NVBENCH_BUILD_DIR})

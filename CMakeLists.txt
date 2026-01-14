@@ -57,12 +57,8 @@ option(ESSENTIALS_AMD_BACKEND
   ON)
 
 option(ESSENTIALS_NVIDIA_BACKEND
-  "If on, builds essentials with __HIP_PLATFORM_NVIDIA__ set."
+  "If on, builds essentials with CUDA backend for NVIDIA GPUs."
   OFF)
-
-if(${ESSENTIALS_NVIDIA_BACKEND})
-  message(FATAL_ERROR "NVIDIA backend is currently not supported in this branch.")
-endif()
 
 if((${ESSENTIALS_AMD_BACKEND} AND ${ESSENTIALS_NVIDIA_BACKEND}))
   message(FATAL_ERROR "Both NVIDIA and AMD backends specified [ON], select one: -DESSENTIALS_AMD_BACKEND=ON or -DESSENTIALS_NVIDIA_BACKEND=ON.")
@@ -407,6 +403,21 @@ else()
 endif()
 
 ####################################################
+################# COLLECT METRICS ##################
+####################################################
+option(ESSENTIALS_COLLECT_METRICS
+  "If on, builds Essentials with metrics collection enabled."
+  OFF)
+
+if(ESSENTIALS_COLLECT_METRICS)
+  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=1)
+  set(ESSENTIALS_BUILD_TESTS OFF)
+  set(ESSENTIALS_BUILD_BENCHMARKS OFF)
+else()
+  target_compile_definitions(essentials INTERFACE ESSENTIALS_COLLECT_METRICS=0)
+endif(ESSENTIALS_COLLECT_METRICS)
+
+####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
 ####################################################
 
@@ -430,7 +441,6 @@ endif(ESSENTIALS_BUILD_TESTS)
 ################ BUILD BENCHMARKS  #################
 ####################################################
 
-# Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_BENCHMARKS)
   # ... see https://github.com/NVIDIA/nvbench/issues/66
   set(NVBench_ENABLE_NVML OFF)

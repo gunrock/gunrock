@@ -19,7 +19,7 @@ struct parameters_t {
   std::string tag_string = "";
   int num_runs = 1;
   cxxopts::Options options;
-  bool collect_metrics = false;
+  bool export_metrics = false;
   bool validate = false;
   bool binary = false;
   
@@ -38,8 +38,8 @@ struct parameters_t {
       : options(argv[0], algorithm + " example") {
     // Add command line options
     options.add_options()("help", "Print help")  // help
-        ("collect_metrics",
-         "collect performance analysis metrics")  // performance evaluation
+        ("export_metrics",
+         "export performance analysis metrics")  // performance evaluation
         ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
         ("d,json_dir", "JSON output directory",
          cxxopts::value<std::string>())  // json output directory
@@ -56,7 +56,7 @@ struct parameters_t {
     // Algorithms with sources
     if (algorithm == "Betweenness Centrality" ||
         algorithm == "Breadth First Search" ||
-        algorithm == "Single Source Shortest Path") {
+        algorithm == "Single Source Shortest Path" || algorithm == "DAWN") {
       options.add_options()("s,src",
                             "Source(s) (random if omitted); "
                             "comma-separated string of ints",
@@ -64,7 +64,7 @@ struct parameters_t {
           ("n,num_runs", "Number of runs (ignored if multiple sources passed)",
            cxxopts::value<int>());  // runs
       if (algorithm == "Breadth First Search" ||
-          algorithm == "Single Source Shortest Path") {
+          algorithm == "Single Source Shortest Path" || algorithm == "DAWN") {
         options.add_options()("validate", "CPU validation");  // validate
       }
     } else {
@@ -97,8 +97,8 @@ struct parameters_t {
       validate = true;
     }
 
-    if (result.count("collect_metrics") == 1) {
-      collect_metrics = true;
+    if (result.count("export_metrics") == 1) {
+      export_metrics = true;
     }
 
     if (result.count("num_runs") == 1) {

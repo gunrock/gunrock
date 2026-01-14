@@ -15,6 +15,7 @@
 #include <gunrock/cuda/cuda.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
+#include <gunrock/framework/benchmark.hxx>
 
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
@@ -136,6 +137,11 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     auto e = sedges[id] + i - degrees[id];
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
+
+#if (ESSENTIALS_COLLECT_METRICS)
+    benchmark::LOG_EDGE_VISITED(1);
+    benchmark::LOG_VERTEX_VISITED(2);
+#endif
 
     // Use-defined advance condition.
     bool cond = op(v, n, e, w);

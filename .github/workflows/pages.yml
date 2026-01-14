@@ -8,6 +8,10 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+env:
+  BUILD_TYPE: Release
+  ARCHITECTURES: 90
+
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
@@ -24,24 +28,28 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        
-      - run: sudo apt update && sudo apt install gcc-11 g++-11
-        shell: bash
-
+      - name: Free up space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.8
+        uses: Jimver/cuda-toolkit@v0.2.16
         id: cuda-toolkit
         with:
-          cuda: '11.7.0'
+          cuda: '12.5.0'
           linux-local-args: '["--toolkit"]'
+
+      - name: Checkout
+        uses: actions/checkout@v4
       
       - name: Configure cmake for Doxygen
-        run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=ON -D ESSENTIALS_BUILD_BENCHMARKS=ON
+        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
         shell: bash
         env:
           CC:   gcc-11
@@ -49,9 +57,9 @@ jobs:
 
       # Testing with a different python
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.7' 
+          python-version: '3.7'
         
       # Install requirements
       # Note: doxygen is not visible in $PATH until the subsequent actions.
@@ -77,14 +85,14 @@ jobs:
           make html
         
       - name: Setup Pages
-        uses: actions/configure-pages@v2
+        uses: actions/configure-pages@v5
       
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           # Upload html directory
           path: './docs/sphinx/_build/html'
           
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4

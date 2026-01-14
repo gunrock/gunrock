@@ -86,15 +86,12 @@ void bfs_bench(nvbench::state& state) {
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
-  thrust::device_vector<int> edges_visited(1);
-  int search_depth = 0;
 
   // --
   // Run BFS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::bfs::run(G, single_source, false, distances.data().get(),
-                      predecessors.data().get(), edges_visited.data().get(),
-                      &search_depth);
+    gunrock::bfs::run(G, single_source, distances.data().get(),
+                      predecessors.data().get());
   });
 }
 

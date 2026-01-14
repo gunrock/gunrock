@@ -9,21 +9,13 @@ set(FETCHCONTENT_BASE_DIR ${FC_BASE})
 FetchContent_Declare(
   json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v3.10.5
+    GIT_TAG        develop
 )
 
 FetchContent_GetProperties(json)
 if(NOT json_POPULATED)
-  # Check if source directory already exists and use it
-  set(JSON_SRC_DIR "${FETCHCONTENT_BASE_DIR}/json-src")
-  if(EXISTS "${JSON_SRC_DIR}/include")
-    message(STATUS "Using existing json directory: ${JSON_SRC_DIR}")
-    set(json_SOURCE_DIR "${JSON_SRC_DIR}")
-    set(json_POPULATED TRUE)
-  else()
-    FetchContent_Populate(
-      json
-    )
-  endif()
+  FetchContent_MakeAvailable(
+    json
+  )
 endif()
 set(NHLOMANN_JSON_INCLUDE_DIR "${json_SOURCE_DIR}/include")

@@ -54,10 +54,10 @@ __device__ __host__ Size rounddown_power2(Size num) {
 }
 
 #ifndef align_up_yx
-#define align_up_yx(num, align) (((num) + ((align)-1)) & ~((align)-1))
+#define align_up_yx(num, align) (((num) + ((align) - 1)) & ~((align) - 1))
 #endif
 
 #ifndef align_down
-#define align_down(num, align) ((num) & ~((align)-1))
+#define align_down(num, align) ((num) & ~((align) - 1))
 #endif
 }  // namespace gunrock

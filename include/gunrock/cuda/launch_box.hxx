@@ -196,7 +196,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
   typedef select_launch_params_t<lp_v...> params_t;
 
   // Empty constructor to avoid compiler warnings.
-  launch_box_t(){};
+  launch_box_t() {};
 
   /**
    * @brief Launch a function with the given parameters on a simple strided
