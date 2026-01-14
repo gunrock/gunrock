@@ -1,8 +1,15 @@
 #include <cxxopts.hpp>
+#include <string>
+#include <algorithm>
+#include <gunrock/framework/operators/configs.hxx>
 
 namespace gunrock {
 namespace io {
 namespace cli {
+
+// Forward declarations
+operators::load_balance_t parse_load_balance(std::string str);
+operators::filter_algorithm_t parse_filter_algorithm(std::string str);
 
 struct parameters_t {
   std::string filename;
@@ -15,6 +22,11 @@ struct parameters_t {
   bool collect_metrics = false;
   bool validate = false;
   bool binary = false;
+  
+  // Operator configuration parameters
+  operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped;
+  operators::filter_algorithm_t filter_algorithm = operators::filter_algorithm_t::compact;
+  bool enable_filter = false;
 
   /**
    * @brief Construct a new parameters object and parse command line arguments.
@@ -34,7 +46,12 @@ struct parameters_t {
         ("f,json_file", "JSON output file",
          cxxopts::value<std::string>())  // json output file
         ("t,tag", "Tags for the JSON output; comma-separated string of tags",
-         cxxopts::value<std::string>());  // tags
+         cxxopts::value<std::string>())  // tags
+        ("advance_load_balance", "Load balancing technique for advance operator (thread_mapped, block_mapped, merge_path, etc.)",
+         cxxopts::value<std::string>())  // advance load balance
+        ("filter_algorithm", "Filter algorithm (remove, predicated, compact, bypass)",
+         cxxopts::value<std::string>())  // filter algorithm
+        ("enable_filter", "Enable filter operator");  // enable filter
 
     // Algorithms with sources
     if (algorithm == "Betweenness Centrality" ||
@@ -103,6 +120,18 @@ struct parameters_t {
     if (result.count("json_file") == 1) {
       json_file = result["json_file"].as<std::string>();
     }
+    
+    if (result.count("advance_load_balance") == 1) {
+      advance_load_balance = parse_load_balance(result["advance_load_balance"].as<std::string>());
+    }
+    
+    if (result.count("filter_algorithm") == 1) {
+      filter_algorithm = parse_filter_algorithm(result["filter_algorithm"].as<std::string>());
+    }
+    
+    if (result.count("enable_filter") == 1) {
+      enable_filter = true;
+    }
   }
 };
 
@@ -154,6 +183,45 @@ void parse_tag_string(std::string tag_str, std::vector<std::string>* tag_vect) {
       tag_vect->push_back(tag);
     }
   }
+}
+
+/**
+ * @brief Parse load_balance_t enum from string.
+ * 
+ * @param str String representation (case-insensitive).
+ * @return operators::load_balance_t Enum value.
+ */
+operators::load_balance_t parse_load_balance(std::string str) {
+  std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+  
+  if (str == "thread_mapped") return operators::load_balance_t::thread_mapped;
+  if (str == "warp_mapped") return operators::load_balance_t::warp_mapped;
+  if (str == "block_mapped") return operators::load_balance_t::block_mapped;
+  if (str == "bucketing") return operators::load_balance_t::bucketing;
+  if (str == "merge_path") return operators::load_balance_t::merge_path;
+  if (str == "merge_path_v2") return operators::load_balance_t::merge_path_v2;
+  if (str == "work_stealing") return operators::load_balance_t::work_stealing;
+  
+  // Default to block_mapped
+  return operators::load_balance_t::block_mapped;
+}
+
+/**
+ * @brief Parse filter_algorithm_t enum from string.
+ * 
+ * @param str String representation (case-insensitive).
+ * @return operators::filter_algorithm_t Enum value.
+ */
+operators::filter_algorithm_t parse_filter_algorithm(std::string str) {
+  std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+  
+  if (str == "remove") return operators::filter_algorithm_t::remove;
+  if (str == "predicated") return operators::filter_algorithm_t::predicated;
+  if (str == "compact") return operators::filter_algorithm_t::compact;
+  if (str == "bypass") return operators::filter_algorithm_t::bypass;
+  
+  // Default to compact
+  return operators::filter_algorithm_t::compact;
 }
 
 }  // namespace cli

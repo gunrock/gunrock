@@ -18,8 +18,20 @@ template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
   bool collect_metrics;
-  param_t(vertex_t _single_source, bool _collect_metrics)
-      : single_source(_single_source), collect_metrics(_collect_metrics) {}
+  operators::load_balance_t advance_load_balance;
+  operators::filter_algorithm_t filter_algorithm;
+  bool enable_filter;
+  
+  param_t(vertex_t _single_source, 
+          bool _collect_metrics,
+          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
+          operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::compact,
+          bool _enable_filter = false)
+      : single_source(_single_source), 
+        collect_metrics(_collect_metrics),
+        advance_load_balance(_advance_load_balance),
+        filter_algorithm(_filter_algorithm),
+        enable_filter(_enable_filter) {}
 };
 
 template <typename vertex_t>
@@ -98,6 +110,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto single_source = P->param.single_source;
     auto collect_metrics = P->param.collect_metrics;
+    auto advance_load_balance = P->param.advance_load_balance;
+    auto filter_algorithm = P->param.filter_algorithm;
+    auto enable_filter = P->param.enable_filter;
     auto distances = P->result.distances;
     auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;
@@ -151,23 +166,59 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    // Execute advance operator on the provided lambda
+    // Execute advance operator on the provided lambda using runtime dispatch
     // Collect metrics if option is turned on
     if (collect_metrics) {
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, search_with_metrics, context);
+      operators::advance::execute_runtime(G, E, search_with_metrics, 
+                                           advance_load_balance, context);
       *search_depth = iteration;
     } else {
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, search, context);
+      operators::advance::execute_runtime(G, E, search, 
+                                           advance_load_balance, context);
     }
-    // Execute filter operator to remove the invalids.
-    // @todo: Add CLI option to enable or disable this.
-    // operators::filter::execute<operators::filter_algorithm_t::compact>(
-    // G, E, remove_invalids, context);
+    
+    // Execute filter operator to remove the invalids if enabled
+    if (enable_filter) {
+      operators::filter::execute_runtime(G, E, remove_invalids, 
+                                          filter_algorithm, context);
+    }
   }
 
 };  // struct enactor_t
+
+/**
+ * @brief Run Breadth-First Search algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t).
+ * @param result Algorithm results (result_t).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::vertex_type>& result,
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
+) {
+  using vertex_t = typename graph_t::vertex_type;
+  using param_type = param_t<vertex_t>;
+  using result_type = result_t<vertex_t>;
+
+  using problem_type = problem_t<graph_t, param_type, result_type>;
+  using enactor_type = enactor_t<problem_type>;
+
+  problem_type problem(G, param, result, context);
+  problem.init();
+  problem.reset();
+
+  enactor_type enactor(&problem, context);
+  return enactor.enact();
+}
 
 /**
  * @brief Run Breadth-First Search algorithm on a given graph, G, starting from
@@ -187,7 +238,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
-          bool collect_metrics,                          // Parameter
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
           int* edges_visited,                            // Output
@@ -200,18 +250,10 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
-  param_type param(single_source, collect_metrics);
+  param_type param(single_source, false);  // collect_metrics removed from simple API
   result_type result(distances, predecessors, edges_visited, search_depth);
 
-  using problem_type = problem_t<graph_t, param_type, result_type>;
-  using enactor_type = enactor_t<problem_type>;
-
-  problem_type problem(G, param, result, context);
-  problem.init();
-  problem.reset();
-
-  enactor_type enactor(&problem, context);
-  return enactor.enact();
+  return run(G, param, result, context);
 }
 
 }  // namespace bfs

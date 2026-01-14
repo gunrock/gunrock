@@ -17,7 +17,7 @@ namespace bc {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  vertex_t collect_metrics;
+  bool collect_metrics;
   param_t(vertex_t _single_source, bool _collect_metrics)
       : single_source(_single_source), collect_metrics(_collect_metrics) {}
 };
@@ -242,29 +242,29 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run Betweenness Centrality algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t).
+ * @param result Algorithm results (result_t).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::vertex_type single_source,
-          bool collect_metrics,
-          typename graph_t::weight_type* bc_values,
-          int* edges_visited,
-          int* search_depth,
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
-
   using param_type = param_t<vertex_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(single_source, collect_metrics);
-  result_type result(bc_values, edges_visited, search_depth);
-  // </user-defined>
-
-  // <boiler-plate>
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
@@ -279,7 +279,28 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context, props);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::vertex_type single_source,
+          typename graph_t::weight_type* bc_values,
+          int* edges_visited,
+          int* search_depth,
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
+) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  using param_type = param_t<vertex_t>;
+  using result_type = result_t<weight_t>;
+
+  param_type param(single_source, false);  // collect_metrics removed from simple API
+  result_type result(bc_values, edges_visited, search_depth);
+
+  return run(G, param, result, context);
 }
 
 template <typename graph_t>

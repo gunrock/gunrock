@@ -19,7 +19,11 @@ namespace spmv {
 template <typename weight_t>
 struct param_t {
   weight_t* x;
-  param_t(weight_t* _x) : x(_x) {}
+  operators::load_balance_t advance_load_balance;
+  
+  param_t(weight_t* _x,
+          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped)
+      : x(_x), advance_load_balance(_advance_load_balance) {}
 };
 
 template <typename weight_t>
@@ -140,6 +144,7 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::weight_type* x,  // Input vector
           typename graph_t::weight_type* y,  // Output vector
+          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -150,7 +155,7 @@ float run(graph_t& G,
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(x);
+  param_type param(x, advance_load_balance);
   result_type result(y);
   // </user-defined>
 

@@ -16,16 +16,16 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+  gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
                                         "Betweenness Centrality");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto [properties, coo] = mm.load(params.filename);
+  auto [properties, coo] = mm.load(arguments.filename);
 
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
-  if (params.binary) {
-    csr.read_binary(params.filename);
+  if (arguments.binary) {
+    csr.read_binary(arguments.filename);
   } else {
     csr.from_coo(coo);
   }
@@ -45,21 +45,23 @@ void test_bc(int num_arguments, char** argument_array) {
 
   // Parse sources
   std::vector<int> source_vect;
-  gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
-                                        n_vertices, params.num_runs);
+  gunrock::io::cli::parse_source_string(arguments.source_string, &source_vect,
+                                        n_vertices, arguments.num_runs);
   // Parse tags
   std::vector<std::string> tag_vect;
-  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
+  gunrock::io::cli::parse_tag_string(arguments.tag_string, &tag_vect);
 
   // --
   // GPU Run
 
   std::vector<float> run_times;
   for (int i = 0; i < source_vect.size(); i++) {
-    // Record run times without collecting metrics (due to overhead)
-    run_times.push_back(gunrock::bc::run(G, source_vect[i], true,
-                                         bc_values.data().get(), &edges_visited,
-                                         &search_depth));
+    // Use new run API with param_t
+    gunrock::bc::param_t<vertex_t> param(source_vect[i], false);  // collect_metrics
+    gunrock::bc::result_t<weight_t> result(
+        bc_values.data().get(), &edges_visited, &search_depth);
+    
+    run_times.push_back(gunrock::bc::run(G, param, result));
   }
 
   // --
@@ -67,13 +69,13 @@ void test_bc(int num_arguments, char** argument_array) {
 
   std::cout << "Single source : " << source_vect.back() << "\n";
   print::head(bc_values, 40, "GPU bc values");
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+  std::cout << "GPU Elapsed Time : " << run_times[arguments.num_runs - 1]
             << " (ms)" << std::endl;
 
   // --
   // Run performance evaluation
 
-  if (params.collect_metrics) {
+  if (arguments.collect_metrics) {
     std::vector<int> edges_visited_vect;
     std::vector<int> search_depth_vect;
     std::vector<int> nodes_visited_vect(source_vect.size());
@@ -81,9 +83,12 @@ void test_bc(int num_arguments, char** argument_array) {
     vertex_t n_edges = G.get_number_of_edges();
 
     for (int i = 0; i < source_vect.size(); i++) {
-      float metrics_run_time = gunrock::bc::run(
-          G, source_vect[i], params.collect_metrics, bc_values.data().get(),
-          &edges_visited, &search_depth);
+      // Use new run API with param_t for metrics collection
+      gunrock::bc::param_t<vertex_t> param(source_vect[i], true);  // collect_metrics
+      gunrock::bc::result_t<weight_t> result(
+          bc_values.data().get(), &edges_visited, &search_depth);
+      
+      float metrics_run_time = gunrock::bc::run(G, param, result);
 
       edges_visited_vect.push_back(edges_visited);
       search_depth_vect.push_back(search_depth);
@@ -95,8 +100,8 @@ void test_bc(int num_arguments, char** argument_array) {
 
     gunrock::util::stats::get_performance_stats(
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
-        search_depth_vect, run_times, "bc", params.filename, "market",
-        params.json_dir, params.json_file, source_vect, tag_vect, num_arguments,
+        search_depth_vect, run_times, "bc", arguments.filename, "market",
+        arguments.json_dir, arguments.json_file, source_vect, tag_vect, num_arguments,
         argument_array);
   }
 }
