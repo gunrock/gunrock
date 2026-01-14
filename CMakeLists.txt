@@ -281,6 +281,10 @@ else()
     INTERFACE ${CMAKE_THREAD_LIBS_INIT}
     -lstdc++fs
   )
+  
+  if(TARGET roc::rocthrust)
+    target_link_libraries(essentials INTERFACE roc::rocthrust)
+  endif()
 endif()
 
 ####################################################

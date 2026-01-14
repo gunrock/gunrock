@@ -29,24 +29,35 @@ if(${ESSENTIALS_NVIDIA_BACKEND})
   set(CUB_INCLUDE_DIR "${thrust_SOURCE_DIR}/dependencies/cub")
   set(LIBCUDACXX_INCLUDE_DIR "${thrust_SOURCE_DIR}/dependencies/libcudacxx/include")
 else()
-  # For AMD/ROCm 6, use system-installed rocThrust and hipCUB
-  # Note: rocThrust is now part of rocm-libraries monorepo
-  # System-installed version from ROCm 6.4.2 is used by default
-  get_filename_component(FC_BASE "../externals"
-                  REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
-  set(FETCHCONTENT_BASE_DIR ${FC_BASE})
-  
-  if(DEFINED ROCM_PATH AND EXISTS "${ROCM_PATH}/include/thrust")
-    message(STATUS "Using system-installed rocThrust from: ${ROCM_PATH}/include/thrust")
-    message(STATUS "  (rocThrust is part of rocm-libraries: https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocthrust)")
-    set(THRUST_INCLUDE_DIR "${ROCM_PATH}/include/thrust")
+  # For AMD/ROCm, use find_package to get rocThrust and rocPRIM
+  # This uses the CMake config files which set up include paths correctly
+  # and avoids the problematic include chain issue with manual include paths
+  if(DEFINED ROCM_PATH)
+    # rocThrust requires rocPRIM
+    find_package(rocprim REQUIRED CONFIG PATHS "${ROCM_PATH}" NO_DEFAULT_PATH)
+    find_package(rocthrust REQUIRED CONFIG PATHS "${ROCM_PATH}" NO_DEFAULT_PATH)
     
-    # Use system-installed hipCUB for CUB (also from rocm-libraries)
-    if(EXISTS "${ROCM_PATH}/include/hipcub")
-      message(STATUS "Using system-installed hipCUB from: ${ROCM_PATH}/include/hipcub")
-      set(CUB_INCLUDE_DIR "${ROCM_PATH}/include/hipcub/backend/cub")
+    # Get include directories from the target (but we'll use target_link_libraries instead)
+    # Keep these for backward compatibility with existing code that uses THRUST_INCLUDE_DIR
+    get_target_property(THRUST_INCLUDE_DIR roc::rocthrust INTERFACE_INCLUDE_DIRECTORIES)
+    if(THRUST_INCLUDE_DIR)
+      list(GET THRUST_INCLUDE_DIR 0 THRUST_INCLUDE_DIR)
     else()
-      message(WARNING "hipCUB not found, CUB functionality may be limited")
+      # Fallback to default path
+      set(THRUST_INCLUDE_DIR "${ROCM_PATH}/include/thrust")
+    endif()
+    
+    # For hipCUB, try to find it via find_package or use default path
+    if(TARGET roc::hipcub)
+      get_target_property(CUB_INCLUDE_DIR roc::hipcub INTERFACE_INCLUDE_DIRECTORIES)
+      if(CUB_INCLUDE_DIR)
+        list(GET CUB_INCLUDE_DIR 0 CUB_INCLUDE_DIR)
+        # hipCUB's include is typically the parent directory
+        set(CUB_INCLUDE_DIR "${CUB_INCLUDE_DIR}/backend/cub")
+      endif()
+    endif()
+    if(NOT CUB_INCLUDE_DIR)
+      # Fallback to default path
       set(CUB_INCLUDE_DIR "${ROCM_PATH}/include/hipcub/backend/cub")
     endif()
     
@@ -59,12 +70,12 @@ else()
     if(NOT LIBCUDACXX_INCLUDE_DIR)
       set(LIBCUDACXX_INCLUDE_DIR "${ROCM_PATH}/include")
     endif()
+    
+    message(STATUS "Using rocThrust via find_package (target: roc::rocthrust)")
+    message(STATUS "rocThrust include: ${THRUST_INCLUDE_DIR}")
+    message(STATUS "CUB include: ${CUB_INCLUDE_DIR}")
+    message(STATUS "libcudacxx include: ${LIBCUDACXX_INCLUDE_DIR}")
   else()
-    message(FATAL_ERROR "ROCm path not set or rocThrust not found. Please set ROCM_PATH and ensure ROCm 6 is installed.")
-    message(FATAL_ERROR "rocThrust is available in rocm-libraries: https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocthrust")
+    message(FATAL_ERROR "ROCm path not set. Please set ROCM_PATH.")
   endif()
-  
-  message(STATUS "rocThrust include: ${THRUST_INCLUDE_DIR}")
-  message(STATUS "CUB include: ${CUB_INCLUDE_DIR}")
-  message(STATUS "libcudacxx include: ${LIBCUDACXX_INCLUDE_DIR}")
 endif()
