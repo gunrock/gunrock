@@ -59,7 +59,36 @@ if(DEFINED ROCM_PATH)
         # Fallback: try alternative path structure
         set(THRUST_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocthrust/include")
       endif()
-    endif()
+      
+      # Generate rocthrust_version.hpp from template if it doesn't exist
+      # This file is needed by Thrust headers but is normally generated during rocThrust build
+      set(ROCTHRUST_VERSION_HPP "${THRUST_INCLUDE_DIR}/thrust/rocthrust_version.hpp")
+      set(ROCTHRUST_VERSION_HPP_IN "${THRUST_INCLUDE_DIR}/thrust/rocthrust_version.hpp.in")
+      if(EXISTS "${ROCTHRUST_VERSION_HPP_IN}" AND NOT EXISTS "${ROCTHRUST_VERSION_HPP}")
+        # Try to get version from system installation first
+        if(EXISTS "${ROCM_PATH}/include/thrust/rocthrust_version.hpp")
+          execute_process(
+            COMMAND ${CMAKE_COMMAND} -E copy
+              "${ROCM_PATH}/include/thrust/rocthrust_version.hpp"
+              "${ROCTHRUST_VERSION_HPP}"
+            RESULT_VARIABLE copy_result
+            ERROR_QUIET
+          )
+        endif()
+        
+        # If copy failed, generate a minimal version from template
+        if(NOT EXISTS "${ROCTHRUST_VERSION_HPP}")
+          file(READ "${ROCTHRUST_VERSION_HPP_IN}" template_content)
+          # Replace CMake variables with reasonable defaults
+          string(REPLACE "@rocthrust_VERSION_NUMBER@" "100500" template_content "${template_content}")
+          string(REPLACE "@rocthrust_VERSION_MAJOR@" "1" template_content "${template_content}")
+          string(REPLACE "@rocthrust_VERSION_MINOR@" "5" template_content "${template_content}")
+          string(REPLACE "@rocthrust_VERSION_PATCH@" "0" template_content "${template_content}")
+          file(WRITE "${ROCTHRUST_VERSION_HPP}" "${template_content}")
+          message(STATUS "Generated ${ROCTHRUST_VERSION_HPP} from template")
+        endif()
+        endif()
+      endif()
     
     # For hipCUB, try to find it or use rocm-libraries
     find_package(hipcub QUIET CONFIG PATHS "${ROCM_PATH}" NO_DEFAULT_PATH)
