@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include <gunrock/compat/runtime_api.h>
+
 namespace gunrock {
 namespace gcuda {
 

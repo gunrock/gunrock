@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <string>
+#include <gunrock/compat/runtime_api.h>
 
 namespace gunrock {
 

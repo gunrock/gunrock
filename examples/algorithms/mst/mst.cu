@@ -68,10 +68,10 @@ void test_mst(int num_arguments, char** argument_array) {
   // IO
 
   csr_t csr;
-  parameters_t params(num_arguments, argument_array);
+  parameters_t arguments(num_arguments, argument_array);
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto [properties, coo] = mm.load(params.filename);
+  auto [properties, coo] = mm.load(arguments.filename);
 
   if (!properties.symmetric) {
     printf("Error: input matrix must be symmetric\n");
@@ -103,7 +103,7 @@ void test_mst(int num_arguments, char** argument_array) {
   // --
   // CPU Run
 
-  if (params.validate) {
+  if (arguments.validate) {
     weight_t cpu_mst_weight;
     float cpu_elapsed =
         mst_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, &cpu_mst_weight);

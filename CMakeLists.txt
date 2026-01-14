@@ -134,10 +134,9 @@ set(PROJECT_DEPS_DIR externals)
 # begin /* Include cmake modules */
 if(${ESSENTIALS_AMD_BACKEND})
   include(${PROJECT_SOURCE_DIR}/cmake/FetchROCMHIP.cmake)
-endif()
-
-include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
-if(${ESSENTIALS_NVIDIA_BACKEND})
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+else()
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchCCCL.cmake)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 endif()
 
@@ -241,14 +240,23 @@ target_include_directories(essentials
   INTERFACE ${ESSENTIALS_INCLUDE_DIR}
   INTERFACE ${ESSENTIALS_INCLUDE_DIR}/gunrock/compat
   INTERFACE ${CXXOPTS_INCLUDE_DIR}
-  INTERFACE ${THRUST_INCLUDE_DIR}
-  INTERFACE ${CUB_INCLUDE_DIR}
-  INTERFACE ${LIBCUDACXX_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
+
+if(${ESSENTIALS_NVIDIA_BACKEND})
+  target_include_directories(essentials
+    INTERFACE ${CCCL_INCLUDE_DIR}
+  )
+else()
+  target_include_directories(essentials
+    INTERFACE ${THRUST_INCLUDE_DIR}
+    INTERFACE ${CUB_INCLUDE_DIR}
+    INTERFACE ${LIBCUDACXX_INCLUDE_DIR}
+  )
+endif()
 
 ####################################################
 ############ TARGET LINK LIBRARIES #################

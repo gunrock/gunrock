@@ -60,22 +60,22 @@ void test_tc(int num_arguments, char** argument_array) {
 
   // --
   // IO
-  parameters_t params(num_arguments, argument_array);
+  parameters_t arguments(num_arguments, argument_array);
   gunrock::graph::graph_properties_t properties =
       gunrock::graph::graph_properties_t();
 
-  if (util::is_market(params.filename)) {
+  if (util::is_market(arguments.filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    auto [properties, coo] = mm.load(params.filename);
+    auto [properties, coo] = mm.load(arguments.filename);
     if (!properties.symmetric) {
       std::cerr << "Error: input matrix must be symmetric" << std::endl;
       exit(1);
     }
     csr.from_coo(coo);
-  } else if (util::is_binary_csr(params.filename)) {
-    csr.read_binary(params.filename);
+  } else if (util::is_binary_csr(arguments.filename)) {
+    csr.read_binary(arguments.filename);
   } else {
-    std::cerr << "Unknown file format: " << params.filename << std::endl;
+    std::cerr << "Unknown file format: " << arguments.filename << std::endl;
     exit(1);
   }
 
@@ -94,21 +94,21 @@ void test_tc(int num_arguments, char** argument_array) {
   // GPU Run
 
   std::size_t total_triangles = 0;
-  float gpu_elapsed = tc::run(G, params.reduce_all_triangles,
+  float gpu_elapsed = tc::run(G, arguments.reduce_all_triangles,
                               triangles_count.data().get(), &total_triangles);
 
   // --
   // Log
 
   print::head(triangles_count, 40, "Per-vertex triangle count");
-  if (params.reduce_all_triangles) {
+  if (arguments.reduce_all_triangles) {
     std::cout << "Total Graph Traingles : " << total_triangles << std::endl;
   }
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 
   // --
   // CPU validation
-  if (params.validate) {
+  if (arguments.validate) {
     std::vector<count_t> reference_triangles_count(n_vertices, 0);
     std::size_t reference_total_triangles = 0;
 

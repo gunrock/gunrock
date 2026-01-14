@@ -11,7 +11,7 @@
 
 #include <iostream>
 #include <memory>
-#include <hip/hip_runtime.h>
+#include <gunrock/compat/runtime_api.h>
 #include <gunrock/error.hxx>
 
 namespace gunrock {

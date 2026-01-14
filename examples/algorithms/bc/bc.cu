@@ -16,16 +16,16 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+  gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
                                         "Betweenness Centrality");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto [properties, coo] = mm.load(params.filename);
+  auto [properties, coo] = mm.load(arguments.filename);
 
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
 
-  if (params.binary) {
-    csr.read_binary(params.filename);
+  if (arguments.binary) {
+    csr.read_binary(arguments.filename);
   } else {
     csr.from_coo(coo);
   }
@@ -44,11 +44,11 @@ void test_bc(int num_arguments, char** argument_array) {
 
   // Parse sources
   std::vector<int> source_vect;
-  gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
-                                        n_vertices, params.num_runs);
+  gunrock::io::cli::parse_source_string(arguments.source_string, &source_vect,
+                                        n_vertices, arguments.num_runs);
   // Parse tags
   std::vector<std::string> tag_vect;
-  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
+  gunrock::io::cli::parse_tag_string(arguments.tag_string, &tag_vect);
 
   // --
   // GPU Run
@@ -70,10 +70,10 @@ void test_bc(int num_arguments, char** argument_array) {
   }
 
   // Export metrics
-  if (params.export_metrics) {
+  if (arguments.export_metrics) {
     gunrock::util::stats::export_performance_stats(
         benchmark_metrics, n_edges, n_vertices, run_times, "bc",
-        params.filename, "market", params.json_dir, params.json_file,
+        arguments.filename, "market", arguments.json_dir, arguments.json_file,
         source_vect, tag_vect, num_arguments, argument_array);
   }
 
@@ -82,7 +82,7 @@ void test_bc(int num_arguments, char** argument_array) {
 
   std::cout << "Single source : " << source_vect.back() << "\n";
   print::head(bc_values, 40, "GPU bc values");
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+  std::cout << "GPU Elapsed Time : " << run_times[arguments.num_runs - 1]
             << " (ms)" << std::endl;
 }
 

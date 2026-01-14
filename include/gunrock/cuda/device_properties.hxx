@@ -9,6 +9,7 @@
  */
 #pragma once
 #include <iostream>
+#include <gunrock/compat/runtime_api.h>
 #include <gunrock/cuda/device.hxx>
 #include <gunrock/error.hxx>
 
@@ -96,19 +97,34 @@ inline constexpr unsigned cta_max_threads() {
 }
 
 /**
- * @brief Warp size (has always been 32, but is subject to change).
+ * @brief Warp/wavefront size.
+ * NVIDIA: 32 (warp size)
+ * AMD: 64 (wavefront size for most architectures)
  * \return unsigned
  */
 inline constexpr unsigned warp_max_threads() {
-  return 1 << 5;
+#if defined(__HIP_PLATFORM_AMD__)
+  return 64;  // AMD: wavefront size is 64 for most architectures
+#else
+  return 32;  // NVIDIA: warp size is always 32
+#endif
 }
 
 /**
- * @brief Maximum number of resident blocks per SM.
+ * @brief Maximum number of resident blocks per SM/CU.
  * @param capability Compute capability from which to get the result
  * \return unsigned
+ * 
+ * NVIDIA: Maximum resident blocks per SM based on compute capability
+ * AMD: Reasonable default for most architectures (can vary by gfx architecture)
  */
 inline constexpr unsigned sm_max_ctas(compute_capability_t capability) {
+#if defined(__HIP_PLATFORM_AMD__)
+  // AMD: Return a reasonable default (typically higher than NVIDIA)
+  // Actual value depends on gfx architecture but is generally 32-40 for modern GPUs
+  return 32;
+#else
+  // NVIDIA: Use compute capability-specific values
   return (capability >= 86) ? 16 :  // SM86+
              (capability >= 80) ? 32
                                 :  // SM80
@@ -117,6 +133,7 @@ inline constexpr unsigned sm_max_ctas(compute_capability_t capability) {
              (capability >= 50) ? 32
                                 :  // SM50-SM72
              16;                   // SM30-SM37
+#endif
 }
 
 /**
