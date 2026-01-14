@@ -14,17 +14,27 @@ on:
 
 env:
   BUILD_TYPE: Release
-  ARCHITECTURES: 90
   
 jobs:
   build:
     strategy:
       matrix:
         os: [ubuntu-22.04]
+        backend: [nvidia, amd]
+        include:
+          - backend: nvidia
+            architectures: "90"
+            cmake_backend_flag: "-DESSENTIALS_NVIDIA_BACKEND=ON -DESSENTIALS_AMD_BACKEND=OFF"
+            cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
+          - backend: amd
+            architectures: "gfx950"
+            cmake_backend_flag: "-DESSENTIALS_AMD_BACKEND=ON -DESSENTIALS_NVIDIA_BACKEND=OFF"
+            cmake_arch_flag: "-DCMAKE_HIP_ARCHITECTURES=gfx950"
         
     # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
     if: "!contains(github.event.commits[0].message, '[skip ubuntu]')"
     runs-on: ${{matrix.os}}
+    name: Build (${{matrix.backend}})
 
     steps:
       - name: Free up space
@@ -34,8 +44,9 @@ jobs:
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
   
-      # Fetch CUDA toolkit using Jimver/cuda-toolkit
+      # Fetch CUDA toolkit for NVIDIA backend
       - name: Fetch CUDA toolkit
+        if: matrix.backend == 'nvidia'
         uses: Jimver/cuda-toolkit@v0.2.16
         id: cuda-toolkit
         with:
@@ -43,12 +54,30 @@ jobs:
           linux-local-args: '["--toolkit"]'
 
       - name: Check nvcc version
+        if: matrix.backend == 'nvidia'
         run: nvcc -V
+
+      # Install ROCm for AMD backend
+      - name: Install ROCm
+        if: matrix.backend == 'amd'
+        uses: loostrum/rocm-installer@v0.2
+        with:
+          version: latest
+          packages: rocm-hip-runtime-dev
+
+      - name: Check hipcc version
+        if: matrix.backend == 'amd'
+        run: hipcc --version
         
       - uses: actions/checkout@v4
         
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
+        run: |
+          cmake -B ${{github.workspace}}/build \
+            -DESSENTIALS_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            ${{matrix.cmake_backend_flag}} \
+            ${{matrix.cmake_arch_flag}}
         
       - name: Build all applications
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
