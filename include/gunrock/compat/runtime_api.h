@@ -67,6 +67,8 @@
   #define hipDeviceEnablePeerAccess cudaDeviceEnablePeerAccess
   #define hipDeviceGetAttribute cudaDeviceGetAttribute
   #define hipDeviceAttributeMaxGridDimX cudaDevAttrMaxGridDimX
+  #define hipDeviceAttributeClockRate cudaDevAttrClockRate
+  #define hipDeviceAttributeMemoryClockRate cudaDevAttrMemoryClockRate
   
   // Function attributes
   typedef cudaFuncAttributes hipFuncAttributes;

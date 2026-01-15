@@ -192,8 +192,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto policy = context.get_context(0)->execution_policy();
 
     //  Check if all vertices have been removed from graph
+    // Note: thrust::identity doesn't exist in newer Thrust versions, use lambda instead
     bool graph_empty = thrust::all_of(
-        policy, P->deleted.begin(), P->deleted.end(), thrust::identity<bool>());
+        policy, P->deleted.begin(), P->deleted.end(),
+        [] __host__ __device__ (bool x) { return x; });
 
     if (graph_empty) {
       printf("degeneracy = %u\n", this->iteration);

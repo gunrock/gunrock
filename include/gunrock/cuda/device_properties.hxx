@@ -231,8 +231,16 @@ inline constexpr unsigned shared_memory_bank_stride() {
                                                               : 1 << 2;
 }
 */
-inline constexpr unsigned clock_rate(device_properties_t& prop) {
+inline unsigned clock_rate(device_properties_t& prop, device_id_t device = 0) {
+#if defined(__CUDACC__) && !defined(__HIP__)
+  // CUDA 13.1+ removed clockRate from cudaDeviceProp, use attribute instead
+  int clock_rate_khz;
+  hipDeviceGetAttribute(&clock_rate_khz, hipDeviceAttributeClockRate, device);
+  return clock_rate_khz;
+#else
+  // HIP still has clockRate field
   return prop.clockRate;
+#endif
 }
 
 inline constexpr unsigned compute_version(device_properties_t& prop) {
@@ -297,6 +305,27 @@ void print(device_properties_t& prop) {
   error::error_t status = hipMemGetInfo(&freeMem, &totalMem);
   error::throw_if_exception(status);
 
+#if defined(__CUDACC__) && !defined(__HIP__)
+  // CUDA 13.1+ removed clockRate and memoryClockRate from cudaDeviceProp
+  int clock_rate_khz, memory_clock_rate_khz;
+  hipDeviceGetAttribute(&clock_rate_khz, hipDeviceAttributeClockRate, ordinal);
+  hipDeviceGetAttribute(&memory_clock_rate_khz, hipDeviceAttributeMemoryClockRate, ordinal);
+  double memBandwidth =
+      (memory_clock_rate_khz * 1000.0) * (prop.memoryBusWidth / 8 * 2) / 1.0e9;
+  
+  std::cout << prop.name << " : " << clock_rate_khz / 1000.0 << " Mhz "
+            << "(Ordinal " << ordinal << ")" << std::endl;
+  std::cout << "FreeMem: " << (int)(freeMem / (1 << 20)) << " MB "
+            << "TotalMem: " << (int)(totalMem / (1 << 20)) << " MB "
+            << ((int)8 * sizeof(int*)) << "-bit pointers." << std::endl;
+  std::cout << prop.multiProcessorCount
+            << " SMs enabled, Compute Capability sm_" << prop.major
+            << prop.minor << std::endl;
+  std::cout << "Mem Clock: " << memory_clock_rate_khz / 1000.0 << " Mhz x "
+            << prop.memoryBusWidth << " bits (" << memBandwidth << " GB/s)"
+            << std::endl;
+#else
+  // HIP still has clockRate and memoryClockRate fields
   double memBandwidth =
       (prop.memoryClockRate * 1000.0) * (prop.memoryBusWidth / 8 * 2) / 1.0e9;
 
@@ -311,6 +340,7 @@ void print(device_properties_t& prop) {
   std::cout << "Mem Clock: " << prop.memoryClockRate / 1000.0 << " Mhz x "
             << prop.memoryBusWidth << " bits (" << memBandwidth << " GB/s)"
             << std::endl;
+#endif
   std::cout << "ECC " << (prop.ECCEnabled ? "Enabled" : "Disabled")
             << std::endl;
 }
