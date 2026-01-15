@@ -20,8 +20,18 @@
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
 
-#include <hipcub/block/block_load.hpp>
-#include <hipcub/block/block_scan.hpp>
+// Include appropriate CUB library based on compiler
+#if defined(__CUDACC__) && !defined(__HIP__)
+  // Pure CUDA (NVCC without HIP): Use CUB
+  #include <cub/block/block_load.cuh>
+  #include <cub/block/block_scan.cuh>
+  namespace cub_namespace = cub;
+#else
+  // HIP compiler (works for both NVIDIA and AMD platforms): Use hipCUB
+  #include <hipcub/block/block_load.hpp>
+  #include <hipcub/block/block_scan.hpp>
+  namespace cub_namespace = hipcub;
+#endif
 
 namespace gunrock {
 namespace operators {
@@ -50,7 +60,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   using type_t = frontier_t;
 
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
-  using block_scan_t = hipcub::BlockScan<edge_t, THREADS_PER_BLOCK>;
+  using block_scan_t = cub_namespace::BlockScan<edge_t, THREADS_PER_BLOCK>;
 
   auto global_idx = gcuda::thread::global::id::x();
   auto local_idx = gcuda::thread::local::id::x();
