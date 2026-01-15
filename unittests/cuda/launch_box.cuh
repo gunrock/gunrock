@@ -41,10 +41,11 @@ TEST(cuda, launch_box_fallback) {
 
   // Get 2 SM versions that are not the device's current one
 #if __HIP_PLATFORM_AMD__
-#if SM_TARGET == gfx942
+  // SM_TARGET is now a numeric identifier (e.g., 942 for gfx942) to avoid macro conflicts
+#if SM_TARGET == 942
 #define NOT_CURRENT_SM_1 sm_gfx950
 #define NOT_CURRENT_SM_2 sm_gfx90a
-#elif SM_TARGET == gfx950
+#elif SM_TARGET == 950
 #define NOT_CURRENT_SM_1 sm_gfx942
 #define NOT_CURRENT_SM_2 sm_gfx90a
 #else

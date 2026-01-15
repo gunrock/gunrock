@@ -28,8 +28,34 @@
   namespace cub_namespace = cub;
 #else
   // HIP compiler (works for both NVIDIA and AMD platforms): Use hipCUB
+  // Undefine architecture macros that HIP may define to avoid conflicts with rocPRIM enums
+  #ifdef __HIP_PLATFORM_AMD__
+    #ifdef gfx942
+      #pragma push_macro("gfx942")
+      #undef gfx942
+    #endif
+    #ifdef gfx950
+      #pragma push_macro("gfx950")
+      #undef gfx950
+    #endif
+    #ifdef gfx90a
+      #pragma push_macro("gfx90a")
+      #undef gfx90a
+    #endif
+  #endif
   #include <hipcub/block/block_load.hpp>
   #include <hipcub/block/block_scan.hpp>
+  #ifdef __HIP_PLATFORM_AMD__
+    #ifdef gfx942
+      #pragma pop_macro("gfx942")
+    #endif
+    #ifdef gfx950
+      #pragma pop_macro("gfx950")
+    #endif
+    #ifdef gfx90a
+      #pragma pop_macro("gfx90a")
+    #endif
+  #endif
   namespace cub_namespace = hipcub;
 #endif
 

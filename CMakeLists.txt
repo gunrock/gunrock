@@ -209,6 +209,9 @@ if(${ESSENTIALS_NVIDIA_BACKEND})
       HIP_BACKEND=1
   )
 else()
+  # For AMD, keep SM_TARGET as architecture identifier (e.g., gfx942)
+  # HIP may define gfx942 as a macro, which conflicts with rocPRIM's enum usage
+  # We'll handle this by undefining the macro in compatibility headers if needed
   target_compile_definitions(essentials
     INTERFACE 
       SM_TARGET=${CMAKE_HIP_ARCHITECTURES}
