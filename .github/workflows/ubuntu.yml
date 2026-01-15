@@ -92,7 +92,7 @@ jobs:
         uses: loostrum/rocm-installer@v0.2
         with:
           version: latest
-          packages: rocm-hip-runtime-dev rocprim-dev rocthrust-dev hipcub-dev hiprand-dev hipsparse-dev
+          packages: rocm-hip-runtime-dev rocprim-dev rocthrust-dev hipcub-dev hiprand-dev hipsparse-dev rocrand
 
       - name: Check hipcc version
         if: matrix.backend == 'amd'
