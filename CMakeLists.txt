@@ -340,6 +340,9 @@ set(CUDA_RELEASE_FLAGS
   --expt-extended-lambda 
   --expt-relaxed-constexpr
   --use_fast_math
+  $<$<CXX_COMPILER_ID:MSVC>:
+    --compiler-options="/bigobj /Zc:__cplusplus"
+  >
 )
 
 set(CUDA_DEBUG_FLAGS
@@ -348,6 +351,9 @@ set(CUDA_DEBUG_FLAGS
   --ptxas-options -v
   --debug # Host debug
   --device-debug # Device debug
+  $<$<CXX_COMPILER_ID:MSVC>:
+    --compiler-options="/bigobj /Zc:__cplusplus"
+  >
 )
 
 set(HIP_FLAGS
