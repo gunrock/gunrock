@@ -57,8 +57,13 @@ class boolmap_frontier_t {
     // #ifdef __CUDA_ARCH__
     num_elements = thrust::reduce(thrust::seq, this->begin(), this->end(), 0);
 #else
+#if HIP_BACKEND == 1
     num_elements = thrust::reduce(thrust::cuda::par_nosync.on(stream),
                                   this->begin(), this->end(), 0);
+#else
+    num_elements = thrust::reduce(thrust::hip::par.on(stream),
+                                  this->begin(), this->end(), 0);
+#endif
 #endif
 
     return num_elements;
@@ -147,8 +152,13 @@ class boolmap_frontier_t {
       error::throw_if_exception(hipErrorUnknown,
                                 "Boolmap only supports 1 or 0 as fill value.");
 
+#if HIP_BACKEND == 1
     thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),
                  this->end(), value);
+#else
+    thrust::fill(thrust::hip::par.on(stream), this->begin(),
+                 this->end(), value);
+#endif
   }
 
   /**
