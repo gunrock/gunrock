@@ -32,7 +32,7 @@ using namespace memory;
 
 template <typename label_type>
 bool is_label_valid(label_type value) {
-  if (std::is_integral<label_type>::value)
+  if constexpr (std::is_integral<label_type>::value)
     return (value != gunrock::numeric_limits<label_type>::invalid());
   else
     return isnan(static_cast<double>(value)) ? false : true;

@@ -187,7 +187,8 @@ class striped_memory_mapper_t {
         else if (access == access_flags_t::read_write)
           access_descriptors[remote].flags = hipMemAccessFlagsProtReadWrite;
         else
-          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_MAX;
+          // MAX is a sentinel value, use maximum valid protection level
+          access_descriptors[remote].flags = hipMemAccessFlagsProtReadWrite;
       }
 
       hipMemSetAccess((hipDeviceptr_t)virt.ptr + (stripe_size * local),

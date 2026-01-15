@@ -123,7 +123,6 @@
     #define hipMemAccessFlagsProtNone CU_MEM_ACCESS_FLAGS_PROT_NONE
     #define hipMemAccessFlagsProtRead CU_MEM_ACCESS_FLAGS_PROT_READ
     #define hipMemAccessFlagsProtReadWrite CU_MEM_ACCESS_FLAGS_PROT_READWRITE
-    #define CU_MEM_ACCESS_FLAGS_PROT_MAX CU_MEM_ACCESS_FLAGS_PROT_MAX
     
     // Note: These struct definitions may need adjustment based on CUDA version
     // The HIP structs should match CUDA structs exactly
@@ -153,7 +152,6 @@
     #define hipMemAccessFlagsProtNone 0
     #define hipMemAccessFlagsProtRead 1
     #define hipMemAccessFlagsProtReadWrite 3
-    #define CU_MEM_ACCESS_FLAGS_PROT_MAX 3  // Max value for CUDA access flags
   #endif
 #else
   // HIP compiler (works for both NVIDIA and AMD platforms)
