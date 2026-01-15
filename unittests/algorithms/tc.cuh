@@ -12,6 +12,8 @@
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/algorithms/tc.hxx>
 
+#include <gtest/gtest.h>
+
 using namespace gunrock;
 using namespace memory;
 
@@ -32,9 +34,14 @@ TEST(algorithm, tc) {
       std::vector{1, 2, 3, 0, 2, 0, 1, 3, 0, 2};
   thrust::device_vector<weight_t> Ax(number_of_nonzeros, 0);
 
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      number_of_rows, number_of_columns, number_of_nonzeros, Ap.data().get(),
-      Aj.data().get(), Ax.data().get());
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr(
+      number_of_rows, number_of_columns, number_of_nonzeros);
+  csr.row_offsets = Ap;
+  csr.column_indices = Aj;
+  csr.nonzero_values = Ax;
+
+  graph::graph_properties_t properties;
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   std::size_t total_triangles = 0;
   thrust::device_vector<vertex_t> d_triangles_count(number_of_rows, 0);
@@ -70,9 +77,14 @@ TEST(algorithm, tc_self_loop_vertex) {
       std::vector{0, 1, 2, 3, 0, 1, 2, 0, 1, 3, 0, 2};
   thrust::device_vector<weight_t> Ax(number_of_nonzeros, 0);
 
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      number_of_rows, number_of_columns, number_of_nonzeros, Ap.data().get(),
-      Aj.data().get(), Ax.data().get());
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr(
+      number_of_rows, number_of_columns, number_of_nonzeros);
+  csr.row_offsets = Ap;
+  csr.column_indices = Aj;
+  csr.nonzero_values = Ax;
+
+  graph::graph_properties_t properties;
+  auto G = graph::build<memory_space_t::device>(properties, csr);
 
   std::size_t total_triangles = 0;
   thrust::device_vector<vertex_t> d_triangles_count(number_of_rows, 0);

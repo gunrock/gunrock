@@ -22,9 +22,7 @@ namespace benchmark {
 class benchmark_t {
  public:
   benchmark_t()
-      : edges_visited(1),
-        vertices_visited(1),
-        search_depth(0),
+      : search_depth(0),
         total_runtime() {}
 
   thrust::device_vector<unsigned int> edges_visited;
@@ -63,6 +61,14 @@ __device__ void LOG_VERTEX_VISITED(size_t vertices) {
 
 void INIT_BENCH() {
 #if ESSENTIALS_COLLECT_METRICS
+  // Lazy initialization: allocate device memory only when needed (after HIP runtime is initialized)
+  if (benchmark_instance.edges_visited.size() == 0) {
+    benchmark_instance.edges_visited.resize(1);
+  }
+  if (benchmark_instance.vertices_visited.size() == 0) {
+    benchmark_instance.vertices_visited.resize(1);
+  }
+  
   thrust::fill(benchmark_instance.edges_visited.begin(), benchmark_instance.edges_visited.end(), 0);
   thrust::fill(benchmark_instance.vertices_visited.begin(), benchmark_instance.vertices_visited.end(), 0);
 

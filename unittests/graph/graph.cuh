@@ -1,6 +1,9 @@
 #include <gunrock/error.hxx>            // error checking
 #include <gunrock/graph/graph.hxx>      // graph class
 #include <gunrock/formats/formats.hxx>  // csr support
+#include <gunrock/compat/runtime_api.h>
+
+#include <gtest/gtest.h>
 
 using namespace gunrock;
 using namespace memory;
@@ -104,14 +107,19 @@ void test_graph() {
   Ax[2] = 3;
   Ax[3] = 6;
 
-  // wrap it with shared_ptr<csr_t> (memory_space_t::host)
-  const graph::view_t graph_views = /* graph::view_t::csr; */
-      graph::set(graph::view_t::csr, graph::view_t::csc);
+  // Create CSR format for host
+  format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t> csr(r, c, nnz);
+  for (int i = 0; i <= r; ++i) {
+    csr.row_offsets[i] = Ap[i];
+  }
+  for (int i = 0; i < nnz; ++i) {
+    csr.column_indices[i] = J[i];
+    csr.nonzero_values[i] = Ax[i];
+  }
 
-  auto G = graph::build::from_csr<memory_space_t::host, graph_views>(
-      r, c, nnz, h_Ap.data(), h_J.data(), h_Ax.data(), h_I.data(), h_Aj.data());
+  auto G = graph::build<memory_space_t::host>({}, csr);
 
-  using csr_view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
+  using csr_view_t = graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
   use_graph(G);
 
@@ -122,21 +130,15 @@ void test_graph() {
             << G.template contains_representation<csr_view_t>() << std::endl;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
-  thrust::device_vector<edge_t> d_Ap = h_Ap;
-  thrust::device_vector<vertex_t> d_J = h_J;
-  thrust::device_vector<weight_t> d_Ax = h_Ax;
-  thrust::device_vector<vertex_t> d_I(nnz);
-  thrust::device_vector<edge_t> d_Aj(c + 1);
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> d_csr(csr);
 
-  auto O = graph::build::from_csr<memory_space_t::device, graph_views>(
-      r, c, nnz, d_Ap.data().get(), d_J.data().get(), d_Ax.data().get(),
-      d_I.data().get(), d_Aj.data().get());
+  auto O = graph::build<memory_space_t::device>({}, d_csr);
 
   // Device Output
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   kernel<<<1, 1>>>(O);
-  cudaDeviceSynchronize();
-  error::throw_if_exception(cudaPeekAtLastError());
+  hipDeviceSynchronize();
+  error::throw_if_exception(hipGetLastError());
 
   // TODO: Revisit this test.
   thrust::device_vector<vertex_t> histogram(sizeof(vertex_t) * 8 + 1);
@@ -148,6 +150,6 @@ void test_graph() {
   std::cout << std::endl;
 }
 
-int main(int argc, char** argv) {
+TEST(graph, graph) {
   test_graph();
 }

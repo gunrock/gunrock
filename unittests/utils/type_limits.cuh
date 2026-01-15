@@ -1,4 +1,3 @@
-#include <cstdlib>
 #include <iostream>
 
 #include <gunrock/util/type_limits.hxx>
@@ -7,7 +6,9 @@
 #include <thrust/for_each.h>
 #include <thrust/iterator/counting_iterator.h>
 
-void test_type_limits() {
+#include <gtest/gtest.h>
+
+TEST(utils, type_limits) {
   std::cout << "invalid = " << gunrock::numeric_limits<int>::invalid()
             << " (is valid? " << std::boolalpha
             << gunrock::util::limits::is_valid(
@@ -38,6 +39,8 @@ void test_type_limits() {
     bool inv = gunrock::util::limits::is_valid(y);
 
     printf("%f\n", y);
+    (void)v;
+    (void)inv;
   };
 
   thrust::for_each(thrust::device,
@@ -45,9 +48,4 @@ void test_type_limits() {
                    thrust::make_counting_iterator<int>(1),  // End: 1
                    apply                                    // Unary Operator
   );
-}
-
-int main(int argc, char** argv) {
-  test_type_limits();
-  return EXIT_SUCCESS;
 }

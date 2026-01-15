@@ -1,4 +1,7 @@
 # begin /* Add unit tests */
+# Include GoogleTest module for test discovery
+include(GoogleTest)
+
 set(UNITTEST_SOURCES
   unittests.cu
 )
@@ -33,6 +36,7 @@ foreach(SOURCE IN LISTS UNITTEST_SOURCES)
     )
   endif()
   
-  add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME})
+  # Use gtest_discover_tests to register individual tests instead of add_test
+  gtest_discover_tests(${TEST_NAME})
 endforeach()
 # end /* Add unit tests */

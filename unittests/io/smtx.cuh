@@ -25,7 +25,7 @@ TEST(io, smtx) {
   io::smtx_t<row_t, edge_t, nonzero_t> smtx;
 
   csr_t csr = smtx.load(
-      "datasets/layers.0.blocks.0.attn.proj_swin_tiny_unstructured_50.smtx");
+      "../../datasets/layers.0.blocks.0.attn.proj_swin_tiny_unstructured_50.smtx");
 
   EXPECT_EQ(csr.number_of_rows, 96);
   EXPECT_EQ(csr.number_of_columns, 96);

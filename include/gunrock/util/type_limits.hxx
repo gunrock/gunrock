@@ -64,10 +64,10 @@ constexpr __host__ __device__ __forceinline__ bool is_valid(type_t value) {
 
   // Trying:
   // https://stackoverflow.com/questions/61646166/how-to-resolve-fpclassify-ambiguous-call-to-overloaded-function
-  if (std::is_integral<type_t>::value)
+  if constexpr (std::is_integral<type_t>::value)
     return (value != gunrock::numeric_limits<type_t>::invalid());
   else
-    return isnan(static_cast<double>(value)) ? false : true;
+    return !(static_cast<double>(value) != static_cast<double>(value));  // NaN check: x != x is true for NaN
 }
 
 }  // namespace limits

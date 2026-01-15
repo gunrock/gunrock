@@ -190,7 +190,6 @@ else()
       HIP_STANDARD 17
       HIP_STANDARD_REQUIRED ON
       HIP_EXTENSIONS OFF
-      HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES} # Set required architecture.
   )
 endif()
 
@@ -208,6 +207,7 @@ if(${ESSENTIALS_NVIDIA_BACKEND})
       SM_TARGET=${CMAKE_CUDA_ARCHITECTURES}
       ESSENTIALS_BACKEND="NVIDIA"
       __HIP_PLATFORM_NVIDIA__
+      HIP_BACKEND=1
   )
 else()
   target_compile_definitions(essentials
@@ -215,6 +215,7 @@ else()
       SM_TARGET=${CMAKE_HIP_ARCHITECTURES}
       ESSENTIALS_BACKEND="AMD"
       __HIP_PLATFORM_AMD__
+      HIP_BACKEND=0
   )
 endif()
 
