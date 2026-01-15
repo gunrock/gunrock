@@ -103,7 +103,7 @@ jobs:
       - name: Configure cmake
         if: matrix.backend == 'amd'
         env:
-          LD_LIBRARY_PATH: /opt/rocm/lib:${{env.LD_LIBRARY_PATH}}
+          LD_LIBRARY_PATH: /opt/rocm/lib
         run: |
           cmake -B ${{github.workspace}}/build \
             -DESSENTIALS_BUILD_TESTS=ON \
