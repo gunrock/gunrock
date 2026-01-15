@@ -23,12 +23,9 @@ foreach(SOURCE IN LISTS EXPERIMENTS_SOURCES)
                 CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}
         )
     else()
-        set_target_properties(${BINARY_NAME} 
-            PROPERTIES 
-                HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES}
-        )
-
-        set_source_files_properties(${BINARY_NAME} 
+        # HIP_ARCHITECTURES is not a valid target property for executables
+        # Architecture is set globally via CMAKE_HIP_ARCHITECTURES
+        set_source_files_properties(${SOURCE}
             PROPERTIES 
             LANGUAGE HIP
         )
