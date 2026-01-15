@@ -11,33 +11,26 @@
 | `main`    | Default branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials), serves as the official release branch.  | $\geq$ `2.x.x` | Active     |
 | `develop` | Development feature branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials).                             | $\geq$ `2.x.x` | Active     |
 | `master`  | Previous release branch for `gunrock/gunrock` version `1.x.x` interface, preserves all commit history.                             | $\leq$ `1.x.x` | Deprecated |
-| `dev`     | Previous development branch for `gunrock/gunrock`. All changes now merged in `master`.                                             | $\leq$ `1.x.x` | Deprecated |
-| `hip-develop` | Development feature branch with a working HIP port, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials). | $\geq$ `2.x.x` | Active   
-  
+| `dev`     | Previous development branch for `gunrock/gunrock`. All changes now merged in `master`.                                             | $\leq$ `1.x.x` | Deprecated |  
 
 
 ## Quick Start Guide
-Before building Gunrock make sure you have a HIP compiler installed on your system. Other external dependencies are  `rocm/rocthrust`, `rocm/hipcub`, etc
+Before building Gunrock make sure you have **CUDA Toolkit (NVIDIA)** or **ROCm/HIP (AMD)**[^2] installed on your system. Other external dependencies such as `thrust`, `cub`, etc. are automatically fetched using `cmake`.
+
+> [!WARNING]
+> We're working on downloading other rocm dependencies automatically as well, for now you may have to also install rocprim-dev, rocthrust-dev, hipcub-dev, hiprand-dev, hipsparse-dev, rocrand and roctracer. All of them typically gets installed with ROCm.
 
 
 ```shell
-git clone https://github.com/AMD-HPC/gunrock
-git checkout hip-develop
+git clone https://github.com/gunrock/gunrock.git
 cd gunrock
 mkdir build && cd build
-#for NVIDIA targets, current version has been tested with rocm version 5.2.0
-export HIP_PLATFORM=nvidia
-cmake -DCMAKE_HIP_COMPILER=hipcc .. 
+# For [AMD] MI350 or MI355 (or adjust the CMAKE_HIP_ARCHITECTURES for your GPU)
+cmake -DCMAKE_BUILD_TYPE=Release -DESSENTIALS_AMD_BACKEND=ON -DESSENTIALS_NVIDIA_BACKEND=OFF -DCMAKE_HIP_ARCHITECTURES=gfx950 .. 
+# For [NVIDIA] H100 (or adjust the CMAKE_CUDA_ARCHITECTURES for your GPU)
+cmake -DCMAKE_BUILD_TYPE=Release -DESSENTIALS_AMD_BACKEND=OFF -DESSENTIALS_NVIDIA_BACKEND=ON -DCMAKE_CUDA_ARCHITECTURES=90 .. 
 make sssp # or for all algorithms, use: make -j$(nproc)
-#to run the example,
-bin/sssp --validate -m ../datasets/chesapeake/chesapeake.mtx
-
-
-#for AMD targets:
-cmake  .. 
-make sssp # or for all algorithms, use: make -j$(nproc)
-#to run the example,
-bin/sssp --validate -m ../datasets/chesapeake/chesapeake.mtx
+bin/sssp --market ../datasets/chesapeake/chesapeake.mtx
 ```
 
 ## Implementing Graph Algorithms
@@ -133,4 +126,4 @@ Thank you for citing our work.
 Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/gunrock/blob/main/LICENSE).
 
 [^1]: This repository has been moved from https://github.com/gunrock/essentials and the previous history is preserved with tags and under `master` branch. Read more about gunrock and essentials in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
-[^2]: Recommended **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.
+[^2]: Recommended **CUDA v12.4 or higher** and **ROCm 6.4 or higher**.
