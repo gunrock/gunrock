@@ -19,7 +19,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
         backend: [nvidia, amd]
         include:
           - backend: nvidia
@@ -47,7 +47,7 @@ jobs:
       # Fetch CUDA toolkit for NVIDIA backend
       - name: Fetch CUDA toolkit
         if: matrix.backend == 'nvidia'
-        uses: Jimver/cuda-toolkit@master
+        uses: Jimver/cuda-toolkit@v0.2.16
         id: cuda-toolkit
         with:
           cuda: '12.5.0'
