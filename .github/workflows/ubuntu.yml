@@ -50,7 +50,7 @@ jobs:
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with:
-          cuda: '13.1.0'
+          cuda: '12.5.0'
           linux-local-args: '["--toolkit"]'
 
       - name: Check nvcc version
