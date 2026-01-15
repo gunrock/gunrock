@@ -54,7 +54,7 @@ enum load_balance_t {
   warp_mapped,    ///< (wip) Equal # of elements per warp
   block_mapped,   ///< Equal # of elements per block
   bucketing,      ///< (wip) Davidson et al. (SSSP)
-  merge_path,     ///< Merrill & Garland (SpMV):: ModernGPU
+  merge_path,     ///< Merrill & Garland (SpMV):: DEPRECATED (use merge_path_v2)
   merge_path_v2,  ///< Merrill & Garland (SpMV):: CUSTOM
   work_stealing,  ///< (wip) <cite>
 };
@@ -93,7 +93,7 @@ enum advance_direction_t {
 enum filter_algorithm_t {
   remove,      ///< Remove if predicate = true
   predicated,  ///< Copy if predicate = true
-  compact,     ///< 2-Pass Transform compact
+  compact,     ///< 2-Pass Transform compact (DEPRECATED - ModernGPU removed)
   bypass       ///< Marks as invalid, instead of culling
 };
 

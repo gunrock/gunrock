@@ -11,6 +11,7 @@
 #pragma once
 
 #include <gunrock/cuda/context.hxx>
+#include <gunrock/error.hxx>
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/util/type_traits.hxx>
@@ -200,9 +201,10 @@ void execute_runtime(graph_t& G,
   } else if (alg_type == filter_algorithm_t::remove) {
     execute<filter_algorithm_t::remove>(G, E, op, context, swap_buffers);
   } else if (alg_type == filter_algorithm_t::compact) {
-    // Note: compact may not be fully implemented, but include for completeness
-    // If compact is not available, this will fail at compile time
-    execute<filter_algorithm_t::compact>(G, E, op, context, swap_buffers);
+    // Note: compact is no longer supported due to ModernGPU removal
+    error::throw_if_exception(hipErrorUnknown,
+                              "compact filter algorithm is no longer supported "
+                              "due to ModernGPU removal.");
   } else {
     error::throw_if_exception(hipErrorUnknown, "Filter algorithm type not supported.");
   }

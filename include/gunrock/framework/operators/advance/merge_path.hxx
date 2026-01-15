@@ -12,6 +12,7 @@
 
 #include <gunrock/util/math.hxx>
 #include <gunrock/cuda/context.hxx>
+#include <gunrock/error.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
 
@@ -116,9 +117,11 @@ void execute(graph_t& G,
   int end = (input_type == advance_io_type_t::graph)
                 ? G.get_number_of_vertices()
                 : input->get_number_of_elements();
-  mgpu::transform_lbs(neighbors_expand, size_of_output,
-                      thrust::raw_pointer_cast(segments.data()), end,
-                      *(context.mgpu()));
+  
+  // ModernGPU support has been removed. Use merge_path_v2 instead.
+  error::throw_if_exception(hipErrorUnknown,
+                            "merge_path operator is no longer supported. "
+                            "Please use merge_path_v2 instead.");
 }
 }  // namespace merge_path
 }  // namespace advance

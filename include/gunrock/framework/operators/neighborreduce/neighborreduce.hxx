@@ -16,7 +16,8 @@
 
 #include <gunrock/framework/operators/configs.hxx>
 
-#include <moderngpu/kernel_segreduce.hxx>
+// ModernGPU support has been removed
+// #include <moderngpu/kernel_segreduce.hxx>
 
 // #define LBS_SEGREDUCE 1
 
@@ -75,27 +76,10 @@ void execute(graph_t& G,
                                 "required for neighborreduce operator.");
     }
 
-#ifndef LBS_SEGREDUCE
-    // TODO: Throw an exception if input_t is not advance_io_type_t::graph.
-    mgpu::transform_segreduce(op, G.get_number_of_edges(), G.get_row_offsets(),
-                              G.get_number_of_vertices(), output, arithmetic_op,
-                              init_value, *(context0->mgpu()));
-
-#else
-
-    auto f = [=] __device__(std::size_t index, std::size_t seg,
-                            std::size_t rank) {
-      auto v = type_t(seg);
-      auto start_edge = G.get_starting_edge(v);
-      auto e = start_edge + rank;
-      return op(e);
-    };
-
-    // TODO: Throw an exception if input_t is not advance_io_type_t::graph.
-    mgpu::lbs_segreduce(f, G.get_number_of_edges(), G.get_row_offsets(),
-                        G.get_number_of_vertices(), output, arithmetic_op,
-                        init_value, *(context0->mgpu()));
-#endif
+  // ModernGPU support has been removed. This operator is no longer available.
+  error::throw_if_exception(hipErrorUnknown,
+                            "neighborreduce operator is no longer supported "
+                            "due to ModernGPU removal.");
   }
 }
 
