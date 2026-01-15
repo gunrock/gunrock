@@ -5,6 +5,7 @@
 #include <limits>
 #include <assert.h>
 
+#include <gunrock/compat/runtime_api.h>
 #include <gunrock/util/experimental/async/util.hxx>
 
 namespace gunrock {
