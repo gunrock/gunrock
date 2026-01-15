@@ -73,9 +73,11 @@ class standard_context_t : public context_t {
   // of dummy_k for each translation unit.
   template <int dummy_arg = 0>
   void init() {
-    gcuda::function_attributes_t attr;
+    gcuda::function_attributes_t attr = {};
     // error::error_t status = hipFuncGetAttributes(&attr, dummy_k<0>);
     // error::throw_if_exception(status);
+    // Note: attr.ptxVersion is uninitialized when hipFuncGetAttributes is commented out
+    // Using default value of 0, which will be handled by make_compute_capability
     _ptx_version = gcuda::make_compute_capability(attr.ptxVersion);
 
     hipSetDevice(_ordinal);

@@ -20,7 +20,7 @@
   typedef cudaStream_t hipStream_t;
   typedef cudaEvent_t hipEvent_t;
   typedef cudaError_t hipError_t;
-  typedef cudaDeviceProp_t hipDeviceProp_t;
+  typedef cudaDeviceProp hipDeviceProp_t;  // Note: CUDA uses struct cudaDeviceProp, not cudaDeviceProp_t
   typedef cudaMemcpyKind hipMemcpyKind;
   
   // hipDeviceptr_t will be defined later for CUDA 10.2+ (virtual memory APIs)
