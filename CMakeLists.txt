@@ -342,9 +342,9 @@ set(CUDA_RELEASE_FLAGS
   --expt-relaxed-constexpr
   --use_fast_math
   # Suppress common benign CUDA warnings
-  --diag-suppress=177
-  --diag-suppress=550
-  --diag-suppress=20014
+  # --diag-suppress=177
+  # --diag-suppress=550
+  # --diag-suppress=20014
   $<$<CXX_COMPILER_ID:MSVC>:
     -Xcompiler=/bigobj
     -Xcompiler=/Zc:__cplusplus
@@ -359,9 +359,9 @@ set(CUDA_DEBUG_FLAGS
   --debug # Host debug
   --device-debug # Device debug
   # Suppress common benign CUDA warnings
-  --diag-suppress=177
-  --diag-suppress=550
-  --diag-suppress=20014
+  # --diag-suppress=177
+  # --diag-suppress=550
+  # --diag-suppress=20014
   $<$<CXX_COMPILER_ID:MSVC>:
     -Xcompiler=/bigobj
     -Xcompiler=/Zc:__cplusplus
