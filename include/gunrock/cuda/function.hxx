@@ -9,10 +9,12 @@
  */
 #pragma once
 
+#include <gunrock/compat/runtime_api.h>
+
 namespace gunrock {
 namespace gcuda {
 
-typedef cudaFuncAttributes function_attributes_t;
+typedef hipFuncAttributes function_attributes_t;
 
 }  // namespace gcuda
 }  // namespace gunrock

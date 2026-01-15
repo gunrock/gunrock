@@ -1,13 +1,14 @@
+#include <gunrock/compat/runtime_api.h>
 #include <gunrock/error.hxx>  // error checking
 #include <gunrock/framework/problem.hxx>
 
+#include <gtest/gtest.h>
+
 using namespace gunrock;
 
-void test_problem() {
-  error::error_t status = cudaSuccess;
+TEST(framework, problem) {
+  // Use fully qualified type to avoid MSVC parsing issues
+  gunrock::error::error_t status = hipSuccess;
   // XXX ... write a test for [problem.hxx]
-}
-
-int main(int argc, char** argv) {
-  test_problem();
+  (void)status;  // Suppress unused variable warning
 }

@@ -26,11 +26,17 @@ void execute(graph_t& G,
 
   // Copy w/ predicate!
   auto new_length = thrust::remove_copy_if(
-      thrust::cuda::par_nosync.on(context.stream()),  // execution policy
-      input->begin(),                                 // input iterator: begin
-      input->end(),                                   // input iterator: end
-      output->begin(),                                // output iterator: begin
-      predicate                                       // predicate
+  // thrust::hip::par.on(context.stream()),  // execution policy
+#if HIP_BACKEND == 1
+      thrust::cuda::par.on(context.stream()),
+#else
+      thrust::hip::par.on(context.stream()),
+#endif
+
+      input->begin(),   // input iterator: begin
+      input->end(),     // input iterator: end
+      output->begin(),  // output iterator: begin
+      predicate         // predicate
   );
 
   auto new_size = thrust::distance(output->begin(), new_length);

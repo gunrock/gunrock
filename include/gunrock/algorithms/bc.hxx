@@ -137,7 +137,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
-        operators::advance::execute<operators::load_balance_t::merge_path,
+        operators::advance::execute<operators::load_balance_t::merge_path_v2,
                                     operators::advance_direction_t::forward,
                                     operators::advance_io_type_t::vertices,
                                     operators::advance_io_type_t::vertices>(
@@ -175,7 +175,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
-        operators::advance::execute<operators::load_balance_t::merge_path,
+        operators::advance::execute<operators::load_balance_t::merge_path_v2,
                                     operators::advance_direction_t::forward,
                                     operators::advance_io_type_t::vertices,
                                     operators::advance_io_type_t::none>(
@@ -210,7 +210,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     return false;
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     bool converged = (!forward && !backward) ? true : false;
     if (converged) {
       this->get_enactor()->iteration = this->search_depth;

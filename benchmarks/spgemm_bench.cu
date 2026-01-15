@@ -118,11 +118,11 @@ void spgemm_bench(nvbench::state& state) {
 }
 
 int main(int argc, char** argv) {
-  parameters_t params(argc, argv);
-  filename_a = params.filename_a;
-  filename_b = params.filename_b;
+  parameters_t arguments(argc, argv);
+  filename_a = arguments.filename_a;
+  filename_b = arguments.filename_b;
 
-  if (params.help) {
+  if (arguments.help) {
     // Print NVBench help.
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);

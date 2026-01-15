@@ -79,10 +79,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                          weight_t const& weight     // weight (tuple).
                          ) -> bool {
       if (neighbor > source) {
-        auto src_vertex_triangles_count = G.get_intersection_count(
+        vertex_t count = G.get_intersection_count(
             source, neighbor,
             [vertex_triangles_count, source,
-             neighbor](auto intersection_vertex) {
+             neighbor](vertex_t intersection_vertex) {
               if (source != intersection_vertex &&
                   neighbor != intersection_vertex) {
                 math::atomic::add(
@@ -102,7 +102,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, intersect, context);
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     if (this->iteration == 1)
       return true;
     return false;

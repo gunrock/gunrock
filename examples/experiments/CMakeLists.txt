@@ -12,16 +12,26 @@ set(EXPERIMENTS_SOURCES
   # enable_if.cu # [error]
 )
 
-get_target_property(ESSENTIALS_ARCHITECTURES essentials CUDA_ARCHITECTURES)
-
 foreach(SOURCE IN LISTS EXPERIMENTS_SOURCES)
-  get_filename_component(EXPERIMENT "${SOURCE}" NAME_WLE)
-  add_executable(${EXPERIMENT} "${SOURCE}")
-  target_link_libraries(${EXPERIMENT} PRIVATE essentials)
-  set_target_properties(${EXPERIMENT} 
-    PROPERTIES 
-        CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
-  message(STATUS "Example Added: ${EXPERIMENT}")
+    get_filename_component(BINARY_NAME ${SOURCE} NAME_WLE)
+    add_executable(${BINARY_NAME} ${SOURCE})
+    target_link_libraries(${BINARY_NAME} PRIVATE essentials)
+
+    if(${ESSENTIALS_NVIDIA_BACKEND})
+        set_target_properties(${BINARY_NAME} 
+            PROPERTIES 
+                CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}
+        )
+    else()
+        # HIP_ARCHITECTURES is not a valid target property for executables
+        # Architecture is set globally via CMAKE_HIP_ARCHITECTURES
+        set_source_files_properties(${SOURCE}
+            PROPERTIES 
+            LANGUAGE HIP
+        )
+    endif()
+
+    message(STATUS "Gunrock Experiment Added: ${BINARY_NAME}")
 endforeach()
 
 endif (NOT ESSENTIALS_COLLECT_METRICS)

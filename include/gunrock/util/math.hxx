@@ -76,7 +76,8 @@ namespace atomic {
 
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t add(type_t* address, type_t value) {
-#ifdef __CUDA_ARCH__
+#if __HIP_DEVICE_COMPILE__
+  // #ifdef __CUDA_ARCH__
   return atomicAdd(address, value);
 #else
   // use std::atomic::fetch_add();
@@ -88,7 +89,8 @@ __host__ __device__ __forceinline__ type_t add(type_t* address, type_t value) {
 
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t min(type_t* address, type_t value) {
-#ifdef __CUDA_ARCH__
+#if __HIP_DEVICE_COMPILE__
+  // #ifdef __CUDA_ARCH__
   return gcuda::atomicMin(address, value);
 #else
   return std::min<type_t>(*address, value);  // use std::atomic;
@@ -97,7 +99,8 @@ __host__ __device__ __forceinline__ type_t min(type_t* address, type_t value) {
 
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t max(type_t* address, type_t value) {
-#ifdef __CUDA_ARCH__
+#if __HIP_DEVICE_COMPILE__
+  // #ifdef __CUDA_ARCH__
   return gcuda::atomicMax(address, value);
 #else
   return std::max<type_t>(*address, value);  // use std::atomic;
@@ -108,7 +111,8 @@ template <typename type_t>
 __host__ __device__ __forceinline__ type_t cas(type_t* address,
                                                type_t compare,
                                                type_t value) {
-#ifdef __CUDA_ARCH__
+#if __HIP_DEVICE_COMPILE__
+  // #ifdef __CUDA_ARCH__
   return atomicCAS(address, compare, value);
 #else
   type_t old = *address;
@@ -119,7 +123,8 @@ __host__ __device__ __forceinline__ type_t cas(type_t* address,
 
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t exch(type_t* address, type_t value) {
-#ifdef __CUDA_ARCH__
+#if __HIP_DEVICE_COMPILE__
+  // #ifdef __CUDA_ARCH__
   return atomicExch(address, value);
 #else
   type_t old = *address;

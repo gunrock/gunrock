@@ -142,11 +142,11 @@ class graph_csr_t {
 
     auto needle = *destination_edges_iter;
 
-    auto source_search_start = thrust::distance(
-        source_edges_iter,
+    auto lower_bound_result =
         thrust::lower_bound(thrust::seq, source_edges_iter,
-                            source_edges_iter + source_neighbors_count,
-                            needle));
+                            source_edges_iter + source_neighbors_count, needle);
+    edge_type source_search_start = static_cast<edge_type>(
+        thrust::distance(source_edges_iter, lower_bound_result));
 
     if (source_search_start == source_neighbors_count) {
       return 0;

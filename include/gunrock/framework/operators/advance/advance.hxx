@@ -17,11 +17,15 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 #include <gunrock/framework/operators/advance/helpers.hxx>
-#include <gunrock/framework/operators/advance/merge_path.hxx>
+
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/bucketing.hxx>
+
+#if __HIP_PLATFORM_NVIDIA__
 #include <gunrock/framework/operators/advance/merge_path_v2.hxx>
+#include <gunrock/framework/operators/advance/merge_path.hxx>
+#endif
 
 namespace gunrock {
 namespace operators {
@@ -104,25 +108,26 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
-    if (lb == load_balance_t::merge_path) {
-      merge_path::execute<direction, input_type, output_type>(
-          G, op, input, output, segments, *context0);
+    if (lb == load_balance_t::thread_mapped) {
+      thread_mapped::execute<direction, input_type, output_type>(
+          G, op, *input, *output, segments, *context0);
+#if __HIP_PLATFORM_NVIDIA__
     } else if (lb == load_balance_t::merge_path_v2) {
       merge_path_v2::execute<direction, input_type, output_type>(
           G, op, *input, *output, segments, *context0);
-    } else if (lb == load_balance_t::thread_mapped) {
-      thread_mapped::execute<direction, input_type, output_type>(
-          G, op, *input, *output, segments, *context0);
+    } else if (lb == load_balance_t::merge_path) {
+      merge_path::execute<direction, input_type, output_type>(
+          G, op, input, output, segments, *context0);
+#endif
     } else if (lb == load_balance_t::block_mapped) {
       block_mapped::execute<direction, input_type, output_type>(
           G, op, *input, *output, *context0);
     } else {
-      error::throw_if_exception(cudaErrorUnknown,
-                                "Advance type not supported.");
+      error::throw_if_exception(hipErrorUnknown, "Advance type not supported.");
     }
 
   } else {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "`context.size() != 1` not supported");
   }
 }
@@ -217,6 +222,56 @@ void execute(graph_t& G,
    */
   if (swap_buffers && (output_type != advance_io_type_t::none))
     E->swap_frontier_buffers();
+}
+
+/**
+ * @brief Runtime dispatch version of advance execute that accepts load_balance_t
+ * as a runtime parameter instead of a template parameter.
+ * 
+ * This allows algorithms to select the load balancing strategy at runtime based
+ * on command-line arguments or configuration.
+ * 
+ * @tparam graph_t Graph type.
+ * @tparam enactor_type Enactor type.
+ * @tparam operator_type Operator type (lambda function).
+ * @param G Input graph.
+ * @param E Gunrock enactor.
+ * @param op Lambda operator to apply.
+ * @param lb Load balancing technique (runtime parameter).
+ * @param context GPU context.
+ * @param swap_buffers Whether to swap input/output buffers (default: true).
+ */
+template <typename graph_t,
+          typename enactor_type,
+          typename operator_type>
+void execute_runtime(graph_t& G,
+                     enactor_type* E,
+                     operator_type op,
+                     load_balance_t lb,
+                     gcuda::multi_context_t& context,
+                     bool swap_buffers = true) {
+  // Dispatch to appropriate template instantiation based on runtime enum value
+  if (lb == load_balance_t::thread_mapped) {
+    execute<load_balance_t::thread_mapped, advance_direction_t::forward,
+            advance_io_type_t::vertices, advance_io_type_t::vertices>(
+        G, E, op, context, swap_buffers);
+  } else if (lb == load_balance_t::block_mapped) {
+    execute<load_balance_t::block_mapped, advance_direction_t::forward,
+            advance_io_type_t::vertices, advance_io_type_t::vertices>(
+        G, E, op, context, swap_buffers);
+#if __HIP_PLATFORM_NVIDIA__
+  } else if (lb == load_balance_t::merge_path) {
+    execute<load_balance_t::merge_path, advance_direction_t::forward,
+            advance_io_type_t::vertices, advance_io_type_t::vertices>(
+        G, E, op, context, swap_buffers);
+  } else if (lb == load_balance_t::merge_path_v2) {
+    execute<load_balance_t::merge_path_v2, advance_direction_t::forward,
+            advance_io_type_t::vertices, advance_io_type_t::vertices>(
+        G, E, op, context, swap_buffers);
+#endif
+  } else {
+    error::throw_if_exception(hipErrorUnknown, "Load balance type not supported.");
+  }
 }
 
 }  // namespace advance

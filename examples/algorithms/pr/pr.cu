@@ -19,16 +19,16 @@ void test_pr(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+  gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
                                         "Page Rank");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto [properties, coo] = mm.load(params.filename);
+  auto [properties, coo] = mm.load(arguments.filename);
 
   csr_t csr;
 
-  if (params.binary) {
-    csr.read_binary(params.filename);
+  if (arguments.binary) {
+    csr.read_binary(arguments.filename);
   } else {
     csr.from_coo(coo);
   }
@@ -52,7 +52,7 @@ void test_pr(int num_arguments, char** argument_array) {
 
   // Parse tags
   std::vector<std::string> tag_vect;
-  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
+  gunrock::io::cli::parse_tag_string(arguments.tag_string, &tag_vect);
 
   // --
   // GPU Run
@@ -60,8 +60,8 @@ void test_pr(int num_arguments, char** argument_array) {
   std::vector<float> run_times;
 
   auto benchmark_metrics =
-      std::vector<benchmark::host_benchmark_t>(params.num_runs);
-  for (int i = 0; i < params.num_runs; i++) {
+      std::vector<benchmark::host_benchmark_t>(arguments.num_runs);
+  for (int i = 0; i < arguments.num_runs; i++) {
     benchmark::INIT_BENCH();
 
     run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
@@ -76,10 +76,10 @@ void test_pr(int num_arguments, char** argument_array) {
   std::vector<int> src_placeholder;
 
   // Export metrics
-  if (params.export_metrics) {
+  if (arguments.export_metrics) {
     gunrock::util::stats::export_performance_stats(
         benchmark_metrics, n_edges, n_vertices, run_times, "pr",
-        params.filename, "market", params.json_dir, params.json_file,
+        arguments.filename, "market", arguments.json_dir, arguments.json_file,
         src_placeholder, tag_vect, num_arguments, argument_array);
   }
 
@@ -87,7 +87,7 @@ void test_pr(int num_arguments, char** argument_array) {
 
   print::head(p, 40, "GPU rank");
 
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+  std::cout << "GPU Elapsed Time : " << run_times[arguments.num_runs - 1]
             << " (ms)" << std::endl;
 }
 

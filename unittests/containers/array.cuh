@@ -9,7 +9,10 @@
  */
 
 #include <gunrock/error.hxx>
+#include <gunrock/compat/runtime_api.h>
 #include <gunrock/container/array.hxx>
+
+#include <gtest/gtest.h>
 
 template <std::size_t N>
 __global__ void kernel() {
@@ -24,7 +27,7 @@ __global__ void kernel() {
 TEST(containers, array) {
   using namespace gunrock;
 
-  error::error_t status = cudaSuccess;
+  error::error_t status = hipSuccess;
 
   constexpr std::size_t N = 10;
   gunrock::array<float, N> a;
@@ -42,13 +45,13 @@ TEST(containers, array) {
     a[i] = (float)i;
   }
 
-  status = cudaDeviceSynchronize();
-  ASSERT_EQ(status, cudaSuccess)
-      << "CUDART error: " << cudaGetErrorString(status);
+  status = hipDeviceSynchronize();
+  ASSERT_EQ(status, hipSuccess)
+      << "HIP error: " << hipGetErrorString(status);
 
   kernel<N><<<1, N>>>();
 
-  status = cudaDeviceSynchronize();
-  ASSERT_EQ(status, cudaSuccess)
-      << "CUDART error: " << cudaGetErrorString(status);
+  status = hipDeviceSynchronize();
+  ASSERT_EQ(status, hipSuccess)
+      << "HIP error: " << hipGetErrorString(status);
 }

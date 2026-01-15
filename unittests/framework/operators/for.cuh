@@ -24,8 +24,8 @@ struct f {
 TEST(operators, prallel_for) {
   // Build a sample graph using the sample csr.
   auto csr = gunrock::io::sample::csr();
-  auto G = gunrock::graph::build::from_csr<gunrock::memory_space_t::device,
-                                           gunrock::graph::view_t::csr>(csr);
+  gunrock::graph::graph_properties_t properties;
+  auto G = gunrock::graph::build<gunrock::memory_space_t::device>(properties, csr);
 
   // Initialize the devicecontext.
   gunrock::gcuda::device_id_t device = 0;

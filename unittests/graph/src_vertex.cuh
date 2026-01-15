@@ -1,6 +1,9 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/framework/operators/for/for.hxx>
 #include <gunrock/io/sample.hxx>
+#include <gunrock/compat/runtime_api.h>
+
+#include <gtest/gtest.h>
 
 using namespace gunrock;
 using namespace memory;
@@ -21,7 +24,8 @@ void test_get_source_vertex(graph_t& G) {
       G, log_edge, *context);
 }
 
-int main(int argc, char** argv) {
-  auto [csr, G] = io::sample::graph();
+TEST(graph, src_vertex) {
+  auto csr = io::sample::csr<memory_space_t::device>();
+  auto G = graph::build<memory_space_t::device>({}, csr);
   test_get_source_vertex(G);
 }

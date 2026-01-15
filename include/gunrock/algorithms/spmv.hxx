@@ -19,7 +19,11 @@ namespace spmv {
 template <typename weight_t>
 struct param_t {
   weight_t* x;
-  param_t(weight_t* _x) : x(_x) {}
+  operators::load_balance_t advance_load_balance;
+  
+  param_t(weight_t* _x,
+          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped)
+      : x(_x), advance_load_balance(_advance_load_balance) {}
 };
 
 template <typename weight_t>
@@ -69,9 +73,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   void loop(gcuda::multi_context_t& context) override {
-    // TODO: Use a parameter (enum) to select between the two:
-    // Maybe use the existing advance_direction_t enum.
+// TODO: Use a parameter (enum) to select between the two:
+// Maybe use the existing advance_direction_t enum.
+#if __HIP_PLATFORM_NVIDIA__
     pull(context);
+#else
+    push(context);
+#endif
   }
 
   void push(gcuda::multi_context_t& context) {
@@ -103,6 +111,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, spmv, context);
   }
 
+#if __HIP_PLATFORM_NVIDIA__
   void pull(gcuda::multi_context_t& context) {
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -124,8 +133,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::neighborreduce::execute(G, E, y, spmv, plus_t, weight_t(0),
                                        context);
   }
+#endif
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     return this->iteration == 0 ? false : true;
   }
 };  // struct enactor_t
@@ -134,6 +144,7 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::weight_type* x,  // Input vector
           typename graph_t::weight_type* y,  // Output vector
+          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -144,7 +155,7 @@ float run(graph_t& G,
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(x);
+  param_type param(x, advance_load_balance);
   result_type result(y);
   // </user-defined>
 

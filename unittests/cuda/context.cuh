@@ -1,7 +1,9 @@
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>  // error checking
 
-void test_context() {
+#include <gtest/gtest.h>
+
+TEST(cuda, context) {
   using namespace gunrock;
 
   // List of devices we care about
@@ -17,9 +19,5 @@ void test_context() {
   auto context_device_0 = multi_context.get_context(0);
   // auto context_device_1 = multi_context.get_context(0);
 
-  context_device_0.print_properties();
-}
-
-int main(int argc, char** argv) {
-  test_context();
+  context_device_0->print_properties();
 }
