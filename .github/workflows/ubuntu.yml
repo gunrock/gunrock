@@ -45,13 +45,31 @@ jobs:
       #     sudo rm -rf "$AGENT_TOOLSDIRECTORY"
   
       # Fetch CUDA toolkit for NVIDIA backend
-      - name: Fetch CUDA toolkit
+      - name: Install CUDA toolkit via apt
         if: matrix.backend == 'nvidia'
-        uses: Jimver/cuda-toolkit@v0.2.16
-        id: cuda-toolkit
-        with:
-          cuda: '12.5.0'
-          linux-local-args: '["--toolkit"]'
+        run: |
+          # Clean up any existing CUDA installations
+          sudo apt-get remove --purge -y "cuda*" "nvidia-cuda-toolkit" "nvidia-*" 2>/dev/null || true
+          sudo rm -rf /usr/local/cuda* /etc/profile.d/cuda.sh
+          
+          # Add NVIDIA CUDA repository
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
+          sudo mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+          sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/cuda-archive-keyring.gpg 3bf863cc.pub
+          echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /" | sudo tee /etc/apt/sources.list.d/cuda.list
+          sudo apt-get update
+          
+          # Install CUDA toolkit (version 12.4)
+          sudo apt-get install -y cuda-toolkit-12-4
+          
+          # Set up environment
+          echo "export PATH=/usr/local/cuda-12.4/bin:$PATH" >> $GITHUB_ENV
+          echo "export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          sudo ln -sf /usr/local/cuda-12.4 /usr/local/cuda
+          
+          # Verify installation
+          /usr/local/cuda/bin/nvcc --version
 
       - name: Check nvcc version
         if: matrix.backend == 'nvidia'
