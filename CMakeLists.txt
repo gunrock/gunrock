@@ -294,7 +294,7 @@ else()
     INTERFACE hiprand
     INTERFACE hipsparse
     INTERFACE ${CMAKE_THREAD_LIBS_INIT}
-    -lstdc++fs
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-lstdc++fs>
   )
   
   if(TARGET roc::rocthrust)
@@ -316,6 +316,7 @@ target_sources(essentials
 set(CXX_FLAGS 
   $<$<CXX_COMPILER_ID:MSVC>:
     /W4
+    /wd4244
   >
   $<$<CXX_COMPILER_ID:GNU>:
     -Wall 
@@ -340,8 +341,14 @@ set(CUDA_RELEASE_FLAGS
   --expt-extended-lambda 
   --expt-relaxed-constexpr
   --use_fast_math
+  # Suppress common benign CUDA warnings
+  --diag-suppress=177
+  --diag-suppress=550
+  --diag-suppress=20014
   $<$<CXX_COMPILER_ID:MSVC>:
-    --compiler-options="/bigobj /Zc:__cplusplus"
+    -Xcompiler=/bigobj
+    -Xcompiler=/Zc:__cplusplus
+    -Xcompiler=/wd4244
   >
 )
 
@@ -351,8 +358,14 @@ set(CUDA_DEBUG_FLAGS
   --ptxas-options -v
   --debug # Host debug
   --device-debug # Device debug
+  # Suppress common benign CUDA warnings
+  --diag-suppress=177
+  --diag-suppress=550
+  --diag-suppress=20014
   $<$<CXX_COMPILER_ID:MSVC>:
-    --compiler-options="/bigobj /Zc:__cplusplus"
+    -Xcompiler=/bigobj
+    -Xcompiler=/Zc:__cplusplus
+    -Xcompiler=/wd4244
   >
 )
 
