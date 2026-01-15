@@ -40,19 +40,9 @@ foreach(SOURCE IN LISTS UNITTEST_SOURCES)
   endif()
   
   # Use gtest_discover_tests to register individual tests instead of add_test
-  # For AMD builds, set LD_LIBRARY_PATH to find ROCm libraries during test discovery
-  if(${ESSENTIALS_AMD_BACKEND} AND DEFINED ROCM_PATH)
-    # Set environment variable for test discovery
-    set(LD_LIBRARY_PATH_VAR "${ROCM_PATH}/lib")
-    if(DEFINED ENV{LD_LIBRARY_PATH})
-      set(LD_LIBRARY_PATH_VAR "${ROCM_PATH}/lib:$ENV{LD_LIBRARY_PATH}")
-    endif()
-    gtest_discover_tests(${TEST_NAME}
-      PROPERTIES
-        ENVIRONMENT "LD_LIBRARY_PATH=${LD_LIBRARY_PATH_VAR}"
-    )
-  else()
-    gtest_discover_tests(${TEST_NAME})
-  endif()
+  # Note: gtest_discover_tests runs the executable during CMake configuration
+  # For AMD builds, LD_LIBRARY_PATH must be set before running CMake, not here
+  # The ENVIRONMENT property here is for test execution, not discovery
+  gtest_discover_tests(${TEST_NAME})
 endforeach()
 # end /* Add unit tests */
