@@ -23,20 +23,36 @@ foreach(SOURCE IN LISTS UNITTEST_SOURCES)
         CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES}
     )
   else()
-    get_target_property(ESSENTIALS_ARCHITECTURES 
-      essentials HIP_ARCHITECTURES
-    )
-    set_target_properties(${TEST_NAME} 
-      PROPERTIES 
-        HIP_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES}
-    )
+    # HIP_ARCHITECTURES is not a valid target property for executables
+    # Architecture is set globally via CMAKE_HIP_ARCHITECTURES
     set_source_files_properties(${SOURCE}
       PROPERTIES
         LANGUAGE HIP
     )
+    # Set rpath for AMD builds to find ROCm libraries at runtime
+    if(DEFINED ROCM_PATH)
+      set_target_properties(${TEST_NAME}
+        PROPERTIES
+          INSTALL_RPATH "${ROCM_PATH}/lib"
+          BUILD_WITH_INSTALL_RPATH TRUE
+      )
+    endif()
   endif()
   
   # Use gtest_discover_tests to register individual tests instead of add_test
-  gtest_discover_tests(${TEST_NAME})
+  # For AMD builds, set LD_LIBRARY_PATH to find ROCm libraries during test discovery
+  if(${ESSENTIALS_AMD_BACKEND} AND DEFINED ROCM_PATH)
+    # Set environment variable for test discovery
+    set(LD_LIBRARY_PATH_VAR "${ROCM_PATH}/lib")
+    if(DEFINED ENV{LD_LIBRARY_PATH})
+      set(LD_LIBRARY_PATH_VAR "${ROCM_PATH}/lib:$ENV{LD_LIBRARY_PATH}")
+    endif()
+    gtest_discover_tests(${TEST_NAME}
+      PROPERTIES
+        ENVIRONMENT "LD_LIBRARY_PATH=${LD_LIBRARY_PATH_VAR}"
+    )
+  else()
+    gtest_discover_tests(${TEST_NAME})
+  endif()
 endforeach()
 # end /* Add unit tests */
