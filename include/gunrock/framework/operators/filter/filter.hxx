@@ -11,11 +11,12 @@
 #pragma once
 
 #include <gunrock/cuda/context.hxx>
+#include <gunrock/error.hxx>
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/util/type_traits.hxx>
 
-#include <gunrock/framework/operators/filter/compact.hxx>
+// #include <gunrock/framework/operators/filter/compact.hxx>
 #include <gunrock/framework/operators/filter/predicated.hxx>
 #include <gunrock/framework/operators/filter/bypass.hxx>
 #include <gunrock/framework/operators/filter/remove.hxx>
@@ -80,19 +81,20 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto single_context = context.get_context(0);
 
-    if constexpr (alg_type == filter_algorithm_t::compact) {
-      compact::execute(G, op, input, output, *single_context);
-    } else if (alg_type == filter_algorithm_t::predicated) {
+    //    if constexpr (alg_type == filter_algorithm_t::compact) {
+    //    compact::execute(G, op, input, output, *single_context);
+    //  } else
+    if (alg_type == filter_algorithm_t::predicated) {
       predicated::execute(G, op, input, output, *single_context);
     } else if (alg_type == filter_algorithm_t::bypass) {
       bypass::execute(G, op, input, output, *single_context);
     } else if (alg_type == filter_algorithm_t::remove) {
       remove::execute(G, op, input, output, *single_context);
     } else {
-      error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
+      error::throw_if_exception(hipErrorUnknown, "Filter type not supported.");
     }
   } else {
-    error::throw_if_exception(cudaErrorUnknown,
+    error::throw_if_exception(hipErrorUnknown,
                               "`context.size() != 1` not supported");
   }
 }
@@ -163,6 +165,49 @@ void execute(graph_t& G,
    */
   if (swap_buffers)
     E->swap_frontier_buffers();
+}
+
+/**
+ * @brief Runtime dispatch version of filter execute that accepts filter_algorithm_t
+ * as a runtime parameter instead of a template parameter.
+ * 
+ * This allows algorithms to select the filter algorithm at runtime based
+ * on command-line arguments or configuration.
+ * 
+ * @tparam graph_t Graph type.
+ * @tparam enactor_type Enactor type.
+ * @tparam operator_type Operator type (predicate function).
+ * @param G Input graph.
+ * @param E Gunrock enactor.
+ * @param op Predicate function.
+ * @param alg_type Filter algorithm (runtime parameter).
+ * @param context GPU context.
+ * @param swap_buffers Whether to swap input/output buffers (default: true).
+ */
+template <typename graph_t,
+          typename enactor_type,
+          typename operator_type>
+void execute_runtime(graph_t& G,
+                     enactor_type* E,
+                     operator_type op,
+                     filter_algorithm_t alg_type,
+                     gcuda::multi_context_t& context,
+                     bool swap_buffers = true) {
+  // Dispatch to appropriate template instantiation based on runtime enum value
+  if (alg_type == filter_algorithm_t::predicated) {
+    execute<filter_algorithm_t::predicated>(G, E, op, context, swap_buffers);
+  } else if (alg_type == filter_algorithm_t::bypass) {
+    execute<filter_algorithm_t::bypass>(G, E, op, context, swap_buffers);
+  } else if (alg_type == filter_algorithm_t::remove) {
+    execute<filter_algorithm_t::remove>(G, E, op, context, swap_buffers);
+  } else if (alg_type == filter_algorithm_t::compact) {
+    // Note: compact is no longer supported due to ModernGPU removal
+    error::throw_if_exception(hipErrorUnknown,
+                              "compact filter algorithm is no longer supported "
+                              "due to ModernGPU removal.");
+  } else {
+    error::throw_if_exception(hipErrorUnknown, "Filter algorithm type not supported.");
+  }
 }
 
 }  // namespace filter

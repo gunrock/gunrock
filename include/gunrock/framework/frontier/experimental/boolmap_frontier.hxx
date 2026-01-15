@@ -53,11 +53,17 @@ class boolmap_frontier_t {
   __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
       gcuda::stream_t stream = 0) {
     // Compute number of elements using a reduction.
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
+    // #ifdef __CUDA_ARCH__
     num_elements = thrust::reduce(thrust::seq, this->begin(), this->end(), 0);
 #else
+#if HIP_BACKEND == 1
     num_elements = thrust::reduce(thrust::cuda::par_nosync.on(stream),
                                   this->begin(), this->end(), 0);
+#else
+    num_elements = thrust::reduce(thrust::hip::par.on(stream),
+                                  this->begin(), this->end(), 0);
+#endif
 #endif
 
     return num_elements;
@@ -143,11 +149,16 @@ class boolmap_frontier_t {
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
     if (value != 0 || value != 1)
-      error::throw_if_exception(cudaErrorUnknown,
+      error::throw_if_exception(hipErrorUnknown,
                                 "Boolmap only supports 1 or 0 as fill value.");
 
+#if HIP_BACKEND == 1
     thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),
                  this->end(), value);
+#else
+    thrust::fill(thrust::hip::par.on(stream), this->begin(),
+                 this->end(), value);
+#endif
   }
 
   /**

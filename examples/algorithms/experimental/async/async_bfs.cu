@@ -1,4 +1,5 @@
 #include <gunrock/algorithms/experimental/async/bfs.hxx>
+#include <gunrock/compat/runtime_api.h>
 #include "bfs_cpu.hxx"
 
 using namespace gunrock;
@@ -50,7 +51,7 @@ void test_async_bfs(int num_arguments, char** argument_array) {
   thrust::device_vector<vertex_t> depth(n_vertices);
 
   float gpu_elapsed = async::bfs::run(G, single_source, depth.data().get());
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
 
   // --
   // CPU Run

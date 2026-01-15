@@ -4,7 +4,7 @@ namespace gunrock {
 
 // TODO: replace with cuda/global.hxx
 #define TID (threadIdx.x + blockIdx.x * blockDim.x)
-#define WARPID ((threadIdx.x + blockIdx.x * blockDim.x >> 5))
+#define WARPID (((threadIdx.x + blockIdx.x * blockDim.x) >> 5))
 #define LANE_ ((threadIdx.x + blockIdx.x * blockDim.x) & 31)
 #define MAX_U32 (~(uint32_t)0)
 #define MAX_SZ (~(size_t)0)
@@ -22,6 +22,10 @@ __device__ unsigned int lanemask_lt() {
 #endif
 
 __device__ int isShared(void* ptr) {
+#if defined(__HIP_PLATFORM_AMD__)
+  // AMD HIP doesn't support PTX assembly, return false as fallback
+  return 0;
+#else
   int res;
   asm("{"
       ".reg .pred p;\n\t"
@@ -31,6 +35,7 @@ __device__ int isShared(void* ptr) {
       : "=r"(res)
       : PTR_CONSTRAINT(ptr));
   return res;
+#endif
 }
 
 template <class Size>

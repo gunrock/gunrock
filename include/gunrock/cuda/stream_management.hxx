@@ -9,10 +9,12 @@
  */
 #pragma once
 
+#include <gunrock/compat/runtime_api.h>
+
 namespace gunrock {
 namespace gcuda {
 
-typedef cudaStream_t stream_t;
+typedef hipStream_t stream_t;
 
 }  // namespace gcuda
 }  // namespace gunrock

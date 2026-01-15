@@ -99,10 +99,10 @@ void ppr_bench(nvbench::state& state) {
 }
 
 int main(int argc, char** argv) {
-  parameters_t params(argc, argv);
-  filename = params.filename;
+  parameters_t arguments(argc, argv);
+  filename = arguments.filename;
 
-  if (params.help) {
+  if (arguments.help) {
     // Print NVBench help.
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);

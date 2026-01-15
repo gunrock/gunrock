@@ -214,11 +214,11 @@ void geo_bench(nvbench::state& state) {
 }
 
 int main(int argc, char** argv) {
-  parameters_t params(argc, argv);
-  matrix_filename = params.matrix_filename;
-  coordinates_filename = params.coordinates_filename;
+  parameters_t arguments(argc, argv);
+  matrix_filename = arguments.matrix_filename;
+  coordinates_filename = arguments.coordinates_filename;
 
-  if (params.help) {
+  if (arguments.help) {
     // Print NVBench help.
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);

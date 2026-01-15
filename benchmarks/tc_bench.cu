@@ -103,11 +103,11 @@ void tc_bench(nvbench::state& state) {
 }
 
 int main(int argc, char** argv) {
-  parameters_t params(argc, argv);
-  filename_ = params.filename;
-  reduce_all_triangles_ = params.reduce_all_triangles;
+  parameters_t arguments(argc, argv);
+  filename_ = arguments.filename;
+  reduce_all_triangles_ = arguments.reduce_all_triangles;
 
-  if (params.help) {
+  if (arguments.help) {
     // Print NVBench help.
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);

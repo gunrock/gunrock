@@ -13,7 +13,7 @@
 #include <string>
 #include <limits>
 
-#include <gunrock/io/detail/mmio.hxx>
+#include <gunrock/io/detail/mmio_impl.hxx>
 
 #include <gunrock/util/filepath.hxx>
 #include <gunrock/formats/formats.hxx>

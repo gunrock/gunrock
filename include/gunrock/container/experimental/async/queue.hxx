@@ -1,9 +1,11 @@
+
 #pragma once
 
 #include <inttypes.h>
 #include <limits>
 #include <assert.h>
 
+#include <gunrock/compat/runtime_api.h>
 #include <gunrock/util/experimental/async/util.hxx>
 
 namespace gunrock {
@@ -56,18 +58,18 @@ struct Queue {
 
   __host__ void release() {
     if (queue != NULL)
-      cudaFree(queue);
+      hipFree(queue);
   }
 
   __host__ void reset() {
-    cudaMemset((void*)queue, -1, sizeof(T) * capacity);
-    cudaMemset((void*)start, 0, sizeof(CounterT));
-    cudaMemset((void*)start_alloc, 0, sizeof(CounterT));
-    cudaMemset((void*)end, 0, sizeof(CounterT));
-    cudaMemset((void*)end_alloc, 0, sizeof(CounterT));
-    cudaMemset((void*)end_max, 0, sizeof(CounterT));
-    cudaMemset((void*)end_count, 0, sizeof(CounterT));
-    cudaMemset((void*)stop, 0, sizeof(CounterT));
+    hipMemset((void*)queue, -1, sizeof(T) * capacity);
+    hipMemset((void*)start, 0, sizeof(CounterT));
+    hipMemset((void*)start_alloc, 0, sizeof(CounterT));
+    hipMemset((void*)end, 0, sizeof(CounterT));
+    hipMemset((void*)end_alloc, 0, sizeof(CounterT));
+    hipMemset((void*)end_max, 0, sizeof(CounterT));
+    hipMemset((void*)end_count, 0, sizeof(CounterT));
+    hipMemset((void*)stop, 0, sizeof(CounterT));
   }
 
   __forceinline__ __device__ T get(CounterT) const;
@@ -77,7 +79,7 @@ struct Queue {
   template <typename Functor, typename... Args>
   __host__ void launch_thread(int numBlock,
                               int numThread,
-                              cudaStream_t stream,
+                              hipStream_t stream,
                               Functor f,
                               Args... arg);
 };
@@ -100,10 +102,19 @@ __forceinline__ __device__ CounterT Queue<T, CounterT>::next() const {
                       total);  // Get + increment index to read from
   }
 
+  // AMD HIP requires 64-bit mask for __shfl_sync and __syncwarp
+#if defined(__HIP_PLATFORM_AMD__)
+  uint64_t mask64 = static_cast<uint64_t>(mask);
+  __syncwarp(mask64);  // Why do we need this?
+
+  alloc = __shfl_sync(
+      mask64, alloc, leader);  // Share starting index to read from among threads
+#else
   __syncwarp(mask);  // Why do we need this?
 
   alloc = __shfl_sync(
       mask, alloc, leader);  // Share starting index to read from among threads
+#endif
   return alloc + rank;       // Return index for current thread
 }
 
@@ -175,7 +186,7 @@ template <typename T, typename CounterT>
 template <typename Functor, typename... Args>
 void Queue<T, CounterT>::launch_thread(int numBlock,
                                        int numThread,
-                                       cudaStream_t stream,
+                                       hipStream_t stream,
                                        Functor f,
                                        Args... arg) {
   _launch_thread<<<numBlock, numThread, 0, stream>>>(*this, f, arg...);
@@ -201,7 +212,7 @@ struct Queues {
 
   uint32_t min_iter;
   Queue<T, CounterT>* worklist;
-  cudaStream_t* streams;
+  hipStream_t* streams;
 
   __host__ void init(CounterT _capacity,
                      uint32_t _num_q = 8,
@@ -216,14 +227,14 @@ struct Queues {
 
     // Allocate queue memory
     auto queue_size = sizeof(T) * capacity * num_queues;
-    cudaMalloc(&queue, queue_size);
-    cudaMemset((void*)queue, -1, queue_size);
+    hipMalloc(&queue, queue_size);
+    hipMemset((void*)queue, -1, queue_size);
 
     // Allocate counter memory
     auto counter_size =
         sizeof(CounterT) * num_counters * num_queues * PADDING_SIZE;
-    cudaMalloc(&counters, counter_size);
-    cudaMemset((void*)counters, 0, counter_size);
+    hipMalloc(&counters, counter_size);
+    hipMemset((void*)counters, 0, counter_size);
 
     start = &counters[0 * num_queues * PADDING_SIZE];
     start_alloc = &counters[1 * num_queues * PADDING_SIZE];
@@ -235,7 +246,7 @@ struct Queues {
 
     worklist =
         (Queue<T, CounterT>*)malloc(sizeof(Queue<T, CounterT>) * num_queues);
-    streams = (cudaStream_t*)malloc(sizeof(cudaStream_t) * num_queues);
+    streams = (hipStream_t*)malloc(sizeof(hipStream_t) * num_queues);
 
     for (uint64_t q_id = 0; q_id < num_queues; q_id++) {
       auto q_offset = q_id * capacity;
@@ -245,15 +256,15 @@ struct Queues {
           start_alloc + c_offset, end_alloc + c_offset, end_max + c_offset,
           end_count + c_offset, stop, num_queues, q_id, min_iter);
 
-      cudaStreamCreateWithFlags(&streams[q_id], cudaStreamNonBlocking);
+      hipStreamCreateWithFlags(&streams[q_id], hipStreamNonBlocking);
     }
   }
 
   __host__ void release() {
     if (queue != NULL)
-      cudaFree(queue);
+      hipFree(queue);
     if (counters != NULL)
-      cudaFree((void*)counters);
+      hipFree((void*)counters);
     if (streams != NULL)
       free(streams);
     if (worklist != NULL)
@@ -280,8 +291,15 @@ struct Queues {
                         total);  // Get + increment index to write to
     }
 
+    // AMD HIP requires 64-bit mask for __shfl_sync and __syncwarp
+#if defined(__HIP_PLATFORM_AMD__)
+    uint64_t mask64 = static_cast<uint64_t>(mask);
+    alloc =
+        __shfl_sync(mask64, alloc, leader);  // copy alloc to all active threads
+#else
     alloc =
         __shfl_sync(mask, alloc, leader);  // copy alloc to all active threads
+#endif
     assert(alloc + total <= capacity);
 
     queue[q_id * capacity + (alloc + rank)] =
@@ -307,7 +325,11 @@ struct Queues {
       }
       // >>
     }
+#if defined(__HIP_PLATFORM_AMD__)
+    __syncwarp(mask64);
+#else
     __syncwarp(mask);
+#endif
   }
 
   template <typename Functor>
@@ -321,12 +343,12 @@ struct Queues {
     for (int i = 0; i < num_queues; i++)
       worklist[i].reset();
 
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
   }
 
   __host__ void sync() {
     for (int i = 0; i < num_queues; i++)
-      cudaStreamSynchronize(streams[i]);
+      hipStreamSynchronize(streams[i]);
   }
 };
 

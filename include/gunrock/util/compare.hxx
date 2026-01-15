@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <gunrock/compat/runtime_api.h>
 
 namespace gunrock {
 namespace util {
@@ -42,7 +43,7 @@ std::size_t compare(const type_t* d_ptr,
                     comp_t error_op = detail::default_comparator,
                     const bool verbose = false) {
   thrust::host_vector<type_t> d_vec(n);
-  cudaMemcpy(d_vec.data(), d_ptr, n * sizeof(type_t), cudaMemcpyDeviceToHost);
+  hipMemcpy(d_vec.data(), d_ptr, n * sizeof(type_t), hipMemcpyDeviceToHost);
 
   std::size_t error_count = 0;
   for (std::size_t i = 0; i < n; ++i) {

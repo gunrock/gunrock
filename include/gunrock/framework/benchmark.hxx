@@ -22,9 +22,7 @@ namespace benchmark {
 class benchmark_t {
  public:
   benchmark_t()
-      : edges_visited(1),
-        vertices_visited(1),
-        search_depth(0),
+      : search_depth(0),
         total_runtime() {}
 
   thrust::device_vector<unsigned int> edges_visited;
@@ -49,7 +47,7 @@ struct host_benchmark_t {
   double total_runtime = 0;
 };
 
-benchmark_t ____;
+benchmark_t benchmark_instance;
 __managed__ device_benchmark_t BXXX;
 
 __device__ void LOG_EDGE_VISITED(size_t edges) {
@@ -63,11 +61,19 @@ __device__ void LOG_VERTEX_VISITED(size_t vertices) {
 
 void INIT_BENCH() {
 #if ESSENTIALS_COLLECT_METRICS
-  thrust::fill(____.edges_visited.begin(), ____.edges_visited.end(), 0);
-  thrust::fill(____.vertices_visited.begin(), ____.vertices_visited.end(), 0);
+  // Lazy initialization: allocate device memory only when needed (after HIP runtime is initialized)
+  if (benchmark_instance.edges_visited.size() == 0) {
+    benchmark_instance.edges_visited.resize(1);
+  }
+  if (benchmark_instance.vertices_visited.size() == 0) {
+    benchmark_instance.vertices_visited.resize(1);
+  }
+  
+  thrust::fill(benchmark_instance.edges_visited.begin(), benchmark_instance.edges_visited.end(), 0);
+  thrust::fill(benchmark_instance.vertices_visited.begin(), benchmark_instance.vertices_visited.end(), 0);
 
-  BXXX.d_edges_visited = ____.edges_visited.data().get();
-  BXXX.d_vertices_visited = ____.vertices_visited.data().get();
+  BXXX.d_edges_visited = benchmark_instance.edges_visited.data().get();
+  BXXX.d_vertices_visited = benchmark_instance.vertices_visited.data().get();
 #endif
 }
 
@@ -81,12 +87,12 @@ void DESTROY_BENCH() {
 host_benchmark_t EXTRACT() {
   host_benchmark_t results;
 #if ESSENTIALS_COLLECT_METRICS
-  ____.h_edges_visited = ____.edges_visited;
-  ____.h_vertices_visited = ____.vertices_visited;
-  results.edges_visited = ____.h_edges_visited[0];
-  results.vertices_visited = ____.h_vertices_visited[0];
-  results.search_depth = ____.search_depth;
-  results.total_runtime = ____.total_runtime;
+  benchmark_instance.h_edges_visited = benchmark_instance.edges_visited;
+  benchmark_instance.h_vertices_visited = benchmark_instance.vertices_visited;
+  results.edges_visited = benchmark_instance.h_edges_visited[0];
+  results.vertices_visited = benchmark_instance.h_vertices_visited[0];
+  results.search_depth = benchmark_instance.search_depth;
+  results.total_runtime = benchmark_instance.total_runtime;
 #endif
   return results;
 }

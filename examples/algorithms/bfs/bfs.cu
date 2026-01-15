@@ -25,16 +25,16 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+  gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
                                         DEFAULT_BFS_ALGORITHMS);
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  auto [properties, coo] = mm.load(params.filename);
+  auto [properties, coo] = mm.load(arguments.filename);
 
   csr_t csr;
 
-  if (params.binary) {
-    csr.read_binary(params.filename);
+  if (arguments.binary) {
+    csr.read_binary(arguments.filename);
   } else {
     csr.from_coo(coo);
   }
@@ -54,11 +54,11 @@ void test_bfs(int num_arguments, char** argument_array) {
 
   // Parse sources
   std::vector<int> source_vect;
-  gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
-                                        n_vertices, params.num_runs);
+  gunrock::io::cli::parse_source_string(arguments.source_string, &source_vect,
+                                        n_vertices, arguments.num_runs);
   // Parse tags
   std::vector<std::string> tag_vect;
-  gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
+  gunrock::io::cli::parse_tag_string(arguments.tag_string, &tag_vect);
 
   // --
   // Run problem
@@ -85,16 +85,16 @@ void test_bfs(int num_arguments, char** argument_array) {
   }
 
   // Export metrics
-  if (params.export_metrics) {
+  if (arguments.export_metrics) {
     if (DEFAULT_BFS_ALGORITHMS == "DAWN")
       gunrock::util::stats::export_performance_stats(
           benchmark_metrics, n_edges, n_vertices, run_times, "dawn_bfs",
-          params.filename, "market", params.json_dir, params.json_file,
+          arguments.filename, "market", arguments.json_dir, arguments.json_file,
           source_vect, tag_vect, num_arguments, argument_array);
     else
       gunrock::util::stats::export_performance_stats(
           benchmark_metrics, n_edges, n_vertices, run_times, "bfs",
-          params.filename, "market", params.json_dir, params.json_file,
+          arguments.filename, "market", arguments.json_dir, arguments.json_file,
           source_vect, tag_vect, num_arguments, argument_array);
   }
 
@@ -107,7 +107,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // CPU Run
 
-  if (params.validate) {
+  if (arguments.validate) {
     thrust::host_vector<vertex_t> h_distances(n_vertices);
     thrust::host_vector<vertex_t> h_predecessors(n_vertices);
 

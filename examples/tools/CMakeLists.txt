@@ -1,9 +1,31 @@
-# begin /* Add tools' subdirectories */
-if (NOT ESSENTIALS_COLLECT_METRICS)
+# begin /* Add tools */
+set(SOURCES
+  cmd.cu
+  csr_binary.cu
+  nearest_neighbor.cu
+)
 
-add_subdirectory(cmd)
-add_subdirectory(csr_binary)
-add_subdirectory(nearest_neighbor)
+foreach(SOURCE IN LISTS SOURCES)
+    get_filename_component(BINARY_NAME ${SOURCE} NAME_WLE)
+    add_executable(${BINARY_NAME} ${SOURCE})
 
-endif (NOT ESSENTIALS_COLLECT_METRICS)
-# end /* Add tools' subdirectories */
+    target_sources(${BINARY_NAME} PRIVATE ${SOURCE})
+    target_link_libraries(${BINARY_NAME} PRIVATE essentials)
+
+    if(${ESSENTIALS_NVIDIA_BACKEND})
+        set_target_properties(${BINARY_NAME} 
+            PROPERTIES 
+                CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}
+        )
+    else()
+        # HIP_ARCHITECTURES is not a valid target property for executables
+        # Architecture is set globally via CMAKE_HIP_ARCHITECTURES
+        set_source_files_properties(${SOURCE}
+            PROPERTIES 
+            LANGUAGE HIP
+        )
+    endif()
+
+    message(STATUS "Gunrock Tool Added: ${BINARY_NAME}")
+endforeach()
+# end /* Add tools */

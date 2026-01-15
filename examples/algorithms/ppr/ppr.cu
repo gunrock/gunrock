@@ -57,6 +57,8 @@ void test_ppr(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  // Note: run_batch doesn't support operator parameters yet
+  // For single seed runs, use: gunrock::ppr::run(G, seed, p.data().get(), alpha, epsilon, advance_load_balance, filter_algorithm)
   float gpu_elapsed =
       gunrock::ppr::run_batch(G, n_seeds, p.data().get(), alpha, epsilon);
 

@@ -70,7 +70,8 @@ class vector_frontier_t {
    * @param rhs vector_frontier_t object
    */
   __device__ __host__ vector_frontier_t(const vector_frontier_t& rhs) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
+    // #ifdef __CUDA_ARCH__
     raw_ptr = rhs.raw_ptr;
 #else
     p_storage = rhs.p_storage;
@@ -212,8 +213,14 @@ class vector_frontier_t {
    * @param stream GPU stream at which this operation should occur.
    */
   void fill(type_t const value, gcuda::stream_t stream = 0) {
-    thrust::fill(thrust::cuda::par_nosync.on(stream), this->begin(),
-                 this->end(), value);
+    thrust::fill(
+// thrust::hip::par.on(stream),
+#if HIP_BACKEND == 1
+        thrust::cuda::par.on(stream),
+#else
+        thrust::hip::par.on(stream),
+#endif
+        this->begin(), this->end(), value);
   }
 
   /**
@@ -236,8 +243,14 @@ class vector_frontier_t {
     // Set the new number of elements.
     this->set_number_of_elements(size);
 
-    thrust::sequence(thrust::cuda::par_nosync.on(stream), this->begin(),
-                     this->end(), initial_value);
+    thrust::sequence(
+// thrust::hip::par.on(stream),
+#if HIP_BACKEND == 1
+        thrust::cuda::par.on(stream),
+#else
+        thrust::hip::par.on(stream),
+#endif
+        this->begin(), this->end(), initial_value);
   }
 
   /**

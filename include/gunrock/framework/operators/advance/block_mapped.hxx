@@ -1,3 +1,4 @@
+
 /**
  * @file block_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
@@ -19,8 +20,44 @@
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
 
-#include <cub/block/block_load.cuh>
-#include <cub/block/block_scan.cuh>
+// Include appropriate CUB library based on compiler
+#if defined(__CUDACC__) && !defined(__HIP__)
+  // Pure CUDA (NVCC without HIP): Use CUB
+  #include <cub/block/block_load.cuh>
+  #include <cub/block/block_scan.cuh>
+  namespace cub_namespace = cub;
+#else
+  // HIP compiler (works for both NVIDIA and AMD platforms): Use hipCUB
+  // Undefine architecture macros that HIP may define to avoid conflicts with rocPRIM enums
+  #ifdef __HIP_PLATFORM_AMD__
+    #ifdef gfx942
+      #pragma push_macro("gfx942")
+      #undef gfx942
+    #endif
+    #ifdef gfx950
+      #pragma push_macro("gfx950")
+      #undef gfx950
+    #endif
+    #ifdef gfx90a
+      #pragma push_macro("gfx90a")
+      #undef gfx90a
+    #endif
+  #endif
+  #include <hipcub/block/block_load.hpp>
+  #include <hipcub/block/block_scan.hpp>
+  #ifdef __HIP_PLATFORM_AMD__
+    #ifdef gfx942
+      #pragma pop_macro("gfx942")
+    #endif
+    #ifdef gfx950
+      #pragma pop_macro("gfx950")
+    #endif
+    #ifdef gfx90a
+      #pragma pop_macro("gfx90a")
+    #endif
+  #endif
+  namespace cub_namespace = hipcub;
+#endif
 
 namespace gunrock {
 namespace operators {
@@ -49,7 +86,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   using type_t = frontier_t;
 
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
-  using block_scan_t = cub::BlockScan<edge_t, THREADS_PER_BLOCK>;
+  using block_scan_t = cub_namespace::BlockScan<edge_t, THREADS_PER_BLOCK>;
 
   auto global_idx = gcuda::thread::global::id::x();
   auto local_idx = gcuda::thread::local::id::x();

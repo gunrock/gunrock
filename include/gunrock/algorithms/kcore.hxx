@@ -25,11 +25,18 @@ struct result_t {
 template <typename graph_t, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
   result_type result;
+  operators::load_balance_t advance_load_balance;
+  operators::filter_algorithm_t filter_algorithm;
 
   problem_t(graph_t& G,
             result_type& _result,
-            std::shared_ptr<gcuda::multi_context_t> _context)
-      : gunrock::problem_t<graph_t>(G, _context), result(_result) {}
+            std::shared_ptr<gcuda::multi_context_t> _context,
+            operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
+            operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::predicated)
+      : gunrock::problem_t<graph_t>(G, _context), 
+        result(_result),
+        advance_load_balance(_advance_load_balance),
+        filter_algorithm(_filter_algorithm) {}
 
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
@@ -154,10 +161,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (old_degrees != (k + 1)) ? false : true;
     };
 
+    auto advance_load_balance = P->advance_load_balance;
+    auto filter_algorithm = P->filter_algorithm;
+
     while (!f->is_empty()) {
-      // Execute advance operator
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, advance_op, context);
+      // Execute advance operator using runtime dispatch
+      operators::advance::execute_runtime(G, E, advance_op, advance_load_balance, context);
 
       // Mark to-be-deleted vertices as deleted
       auto mark_deleted = [=] __device__(const vertex_t& v) {
@@ -170,13 +179,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           context        // context
       );
 
-      // Execute filter operator
-      operators::filter::execute<operators::filter_algorithm_t::predicated>(
-          G, E, filter_op, context);
+      // Execute filter operator using runtime dispatch
+      operators::filter::execute_runtime(G, E, filter_op, filter_algorithm, context);
     }
   }
 
-  virtual bool is_converged(gcuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto n_vertices = G.get_number_of_vertices();
@@ -184,8 +192,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto policy = context.get_context(0)->execution_policy();
 
     //  Check if all vertices have been removed from graph
+    // Note: thrust::identity doesn't exist in newer Thrust versions, use lambda instead
     bool graph_empty = thrust::all_of(
-        policy, P->deleted.begin(), P->deleted.end(), thrust::identity<bool>());
+        policy, P->deleted.begin(), P->deleted.end(),
+        [] __host__ __device__ (bool x) { return x; });
 
     if (graph_empty) {
       printf("degeneracy = %u\n", this->iteration);
@@ -201,6 +211,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           int* k_cores,  // Output
+          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
+          operators::filter_algorithm_t filter_algorithm = operators::filter_algorithm_t::predicated,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -219,7 +231,7 @@ float run(graph_t& G,
   using enactor_type = enactor_t<problem_type>;
 
   // initialize problem; call `init` and `reset` to prepare data structures
-  problem_type problem(G, result, context);
+  problem_type problem(G, result, context, advance_load_balance, filter_algorithm);
   problem.init();
   problem.reset();
 

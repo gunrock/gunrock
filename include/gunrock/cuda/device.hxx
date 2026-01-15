@@ -9,6 +9,9 @@
  */
 
 #pragma once
+
+#include <gunrock/compat/runtime_api.h>
+
 namespace gunrock {
 namespace gcuda {
 
@@ -17,7 +20,7 @@ typedef int device_id_t;
 namespace device {
 
 void set(gcuda::device_id_t device) {
-  cudaSetDevice(device);
+  hipSetDevice(device);
 }
 
 }  // namespace device
