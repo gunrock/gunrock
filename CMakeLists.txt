@@ -386,6 +386,17 @@ set(HIP_FLAGS
   # -mwavefrontsize64       # Specify wavefront size 64 mode (AMDGPU only)
   # -mxnack                 # Legacy option to specify XNACK mode (AMDGPU only)
   
+  # Undefine architecture macros that CMake adds automatically, which conflict with rocPRIM enums.
+  # CMake's HIP module defines -Dgfx942, -Dgfx90a, etc. based on CMAKE_HIP_ARCHITECTURES,
+  # but rocPRIM uses these as enum values (target_arch::gfx942) which causes compile errors.
+  -Ugfx942
+  -Ugfx950
+  -Ugfx90a
+  -Ugfx908
+  -Ugfx906
+  -Ugfx1030
+  -Ugfx1100
+  
   # Suppress warnings.
   -Wno-unused-result
   -Wno-deprecated-builtins

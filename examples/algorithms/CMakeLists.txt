@@ -28,7 +28,6 @@ endfunction()
 # begin /* Add algorithms' subdirectories */
 add_subdirectory(sssp)
 add_subdirectory(bfs)
-add_subdirectory(dawn)
 add_subdirectory(pr)
 add_subdirectory(bc)
 

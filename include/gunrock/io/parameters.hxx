@@ -56,7 +56,7 @@ struct parameters_t {
     // Algorithms with sources
     if (algorithm == "Betweenness Centrality" ||
         algorithm == "Breadth First Search" ||
-        algorithm == "Single Source Shortest Path" || algorithm == "DAWN") {
+        algorithm == "Single Source Shortest Path") {
       options.add_options()("s,src",
                             "Source(s) (random if omitted); "
                             "comma-separated string of ints",
@@ -64,7 +64,7 @@ struct parameters_t {
           ("n,num_runs", "Number of runs (ignored if multiple sources passed)",
            cxxopts::value<int>());  // runs
       if (algorithm == "Breadth First Search" ||
-          algorithm == "Single Source Shortest Path" || algorithm == "DAWN") {
+          algorithm == "Single Source Shortest Path") {
         options.add_options()("validate", "CPU validation");  // validate
       }
     } else {

@@ -205,7 +205,7 @@ struct enactor_t {
    * @return frontier_t*
    */
   frontier_t* get_input_frontier() {
-    return reinterpret_cast<frontier_t*>(active_frontier);
+    return active_frontier;
   }
 
   /**
@@ -213,7 +213,7 @@ struct enactor_t {
    * @return frontier_t*
    */
   frontier_t* get_output_frontier() {
-    return reinterpret_cast<frontier_t*>(inactive_frontier);
+    return inactive_frontier;
   }
 
   /**

@@ -1,5 +1,4 @@
 #include <gunrock/algorithms/sssp.hxx>
-#include <gunrock/algorithms/dawn.hxx>
 #include "sssp_cpu.hxx"  // Reference implementation
 #include <gunrock/util/performance.hxx>
 #include <gunrock/io/parameters.hxx>
@@ -17,14 +16,12 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  std::string DEFAULT_SSSP_ALGORITHMS =
-      "DAWN";  // Using 'Single Source Shortest Path' here will call the
-               // original SSSP
+
   // --
   // IO
 
   gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
-                                        DEFAULT_SSSP_ALGORITHMS);
+                                        "Single Source Shortest Path");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(arguments.filename);
@@ -41,6 +38,9 @@ void test_sssp(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G = graph::build<memory_space_t::device>(properties, csr);
+
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
 
   // --
   // Params and memory allocation
@@ -66,30 +66,17 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  /// An example of how one can use std::shared_ptr to allocate memory on the
-  /// GPU, using a custom deleter that automatically handles deletion of the
-  /// memory.
-  // std::shared_ptr<weight_t> distances(
-  //     allocate<weight_t>(n_vertices * sizeof(weight_t)),
-  //     deleter_t<weight_t>());
-  // std::shared_ptr<vertex_t> predecessors(
-  //     allocate<vertex_t>(n_vertices * sizeof(vertex_t)),
-  //     deleter_t<vertex_t>());
-
   size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
   auto benchmark_metrics = std::vector<benchmark::host_benchmark_t>(n_runs);
   for (int i = 0; i < n_runs; i++) {
     benchmark::INIT_BENCH();
-    if (DEFAULT_SSSP_ALGORITHMS == "DAWN")
-      run_times.push_back(gunrock::dawn_sssp::run(G, source_vect[i],
-                                                  distances.data().get(),
-                                                  predecessors.data().get()));
-    else
-      run_times.push_back(gunrock::sssp::run(G, source_vect[i],
-                                             distances.data().get(),
-                                             predecessors.data().get()));
+    run_times.push_back(gunrock::sssp::run(G, source_vect[i],
+                                           distances.data().get(),
+                                           predecessors.data().get(),
+                                           context,
+                                           arguments.advance_load_balance));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;
@@ -99,16 +86,10 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   // Export metrics
   if (arguments.export_metrics) {
-    if (DEFAULT_SSSP_ALGORITHMS == "DAWN")
-      gunrock::util::stats::export_performance_stats(
-          benchmark_metrics, n_edges, n_vertices, run_times, "dawn_sssp",
-          arguments.filename, "market", arguments.json_dir, arguments.json_file,
-          source_vect, tag_vect, num_arguments, argument_array);
-    else
-      gunrock::util::stats::export_performance_stats(
-          benchmark_metrics, n_edges, n_vertices, run_times, "sssp",
-          arguments.filename, "market", arguments.json_dir, arguments.json_file,
-          source_vect, tag_vect, num_arguments, argument_array);
+    gunrock::util::stats::export_performance_stats(
+        benchmark_metrics, n_edges, n_vertices, run_times, "sssp",
+        arguments.filename, "market", arguments.json_dir, arguments.json_file,
+        source_vect, tag_vect, num_arguments, argument_array);
   }
 
   // --
