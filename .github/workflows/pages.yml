@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Configure cmake for Doxygen
-        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
+        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DESSENTIALS_NVIDIA_BACKEND=ON -DESSENTIALS_AMD_BACKEND=OFF -DCMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
         shell: bash
         env:
           CC:   gcc-11
