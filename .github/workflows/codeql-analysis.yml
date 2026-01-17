@@ -31,6 +31,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
+        language: [ 'cpp' ]
         backend: [nvidia]
         include:
           - backend: nvidia
@@ -72,7 +73,7 @@ jobs:
         run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}
         
       - name: Build all applications
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target sssp
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
