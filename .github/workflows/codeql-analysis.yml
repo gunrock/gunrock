@@ -31,7 +31,12 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        language: [ 'cpp' ]
+        backend: [nvidia]
+        include:
+          - backend: nvidia
+            architectures: "90"
+            cmake_backend_flag: "-DESSENTIALS_NVIDIA_BACKEND=ON -DESSENTIALS_AMD_BACKEND=OFF"
+            cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
 
     steps:
       - name: Free up space
@@ -43,11 +48,11 @@ jobs:
           
       # Fetch/Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.16
+        uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with:
           cuda: '12.5.0'
@@ -64,11 +69,10 @@ jobs:
           languages: ${{ matrix.language }}
       
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -D CMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
+        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}
         
       - name: Build all applications
-        # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target sssp 
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
