@@ -1,8 +1,8 @@
 # Gunrock: CUDA/C++ GPU Graph Analytics
-[![Ubuntu](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/gunrock/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml)
+[![Ubuntu](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/gunrock/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml) [![Documentation](https://github.com/gunrock/gunrock/actions/workflows/pages.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/pages.yml)
 
-| [**Examples**](https://github.com/gunrock/gunrock/tree/main/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://github.com/gunrock/gunrock/wiki) | [**GitHub Actions**](https://github.com/gunrock/gunrock/actions) |
-|--------------|----------------------|-------------------|-------------------|
+| [**Examples**](https://github.com/gunrock/gunrock/tree/main/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://gunrock.github.io/gunrock/) | [**Deprecated Documentation**](https://gunrock.github.io/docs/#/) | [**GitHub Actions**](https://github.com/gunrock/gunrock/actions) |
+|--------------|----------------------|-------------------|-------------------|---------------|
 
 **Gunrock**[^1] is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
 
@@ -17,7 +17,6 @@ Before building Gunrock make sure you have **CUDA Toolkit (NVIDIA)** or **ROCm/H
 
 > [!WARNING]
 > We're working on downloading other rocm dependencies automatically as well, for now you may have to also install rocprim-dev, rocthrust-dev, hipcub-dev, hiprand-dev, hipsparse-dev, rocrand and roctracer. All of them typically gets installed with ROCm.
-
 
 ```shell
 git clone https://github.com/gunrock/gunrock.git
