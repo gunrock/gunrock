@@ -41,6 +41,7 @@
 #include <gunrock/util/math.hxx>
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/cuda/cuda.hxx>
+#include <gunrock/cuda/launch_box.hxx>
 #include <gunrock/error.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
@@ -328,21 +329,32 @@ void execute(graph_t& G,
   if (num_atoms <= 0 || num_segments <= 0)
     return;
 
-  // Kernel configuration - tuned for AMD gfx942
-  // Higher items_per_thread reduces kernel launch overhead
-  // but increases register pressure
-  constexpr int threads_per_block = 256;
-  constexpr int items_per_thread = 11;
-  constexpr int merge_tile_size = threads_per_block * items_per_thread;
+  // Set-up launch box for merge-path advance
+  // items_per_thread=11 provides good balance between occupancy and work per thread
+  using namespace gcuda::launch_box;
+  using launch_t = launch_box_t<
+      launch_params_dynamic_grid_t<fallback, dim3_t<256>, 11>>;  // 256 threads, 11 items/thread
+
+  launch_t launch_box;
+  
+  constexpr int merge_tile_size = launch_t::block_dimensions.x * launch_t::items_per_thread;
 
   // Total merge path length = num_segments + num_atoms
   // This is different from block_mapped which only considers num_segments
   int num_merge_items = num_segments + num_atoms;
   int num_merge_tiles = (num_merge_items + merge_tile_size - 1) / merge_tile_size;
 
+  launch_box.grid_dimensions = dimensions_t(num_merge_tiles, 1, 1);
+
   // Launch kernel
-  merge_path_kernel<threads_per_block, items_per_thread, input_type, output_type>
-      <<<num_merge_tiles, threads_per_block, 0, context.stream()>>>(
+  auto kernel = merge_path_kernel<
+      launch_t::block_dimensions.x,
+      launch_t::items_per_thread,
+      input_type, output_type,
+      graph_t, operator_t, frontier_t,
+      typename work_tiles_t::value_type>;
+
+  launch_box.launch(context, kernel,
           G, op, input, output, 
           segments.data().get(), num_segments, num_atoms, num_merge_tiles);
 
