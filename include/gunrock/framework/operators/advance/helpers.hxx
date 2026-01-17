@@ -12,8 +12,12 @@
 #pragma once
 
 #include <gunrock/cuda/context.hxx>
+#include <gunrock/error.hxx>
 #include <thrust/transform_scan.h>
 #include <thrust/transform_reduce.h>
+
+#include <string>
+#include <cstddef>
 
 namespace gunrock {
 namespace operators {
@@ -65,7 +69,6 @@ std::size_t compute_output_offsets(graph_t& G,
 
   auto new_length = thrust::transform_exclusive_scan(
       context.execution_policy(),  // execution policy
-      // thrust::cuda::par.on(context.stream()),
       thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
       thrust::make_counting_iterator<std::size_t>(total_elems +
                                                   1),  // input iterator: last
@@ -75,6 +78,8 @@ std::size_t compute_output_offsets(graph_t& G,
       thrust::plus<edge_t>()                           // binary operation
   );
 
+  // thrust::host_vector construction from device memory implicitly synchronizes
+
   // The last item contains the total scanned items, so in a simple
   // example, where the input = {1, 0, 2, 2, 1, 3} resulted in the
   // inclusive scan output = {1, 1, 3, 5, 6, 9}, then output.size() - 1
@@ -82,6 +87,16 @@ std::size_t compute_output_offsets(graph_t& G,
   // We can use this to allocate the size of the output frontier.
   auto location_of_total_scanned_items =
       thrust::distance(segments.begin(), new_length) - 1;
+
+  // Bounds check: ensure we're reading from a valid location
+  if (location_of_total_scanned_items < 0 || 
+      location_of_total_scanned_items >= (std::ptrdiff_t)segments.size()) {
+    error::throw_if_exception(hipErrorInvalidValue,
+                              "Invalid location_of_total_scanned_items: " + 
+                              std::to_string(location_of_total_scanned_items) +
+                              " (segments.size() = " + std::to_string(segments.size()) + 
+                              ", total_elems = " + std::to_string(total_elems) + ")");
+  }
 
   // Move the last element of the scanned work-domain to host.
   // Last Element = size of active buffer - 1;

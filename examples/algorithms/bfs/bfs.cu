@@ -1,5 +1,4 @@
 #include <gunrock/algorithms/bfs.hxx>
-#include <gunrock/algorithms/dawn.hxx>
 #include <gunrock/util/performance.hxx>
 #include <gunrock/io/parameters.hxx>
 #include <gunrock/framework/benchmark.hxx>
@@ -20,13 +19,11 @@ void test_bfs(int num_arguments, char** argument_array) {
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
-  std::string DEFAULT_BFS_ALGORITHMS =
-      "DAWN";  // Using 'Breadth First Search' here will call the original BFS
   // --
   // IO
 
   gunrock::io::cli::parameters_t arguments(num_arguments, argument_array,
-                                        DEFAULT_BFS_ALGORITHMS);
+                                        "Breadth First Search");
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(arguments.filename);
@@ -43,6 +40,9 @@ void test_bfs(int num_arguments, char** argument_array) {
   // Build graph
 
   auto G = graph::build<memory_space_t::device>(properties, csr);
+
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
 
   // --
   // Params and memory allocation
@@ -69,14 +69,12 @@ void test_bfs(int num_arguments, char** argument_array) {
   auto benchmark_metrics = std::vector<benchmark::host_benchmark_t>(n_runs);
   for (int i = 0; i < n_runs; i++) {
     benchmark::INIT_BENCH();
-    if (DEFAULT_BFS_ALGORITHMS == "DAWN")
-      run_times.push_back(gunrock::dawn_bfs::run(G, source_vect[i],
-                                                 distances.data().get(),
-                                                 predecessors.data().get()));
-    else
-      run_times.push_back(gunrock::bfs::run(G, source_vect[i],
-                                            distances.data().get(),
-                                            predecessors.data().get()));
+
+    run_times.push_back(gunrock::bfs::run(G, source_vect[i],
+                                          distances.data().get(),
+                                          predecessors.data().get(),
+                                          context,
+                                          arguments.advance_load_balance));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;
@@ -86,16 +84,10 @@ void test_bfs(int num_arguments, char** argument_array) {
 
   // Export metrics
   if (arguments.export_metrics) {
-    if (DEFAULT_BFS_ALGORITHMS == "DAWN")
-      gunrock::util::stats::export_performance_stats(
-          benchmark_metrics, n_edges, n_vertices, run_times, "dawn_bfs",
-          arguments.filename, "market", arguments.json_dir, arguments.json_file,
-          source_vect, tag_vect, num_arguments, argument_array);
-    else
-      gunrock::util::stats::export_performance_stats(
-          benchmark_metrics, n_edges, n_vertices, run_times, "bfs",
-          arguments.filename, "market", arguments.json_dir, arguments.json_file,
-          source_vect, tag_vect, num_arguments, argument_array);
+    gunrock::util::stats::export_performance_stats(
+        benchmark_metrics, n_edges, n_vertices, run_times, "bfs",
+        arguments.filename, "market", arguments.json_dir, arguments.json_file,
+        source_vect, tag_vect, num_arguments, argument_array);
   }
 
   // Print info for last run

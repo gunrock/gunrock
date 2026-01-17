@@ -21,10 +21,10 @@
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/bucketing.hxx>
+#include <gunrock/framework/operators/advance/merge_path.hxx>
 
 #if __HIP_PLATFORM_NVIDIA__
 #include <gunrock/framework/operators/advance/merge_path_v2.hxx>
-#include <gunrock/framework/operators/advance/merge_path.hxx>
 #endif
 
 namespace gunrock {
@@ -115,10 +115,10 @@ void execute(graph_t& G,
     } else if (lb == load_balance_t::merge_path_v2) {
       merge_path_v2::execute<direction, input_type, output_type>(
           G, op, *input, *output, segments, *context0);
+#endif
     } else if (lb == load_balance_t::merge_path) {
       merge_path::execute<direction, input_type, output_type>(
           G, op, input, output, segments, *context0);
-#endif
     } else if (lb == load_balance_t::block_mapped) {
       block_mapped::execute<direction, input_type, output_type>(
           G, op, *input, *output, *context0);
@@ -259,11 +259,11 @@ void execute_runtime(graph_t& G,
     execute<load_balance_t::block_mapped, advance_direction_t::forward,
             advance_io_type_t::vertices, advance_io_type_t::vertices>(
         G, E, op, context, swap_buffers);
-#if __HIP_PLATFORM_NVIDIA__
   } else if (lb == load_balance_t::merge_path) {
     execute<load_balance_t::merge_path, advance_direction_t::forward,
             advance_io_type_t::vertices, advance_io_type_t::vertices>(
         G, E, op, context, swap_buffers);
+#if __HIP_PLATFORM_NVIDIA__
   } else if (lb == load_balance_t::merge_path_v2) {
     execute<load_balance_t::merge_path_v2, advance_direction_t::forward,
             advance_io_type_t::vertices, advance_io_type_t::vertices>(
