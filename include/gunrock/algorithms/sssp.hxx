@@ -188,7 +188,12 @@ float run(graph_t& G,
   problem.reset();
 
   enactor_type enactor(&problem, context);
-  return enactor.enact();
+  float runtime = enactor.enact();
+  
+  // Synchronize context to ensure all GPU operations complete before next run
+  context->get_context(0)->synchronize();
+  
+  return runtime;
 }
 
 /**

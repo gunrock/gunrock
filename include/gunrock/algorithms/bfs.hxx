@@ -50,7 +50,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> visited;  /// @todo not used.
 
-  void init() override {}
+  void init() override {
+    // Initialize visited vector (even though it's not currently used)
+    auto n_vertices = this->get_graph().get_number_of_vertices();
+    visited.resize(n_vertices);
+  }
 
   void reset() override {
     auto n_vertices = this->get_graph().get_number_of_vertices();
@@ -167,7 +171,12 @@ float run(graph_t& G,
   problem.reset();
 
   enactor_type enactor(&problem, context);
-  return enactor.enact();
+  float runtime = enactor.enact();
+  
+  // Synchronize context to ensure all GPU operations complete before next run
+  context->get_context(0)->synchronize();
+  
+  return runtime;
 }
 
 /**
