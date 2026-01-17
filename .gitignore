@@ -18,38 +18,29 @@
 *.la
 *.a
 
-# Ignore graph dataset files
-*.graph
-*.mtx*
+# Build directories
+build*/
+build_*/
+*_build/
+.cmake/
 
-# Ignore tarball
-*.tar.gz
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+!cmake/*.cmake
 
-# Ignore bin directory
-bin/
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
 
-# Ignore eval directory
-eval/
-
-# Ignore vim temp files
-*.sw~
-
-# Ignore build directory
-build
-build_release
-build_debug
-
-# Ignore external fetched content
-externals/*
-
-# Ignore slurm files
-slurm-*.out
-
-# Ignore sphinx build files
-docs/sphinx/_api/
-docs/sphinx/_build/
-docs/sphinx/_doxygen/
-docs/sphinx/_extensions/
-docs/sphinx/gunrock.wiki/
-build-amd/
-build/
+# Test/benchmark results
+*.csv
+*.db
+*.stats.csv
+*.sysinfo.txt
+results/
