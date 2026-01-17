@@ -44,3 +44,7 @@ cmake_install.cmake
 *.stats.csv
 *.sysinfo.txt
 results/
+
+# Exclude datasets and externals
+datasets/
+externals/
