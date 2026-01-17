@@ -13,22 +13,145 @@
 
 
 ## Quick Start Guide
-Before building Gunrock make sure you have **CUDA Toolkit (NVIDIA)** or **ROCm/HIP (AMD)**[^2] installed on your system. Other external dependencies such as `thrust`, `cub`, etc. are automatically fetched using `cmake`.
+
+### Prerequisites
+
+Before building Gunrock, ensure you have the following installed:
+
+- **CMake** version 3.24 or higher
+- **C++ compiler** with C++17 support (GCC 7+, Clang 5+, or MSVC 2017+)
+- **CUDA Toolkit** (NVIDIA) version 12.4+ or **ROCm/HIP** (AMD) version 6.4+[^2]
+- **Git** (for cloning the repository)
 
 > [!WARNING]
-> We're working on downloading other rocm dependencies automatically as well, for now you may have to also install rocprim-dev, rocthrust-dev, hipcub-dev, hiprand-dev, hipsparse-dev, rocrand and roctracer. All of them typically gets installed with ROCm.
+> For AMD/ROCm builds, you may need to install additional ROCm packages:
+> `rocprim-dev`, `rocthrust-dev`, `hipcub-dev`, `hiprand-dev`, `hipsparse-dev`, `rocrand`, and `roctracer`.
+> These are typically installed with a full ROCm installation.
+
+### Building Gunrock
+
+#### 1. Clone the Repository
 
 ```shell
 git clone https://github.com/gunrock/gunrock.git
 cd gunrock
-mkdir build && cd build
-# For [AMD] MI350 or MI355 (or adjust the CMAKE_HIP_ARCHITECTURES for your GPU)
-cmake -DCMAKE_BUILD_TYPE=Release -DESSENTIALS_AMD_BACKEND=ON -DESSENTIALS_NVIDIA_BACKEND=OFF -DCMAKE_HIP_ARCHITECTURES=gfx950 .. 
-# For [NVIDIA] H100 (or adjust the CMAKE_CUDA_ARCHITECTURES for your GPU)
-cmake -DCMAKE_BUILD_TYPE=Release -DESSENTIALS_AMD_BACKEND=OFF -DESSENTIALS_NVIDIA_BACKEND=ON -DCMAKE_CUDA_ARCHITECTURES=90 .. 
-make sssp # or for all algorithms, use: make -j$(nproc)
-bin/sssp --market ../datasets/chesapeake/chesapeake.mtx
 ```
+
+#### 2. Create Build Directory
+
+```shell
+mkdir build && cd build
+```
+
+#### 3. Configure CMake
+
+**For AMD/ROCm Backend:**
+```shell
+# For AMD MI350/MI355 (gfx950) - adjust CMAKE_HIP_ARCHITECTURES for your GPU
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DESSENTIALS_AMD_BACKEND=ON \
+      -DESSENTIALS_NVIDIA_BACKEND=OFF \
+      -DCMAKE_HIP_ARCHITECTURES=gfx950 \
+      ..
+```
+
+**For NVIDIA/CUDA Backend:**
+```shell
+# For NVIDIA H100 (sm_90) - adjust CMAKE_CUDA_ARCHITECTURES for your GPU
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DESSENTIALS_AMD_BACKEND=OFF \
+      -DESSENTIALS_NVIDIA_BACKEND=ON \
+      -DCMAKE_CUDA_ARCHITECTURES=90 \
+      ..
+```
+
+**Common GPU Architecture Codes:**
+- **NVIDIA**: `75` (Turing), `80` (Ampere), `86` (Ampere), `89` (Ada), `90` (Hopper)
+- **AMD**: `gfx906` (Vega), `gfx908` (MI100), `gfx942` (MI300), `gfx950` (MI350/MI355)
+
+#### 4. Build
+
+**Build all algorithms:**
+```shell
+make -j$(nproc)
+```
+
+**Build specific algorithm:**
+```shell
+make bfs      # Breadth-First Search
+make sssp     # Single-Source Shortest Path
+make pr       # PageRank
+make bc       # Betweenness Centrality
+make color    # Graph Coloring
+# ... and more
+```
+
+**Build all examples:**
+```shell
+make examples
+```
+
+#### 5. Run Examples
+
+```shell
+# Run BFS
+./bin/bfs --market ../datasets/chesapeake/chesapeake.mtx --src 0
+
+# Run SSSP with validation
+./bin/sssp --market ../datasets/chesapeake/chesapeake.mtx --src 0 --validate
+
+# Run with custom optimization options
+./bin/bfs --market ../datasets/chesapeake/chesapeake.mtx \
+          --src 0 \
+          --advance_load_balance merge_path \
+          --enable_filter \
+          --filter_algorithm compact \
+          --num_runs 10
+```
+
+### Available CLI Options
+
+All algorithms support the following optimization options via command-line:
+
+- `--advance_load_balance`: Load balancing strategy (`thread_mapped`, `block_mapped`, `merge_path`, `merge_path_v2`, etc.)
+- `--filter_algorithm`: Filter algorithm (`remove`, `predicated`, `compact`, `bypass`)
+- `--enable_filter`: Enable filter operator
+- `--enable_uniquify`: Enable uniquify operator
+- `--uniquify_algorithm`: Uniquify algorithm (`unique`, `unique_copy`)
+- `--best_effort_uniquify`: Best-effort uniquification (skip sorting)
+- `--uniquify_percent`: Percentage of elements to uniquify (0-100)
+
+### Building in Docker (NVIDIA)
+
+For NVIDIA builds in a Docker container:
+
+```shell
+docker run --rm -v $(pwd):/gunrock -w /gunrock \
+  nvidia/cuda:13.1.0-devel-ubuntu24.04 \
+  bash -c "apt-get update && apt-get install -y cmake git && \
+           mkdir -p build && cd build && \
+           cmake .. -DCMAKE_BUILD_TYPE=Release \
+                    -DESSENTIALS_AMD_BACKEND=OFF \
+                    -DESSENTIALS_NVIDIA_BACKEND=ON \
+                    -DCMAKE_CUDA_ARCHITECTURES=75 && \
+           make -j8 bfs sssp"
+```
+
+### Troubleshooting
+
+**CMake version too old:**
+```shell
+# Install CMake 3.24+ from https://cmake.org/download/
+# Or use the instructions in CMakeLists.txt
+```
+
+**Build fails with "Failed to find ROCm root directory":**
+- Ensure ROCm is properly installed and `ROCM_PATH` is set
+- Or use `-DESSENTIALS_AMD_BACKEND=OFF -DESSENTIALS_NVIDIA_BACKEND=ON` for NVIDIA builds
+
+**Segmentation fault with multiple runs:**
+- This has been fixed in recent commits. Ensure you're using the latest code.
+- If issues persist, try running with `--num_runs 1` first to verify correctness.
 
 ## Implementing Graph Algorithms
 For a detailed explanation, please see the full [documentation](https://github.com/gunrock/gunrock/wiki/How-to-write-a-new-graph-algorithm). The following example shows simple APIs using Gunrock's data-centric, bulk-synchronous programming model, we implement Breadth-First Search on GPUs. This example skips the setup phase of creating a `problem_t` and `enactor_t` struct and jumps straight into the actual algorithm.
