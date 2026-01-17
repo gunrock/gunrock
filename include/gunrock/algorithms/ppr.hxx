@@ -19,15 +19,10 @@ struct param_t {
   vertex_t seed;
   weight_t alpha;
   weight_t epsilon;
-  operators::load_balance_t advance_load_balance;
-  operators::filter_algorithm_t filter_algorithm;
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
   
-  param_t(vertex_t _seed, weight_t _alpha, weight_t _epsilon,
-          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
-          operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::predicated)
-      : seed(_seed), alpha(_alpha), epsilon(_epsilon),
-        advance_load_balance(_advance_load_balance),
-        filter_algorithm(_filter_algorithm) {}
+  param_t(vertex_t _seed, weight_t _alpha, weight_t _epsilon, options_t _options = options_t())
+      : seed(_seed), alpha(_alpha), epsilon(_epsilon), options(_options) {}
 };
 
 template <typename weight_t>
@@ -114,8 +109,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
 
-    auto advance_load_balance = P->param.advance_load_balance;
-    auto filter_algorithm = P->param.filter_algorithm;
+    auto advance_load_balance = P->param.options.advance_load_balance;
+    auto filter_algorithm = P->param.options.filter_algorithm;
     weight_t* p = P->result.p;
     weight_t* r = P->r.data().get();
     weight_t* r_prime = P->r_prime.data().get();
@@ -187,25 +182,34 @@ float run(graph_t& G,
   return enactor.enact();
 }
 
+/**
+ * @brief Run Personalized PageRank algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param seed Seed vertex.
+ * @param p Pointer to the pagerank values.
+ * @param alpha Damping factor.
+ * @param epsilon Convergence threshold.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& seed,
           typename graph_t::weight_type* p,
           typename graph_t::weight_type& alpha,
           typename graph_t::weight_type& epsilon,
-          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
-          operators::filter_algorithm_t filter_algorithm = operators::filter_algorithm_t::predicated,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
-  using param_type = param_t<vertex_t, weight_t>;
-  using result_type = result_t<weight_t>;
-
-  param_type param(seed, alpha, epsilon, advance_load_balance, filter_algorithm);
-  result_type result(p);
+  param_t<vertex_t, weight_t> param(seed, alpha, epsilon);
+  result_t<weight_t> result(p);
 
   return run(G, param, result, context);
 }

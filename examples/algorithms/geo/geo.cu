@@ -165,8 +165,14 @@ void test_geo(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::geo::run(G, coordinates.data().get(),
-                                        total_iterations, spatial_iterations);
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
+  // Create param and result structs
+  gunrock::geo::param_t param(total_iterations, spatial_iterations);
+  gunrock::geo::result_t result(coordinates.data().get());
+
+  float gpu_elapsed = gunrock::geo::run(G, param, result, context);
 
   // --
   // Log + Validate

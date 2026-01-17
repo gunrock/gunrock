@@ -53,6 +53,12 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  // Get optimization options from CLI arguments
+  gunrock::options_t options = arguments.get_options();
+
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
   size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
@@ -60,8 +66,11 @@ void test_bc(int num_arguments, char** argument_array) {
   for (int i = 0; i < n_runs; i++) {
     benchmark::INIT_BENCH();
 
-    run_times.push_back(
-        gunrock::bc::run(G, source_vect[i], bc_values.data().get()));
+    // Create param and result structs with CLI options
+    gunrock::bc::param_t<vertex_t> param(source_vect[i], options);
+    gunrock::bc::result_t<weight_t> result(bc_values.data().get());
+
+    run_times.push_back(gunrock::bc::run(G, param, result, context));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;

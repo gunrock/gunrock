@@ -17,7 +17,10 @@ namespace bc {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  param_t(vertex_t _single_source) : single_source(_single_source) {}
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(vertex_t _single_source, options_t _options = options_t()) 
+    : single_source(_single_source), options(_options) {}
 };
 
 template <typename weight_t>
@@ -219,26 +222,30 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run Betweenness Centrality algorithm on a given graph, G, with
+ * provided parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t) including source and options.
+ * @param result Algorithm results (result_t) with output pointers.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::vertex_type single_source,
-          typename graph_t::weight_type* bc_values,
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
   using param_type = param_t<vertex_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(single_source);
-  result_type result(bc_values);
-  // </user-defined>
-
-  // <boiler-plate>
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
@@ -253,7 +260,35 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context, props);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+/**
+ * @brief Run Betweenness Centrality algorithm on a given graph, G, starting
+ * from the source node, single_source.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param single_source A vertex in the graph (integral type).
+ * @param bc_values Pointer to the betweenness centrality values.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::vertex_type single_source,
+          typename graph_t::weight_type* bc_values,
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  param_t<vertex_t> param(single_source);
+  result_t<weight_t> result(bc_values);
+
+  return run(G, param, result, context);
 }
 
 template <typename graph_t>

@@ -24,7 +24,10 @@ template <typename a_graph_t, typename b_graph_t>
 struct param_t {
   a_graph_t& A;
   b_graph_t& B;
-  param_t(a_graph_t& _A, b_graph_t& _B) : A(_A), B(_B) {}
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(a_graph_t& _A, b_graph_t& _B, options_t _options = options_t()) 
+      : A(_A), B(_B), options(_options) {}
 };
 
 template <typename csr_t>

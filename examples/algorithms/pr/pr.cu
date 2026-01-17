@@ -57,6 +57,12 @@ void test_pr(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  // Get optimization options from CLI arguments
+  gunrock::options_t options = arguments.get_options();
+
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
   std::vector<float> run_times;
 
   auto benchmark_metrics =
@@ -64,7 +70,11 @@ void test_pr(int num_arguments, char** argument_array) {
   for (int i = 0; i < arguments.num_runs; i++) {
     benchmark::INIT_BENCH();
 
-    run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
+    // Create param and result structs with CLI options
+    gunrock::pr::param_t<weight_t> param(alpha, tol, options);
+    gunrock::pr::result_t<weight_t> result(p.data().get());
+
+    run_times.push_back(gunrock::pr::run(G, param, result, context));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;

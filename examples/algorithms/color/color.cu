@@ -47,7 +47,14 @@ void test_color(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::color::run(G, colors.data().get());
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
+  // Create param and result structs (default options)
+  gunrock::color::param_t param;
+  gunrock::color::result_t<vertex_t> result(colors.data().get());
+
+  float gpu_elapsed = gunrock::color::run(G, param, result, context);
 
   // --
   // CPU Run

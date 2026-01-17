@@ -19,7 +19,11 @@ namespace gunrock {
 namespace mst {
 
 template <typename vertex_t>
-struct param_t {};
+struct param_t {
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(options_t _options = options_t()) : options(_options) {}
+};
 
 template <typename vertex_t, typename weight_t>
 struct result_t {
@@ -263,21 +267,29 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };
 
+/**
+ * @brief Run Minimum Spanning Tree algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t) including options.
+ * @param result Algorithm results (result_t) with output pointers.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::weight_type* mst_weight,  // Output
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::vertex_type, typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t, weight_t>;
-
-  param_type param;
-  result_type result(mst_weight);
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -288,6 +300,32 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context);
   return enactor.enact();
+}
+
+/**
+ * @brief Run Minimum Spanning Tree algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param mst_weight Pointer to the MST weight.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::weight_type* mst_weight,  // Output
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  param_t<vertex_t> param;
+  result_t<vertex_t, weight_t> result(mst_weight);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace mst

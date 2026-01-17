@@ -16,27 +16,30 @@
 namespace gunrock {
 namespace kcore {
 
+struct param_t {
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(options_t _options = options_t()) : options(_options) {}
+};
+
 template <typename vertex_t>
 struct result_t {
   int* k_cores;
   result_t(int* _k_cores) : k_cores(_k_cores) {}
 };
 
-template <typename graph_t, typename result_type>
+template <typename graph_t, typename param_type, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
+  param_type param;
   result_type result;
-  operators::load_balance_t advance_load_balance;
-  operators::filter_algorithm_t filter_algorithm;
 
   problem_t(graph_t& G,
+            param_type& _param,
             result_type& _result,
-            std::shared_ptr<gcuda::multi_context_t> _context,
-            operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped,
-            operators::filter_algorithm_t _filter_algorithm = operators::filter_algorithm_t::predicated)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(G, _context), 
-        result(_result),
-        advance_load_balance(_advance_load_balance),
-        filter_algorithm(_filter_algorithm) {}
+        param(_param),
+        result(_result) {}
 
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
@@ -161,8 +164,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (old_degrees != (k + 1)) ? false : true;
     };
 
-    auto advance_load_balance = P->advance_load_balance;
-    auto filter_algorithm = P->filter_algorithm;
+    auto advance_load_balance = P->param.options.advance_load_balance;
+    auto filter_algorithm = P->param.options.filter_algorithm;
 
     while (!f->is_empty()) {
       // Execute advance operator using runtime dispatch
@@ -208,36 +211,59 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };
 
+/**
+ * @brief Run K-Core decomposition algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t) including options.
+ * @param result Algorithm results (result_t) with output pointers.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          int* k_cores,  // Output
-          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
-          operators::filter_algorithm_t filter_algorithm = operators::filter_algorithm_t::predicated,
+          param_t& param,
+          result_t<int>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  using vertex_t = typename graph_t::vertex_type;
-  using weight_t = typename graph_t::weight_type;
-
-  // instantiate `result` template
+                  new gcuda::multi_context_t(0))) {
   using result_type = result_t<int>;
+  using param_type = param_t;
 
-  // initialize `result` w/ the appropriate parameters / data structures
-  result_type result(k_cores);
-
-  // instantiate `problem` and `enactor` templates.
-  using problem_type = problem_t<graph_t, result_type>;
+  using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  // initialize problem; call `init` and `reset` to prepare data structures
-  problem_type problem(G, result, context, advance_load_balance, filter_algorithm);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
-  // initialize enactor; call enactor, returning GPU elapsed time
   enactor_type enactor(&problem, context);
   return enactor.enact();
+}
+
+/**
+ * @brief Run K-Core decomposition algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param k_cores Pointer to the k-core values.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          int* k_cores,  // Output
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  param_t param;
+  result_t<int> result(k_cores);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace kcore

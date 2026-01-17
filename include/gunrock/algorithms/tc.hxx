@@ -18,8 +18,10 @@ namespace tc {
 template <typename vertex_t>
 struct param_t {
   bool reduce_all_triangles;
-  param_t(bool _reduce_all_triangles)
-      : reduce_all_triangles(_reduce_all_triangles) {}
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(bool _reduce_all_triangles, options_t _options = options_t())
+      : reduce_all_triangles(_reduce_all_triangles), options(_options) {}
 };
 
 template <typename vertex_t>
@@ -94,12 +96,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return false;
     };
 
-    // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped,
-                                operators::advance_direction_t::forward,
-                                operators::advance_io_type_t::graph,
-                                operators::advance_io_type_t::none>(
-        G, E, intersect, context);
+    // Execute advance operator on the provided lambda using runtime dispatch
+    auto advance_load_balance = P->param.options.advance_load_balance;
+    operators::advance::execute_runtime(G, E, intersect, advance_load_balance, context);
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) override {
@@ -128,25 +127,28 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run Triangle Counting algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t) including options.
+ * @param result Algorithm results (result_t) with output pointers.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          bool reduce_all_triangles,
-          typename graph_t::vertex_type* vertex_triangles_count,  // Output
-          std::size_t* total_triangles_count,                     // Output
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::vertex_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
-  using weight_t = typename graph_t::weight_type;
 
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
-
-  param_type param(reduce_all_triangles);
-  result_type result(vertex_triangles_count, total_triangles_count);
-  // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -162,8 +164,36 @@ float run(graph_t& G,
   auto time = enactor.enact();
   time += enactor.post_process();
 
-  // </boiler-plate>
   return time;
+}
+
+/**
+ * @brief Run Triangle Counting algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param reduce_all_triangles Whether to reduce all triangles.
+ * @param vertex_triangles_count Pointer to per-vertex triangle counts.
+ * @param total_triangles_count Pointer to total triangle count.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          bool reduce_all_triangles,
+          typename graph_t::vertex_type* vertex_triangles_count,  // Output
+          std::size_t* total_triangles_count,                     // Output
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using vertex_t = typename graph_t::vertex_type;
+
+  param_t<vertex_t> param(reduce_all_triangles);
+  result_t<vertex_t> result(vertex_triangles_count, total_triangles_count);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace tc

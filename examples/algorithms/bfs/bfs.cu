@@ -63,6 +63,9 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Run problem
 
+  // Get optimization options from CLI arguments
+  gunrock::options_t options = arguments.get_options();
+
   size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
@@ -70,11 +73,12 @@ void test_bfs(int num_arguments, char** argument_array) {
   for (int i = 0; i < n_runs; i++) {
     benchmark::INIT_BENCH();
 
-    run_times.push_back(gunrock::bfs::run(G, source_vect[i],
-                                          distances.data().get(),
-                                          predecessors.data().get(),
-                                          context,
-                                          arguments.advance_load_balance));
+    // Create param and result structs with CLI options
+    gunrock::bfs::param_t<vertex_t> param(source_vect[i], options);
+    gunrock::bfs::result_t<vertex_t> result(distances.data().get(),
+                                            predecessors.data().get());
+
+    run_times.push_back(gunrock::bfs::run(G, param, result, context));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;

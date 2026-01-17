@@ -19,11 +19,10 @@ namespace spmv {
 template <typename weight_t>
 struct param_t {
   weight_t* x;
-  operators::load_balance_t advance_load_balance;
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
   
-  param_t(weight_t* _x,
-          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped)
-      : x(_x), advance_load_balance(_advance_load_balance) {}
+  param_t(weight_t* _x, options_t _options = options_t())
+      : x(_x), options(_options) {}
 };
 
 template <typename weight_t>
@@ -140,24 +139,28 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run SpMV algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t) including input vector and options.
+ * @param result Algorithm results (result_t) with output pointers.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::weight_type* x,  // Input vector
-          typename graph_t::weight_type* y,  // Output vector
-          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped,
+          param_t<typename graph_t::weight_type>& param,
+          result_t<typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using weight_t = typename graph_t::weight_type;
 
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
-
-  param_type param(x, advance_load_balance);
-  result_type result(y);
-  // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -172,7 +175,33 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context, props);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+/**
+ * @brief Run SpMV algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param x Input vector.
+ * @param y Output vector.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::weight_type* x,  // Input vector
+          typename graph_t::weight_type* y,  // Output vector
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using weight_t = typename graph_t::weight_type;
+
+  param_t<weight_t> param(x);
+  result_t<weight_t> result(y);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace spmv
