@@ -250,6 +250,13 @@ struct enactor_t {
       ++iteration;
     }
     finalize(*context);
+    // Synchronize the context's stream before ending the timer
+    // The timer records events on the default stream (0), but our operations
+    // run on the context's non-blocking stream, so we need to ensure all
+    // operations complete before the timer measures elapsed time.
+    // Also synchronize the default stream to ensure timer events are properly ordered.
+    single_context->synchronize();
+    hipDeviceSynchronize();  // Ensure all streams complete before timer.end()
     auto runtime = timer.end();
 #if (ESSENTIALS_COLLECT_METRICS)
     benchmark::____.search_depth = iteration;
