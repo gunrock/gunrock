@@ -5,9 +5,9 @@ name: Ubuntu
 on:
   # Triggers the workflow on push or pull request events but only for the master and dev branch
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -98,7 +98,7 @@ jobs:
         if: matrix.backend == 'amd'
         run: hipcc --version
         
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         
       - name: Configure cmake
         if: matrix.backend == 'amd'

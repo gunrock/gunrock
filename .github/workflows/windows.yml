@@ -5,9 +5,9 @@ name: Windows
 on:
   # Triggers the workflow on push or pull request events but only for the master and dev branch
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -43,7 +43,7 @@ jobs:
       - name: Check nvcc version
         run: nvcc -V
         
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Configure cmake
         run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}

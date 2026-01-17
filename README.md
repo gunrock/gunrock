@@ -9,9 +9,7 @@
 | Branch    | Purpose                                                                                                                            | Version        | Status     |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------|----------------|------------|
 | `main`    | Default branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials), serves as the official release branch.  | $\geq$ `2.x.x` | Active     |
-| `develop` | Development feature branch, ported from [`gunrock/essentials`](https://github.com/gunrock/essentials).                             | $\geq$ `2.x.x` | Active     |
 | `master`  | Previous release branch for `gunrock/gunrock` version `1.x.x` interface, preserves all commit history.                             | $\leq$ `1.x.x` | Deprecated |
-| `dev`     | Previous development branch for `gunrock/gunrock`. All changes now merged in `master`.                                             | $\leq$ `1.x.x` | Deprecated |  
 
 
 ## Quick Start Guide
