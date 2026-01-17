@@ -66,6 +66,9 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  // Get optimization options from CLI arguments
+  gunrock::options_t options = arguments.get_options();
+
   size_t n_runs = source_vect.size();
   std::vector<float> run_times;
 
@@ -73,11 +76,13 @@ void test_sssp(int num_arguments, char** argument_array) {
   for (int i = 0; i < n_runs; i++) {
     benchmark::INIT_BENCH();
 
-    // Use legacy API to test
-    run_times.push_back(gunrock::sssp::run(G, source_vect[i],
-                                           distances.data().get(),
-                                           predecessors.data().get(),
-                                           context));
+    // Create param and result structs with CLI options
+    gunrock::sssp::param_t<vertex_t> param(source_vect[i], options);
+    gunrock::sssp::result_t<vertex_t, weight_t> result(distances.data().get(),
+                                                       predecessors.data().get(),
+                                                       n_vertices);
+
+    run_times.push_back(gunrock::sssp::run(G, param, result, context));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;
