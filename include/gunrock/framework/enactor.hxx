@@ -241,22 +241,43 @@ struct enactor_t {
    * **the** time for performance measurements).
    */
   float enact() {
+    // Reset iteration counter at the start of each enact call
+    // This is critical for multiple runs to ensure correct state
+    iteration = 0;
+    
+    // Reset buffer selector and frontier pointers to ensure clean state
+    // This is necessary when enact() is called multiple times
+    buffer_selector = 0;
+    active_frontier = reinterpret_cast<frontier_t*>(&frontiers[0]);
+    inactive_frontier = reinterpret_cast<frontier_t*>(&frontiers[1]);
+    
+    // Reset frontier buffers before each run
+    // This ensures clean state for multiple runs
+    for (auto& frontier : frontiers) {
+      frontier.set_number_of_elements(0);
+    }
+    
     auto single_context = context->get_context(0);
-    prepare_frontier(get_input_frontier(), *context);
     auto timer = single_context->timer();
+    
+    // Record start event BEFORE prepare_frontier to ensure accurate timing
+    // and proper event ordering on the correct stream
     timer.begin();
+    
+    prepare_frontier(get_input_frontier(), *context);
+    
     while (!is_converged(*context)) {
       loop(*context);
       ++iteration;
     }
     finalize(*context);
+    
     // Synchronize the context's stream before ending the timer
     // The timer records events on the default stream (0), but our operations
     // run on the context's non-blocking stream, so we need to ensure all
-    // operations complete before the timer measures elapsed time.
-    // Also synchronize the default stream to ensure timer events are properly ordered.
+    // operations complete before the timer measures elapsed time
     single_context->synchronize();
-    hipDeviceSynchronize();  // Ensure all streams complete before timer.end()
+    
     auto runtime = timer.end();
 #if (ESSENTIALS_COLLECT_METRICS)
     benchmark::____.search_depth = iteration;
