@@ -17,7 +17,10 @@ namespace bfs {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  param_t(vertex_t _single_source) : single_source(_single_source) {}
+  operators::load_balance_t advance_load_balance;
+  param_t(vertex_t _single_source, 
+          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped) 
+    : single_source(_single_source), advance_load_balance(_advance_load_balance) {}
 };
 
 template <typename vertex_t>
@@ -122,8 +125,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped>(
-        G, E, search, context);
+    auto advance_load_balance = P->param.advance_load_balance;
+    operators::advance::execute_runtime(G, E, search, advance_load_balance, context);
 
     // Execute filter operator to remove the invalids.
     // @todo: Add CLI option to enable or disable this.
@@ -155,13 +158,14 @@ float run(graph_t& G,
           typename graph_t::vertex_type* predecessors,   // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
+                  new gcuda::multi_context_t(0)),  // Context
+          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped
 ) {
   using vertex_t = typename graph_t::vertex_type;
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
-  param_type param(single_source);
+  param_type param(single_source, advance_load_balance);
   result_type result(distances, predecessors);
 
   using problem_type = problem_t<graph_t, param_type, result_type>;

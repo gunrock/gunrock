@@ -31,6 +31,7 @@
 
 #include "framework/problem.cuh"
 #include "framework/operators/for.cuh"
+#include "framework/operators/advance/merge_path.cuh"
 
 #include "utils/type_limits.cuh"
 

@@ -32,6 +32,7 @@
   // Map HIP constants to CUDA constants
   #define hipSuccess cudaSuccess
   #define hipErrorUnknown cudaErrorUnknown
+  #define hipErrorInvalidValue cudaErrorInvalidValue
   #define hipStreamNonBlocking cudaStreamNonBlocking
   #define hipEventDisableTiming cudaEventDisableTiming
   #define hipMemcpyHostToDevice cudaMemcpyHostToDevice
