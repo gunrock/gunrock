@@ -94,7 +94,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto single_source = P->param.single_source;
     auto distances = P->result.distances;
-    auto visited = P->visited.data().get();
+    // Note: visited is not currently used in BFS, but kept for future use
 
     auto iteration = this->iteration;
 
