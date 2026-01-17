@@ -183,15 +183,29 @@ float run(graph_t& G,
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, context);
-  problem.init();
-  problem.reset();
+  // Create problem and enactor in a scope to ensure proper cleanup
+  float runtime = 0.0f;
+  {
+    problem_type problem(G, param, result, context);
+    problem.init();
+    problem.reset();
+    
+    // Synchronize after reset to ensure initialization completes
+    context->get_context(0)->synchronize();
 
-  enactor_type enactor(&problem, context);
-  float runtime = enactor.enact();
+    enactor_type enactor(&problem, context);
+    runtime = enactor.enact();
+    
+    // Synchronize context to ensure all GPU operations complete
+    // before problem/enactor destructors run
+    context->get_context(0)->synchronize();
+  }
+  // Problem and enactor are now fully destroyed
   
-  // Synchronize context to ensure all GPU operations complete before next run
-  context->get_context(0)->synchronize();
+  // Final device synchronization to ensure all operations are complete
+  // before the next run starts
+  auto single_context = context->get_context(0);
+  single_context->synchronize();
   
   return runtime;
 }

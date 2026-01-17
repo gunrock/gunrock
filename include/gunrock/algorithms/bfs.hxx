@@ -57,11 +57,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
   }
 
   void reset() override {
+    // Execution policy for a given context (using single-gpu).
+    auto policy = this->context->get_context(0)->execution_policy();
+    
     auto n_vertices = this->get_graph().get_number_of_vertices();
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
+    thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<vertex_t>::max());
-    thrust::fill(thrust::device, d_distances + this->param.single_source,
+    thrust::fill(policy, d_distances + this->param.single_source,
                  d_distances + this->param.single_source + 1, 0);
   }
 };
@@ -166,15 +169,29 @@ float run(graph_t& G,
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, context);
-  problem.init();
-  problem.reset();
+  // Create problem and enactor in a scope to ensure proper cleanup
+  float runtime = 0.0f;
+  {
+    problem_type problem(G, param, result, context);
+    problem.init();
+    problem.reset();
+    
+    // Synchronize after reset to ensure initialization completes
+    context->get_context(0)->synchronize();
 
-  enactor_type enactor(&problem, context);
-  float runtime = enactor.enact();
+    enactor_type enactor(&problem, context);
+    runtime = enactor.enact();
+    
+    // Synchronize context to ensure all GPU operations complete
+    // before problem/enactor destructors run
+    context->get_context(0)->synchronize();
+  }
+  // Problem and enactor are now fully destroyed
   
-  // Synchronize context to ensure all GPU operations complete before next run
-  context->get_context(0)->synchronize();
+  // Final device synchronization to ensure all operations are complete
+  // before the next run starts
+  auto single_context = context->get_context(0);
+  single_context->synchronize();
   
   return runtime;
 }
