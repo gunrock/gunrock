@@ -91,6 +91,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
+  // Synchronize after enact to ensure all GPU operations complete
+  // Note: We can't override enact() since it's not virtual, but we can
+  // ensure synchronization happens in the run() function instead.
+
   void prepare_frontier(frontier_t* f,
                         gcuda::multi_context_t& context) override {
     auto P = this->get_problem();

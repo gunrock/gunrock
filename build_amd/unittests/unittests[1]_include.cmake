@@ -1,5 +1,0 @@
-if(EXISTS "/home/muhosama/gunrock/build_amd/unittests/unittests[1]_tests.cmake")
-  include("/home/muhosama/gunrock/build_amd/unittests/unittests[1]_tests.cmake")
-else()
-  add_test(unittests_NOT_BUILT unittests_NOT_BUILT)
-endif()
