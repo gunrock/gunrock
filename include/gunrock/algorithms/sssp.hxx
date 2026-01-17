@@ -142,8 +142,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::advance::execute_runtime(G, E, shortest_path, advance_load_balance, context);
 
     // Execute filter operator on the provided lambda
-    auto filter_algorithm = P->param.options.filter_algorithm;
-    operators::filter::execute_runtime(G, E, remove_completed_paths, filter_algorithm, context);
+    // SSSP uses bypass filter for visited vertices tracking
+    operators::filter::execute<operators::filter_algorithm_t::bypass>(
+        G, E, remove_completed_paths, context);
 
     // Execute uniquify operator to deduplicate the frontier (if enabled via options)
     if (P->param.options.enable_uniquify) {
