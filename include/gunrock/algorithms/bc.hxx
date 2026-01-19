@@ -274,7 +274,7 @@ float run(graph_t& G,
  * @tparam graph_t Graph type.
  * @param G Graph object.
  * @param bc_values Output array of betweenness centrality values for each vertex.
- * @return float Total time taken to run the algorithm for all vertices.
+ * @return float Sum of execution times for running the algorithm on all vertices.
  */
 template <typename graph_t>
 float run(graph_t& G, typename graph_t::weight_type* bc_values) {

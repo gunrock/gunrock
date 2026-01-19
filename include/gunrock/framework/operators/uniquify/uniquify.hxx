@@ -41,7 +41,7 @@ void execute(frontier_t* input,
         input->sort(sort::order_t::ascending, single_context->stream());
       unique_copy::execute(input, output, *single_context);
     } else {
-      error::throw_if_exception(hipErrorUnknown, "Unqiue type not supported.");
+      error::throw_if_exception(hipErrorUnknown, "Unique type not supported.");
     }
   }
 
