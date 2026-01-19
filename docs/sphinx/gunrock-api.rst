@@ -3,41 +3,74 @@ Gunrock API Reference
 
 .. highlight:: c++
 
+This page provides quick access to commonly-used algorithm and operator functions.
+For complete API documentation including all overloads, see the auto-generated API reference.
+
 Algorithms
 ----------
 
+BFS (Breadth-First Search)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. doxygenfunction:: gunrock::bfs::run
 
-.. doxygenfunction:: gunrock::bc::run(graph_t& G, typename graph_t::vertex_type single_source, typename graph_t::weight_type* bc_values, std::shared_ptr<gcuda::multi_context_t> context)
-   :outline:
+BC (Betweenness Centrality)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. doxygenfunction:: gunrock::bc::run(graph_t& G, typename graph_t::weight_type* bc_values)
-   :outline:
+See :ref:`bc.hxx <file_include_gunrock_algorithms_bc.hxx>` for BC algorithm documentation with multiple overloads.
 
-.. doxygenfunction:: gunrock::color::run(graph_t& G, param_t& param, result_t<typename graph_t::vertex_type>& result, std::shared_ptr<gcuda::multi_context_t> context)
-   :outline:
+Color (Graph Coloring)
+^^^^^^^^^^^^^^^^^^^^^^
 
-.. doxygenfunction:: gunrock::color::run(graph_t& G, typename graph_t::vertex_type* colors, operators::filter_algorithm_t filter_algorithm, std::shared_ptr<gcuda::multi_context_t> context)
-   :outline:
+See :ref:`color.hxx <file_include_gunrock_algorithms_color.hxx>` for graph coloring algorithm documentation with multiple overloads.
+
+Geo (Graph Embedding)
+^^^^^^^^^^^^^^^^^^^^^
 
 .. doxygenfunction:: gunrock::geo::run
 
+HITS
+^^^^
+
 .. doxygenfunction:: gunrock::hits::run
+
+K-Core
+^^^^^^
 
 .. doxygenfunction:: gunrock::kcore::run
 
+MST (Minimum Spanning Tree)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. doxygenfunction:: gunrock::mst::run
 
-.. doxygenfunction:: gunrock::ppr::run(graph_t& G, param_t<typename graph_t::vertex_type, typename graph_t::weight_type>& param, result_t<typename graph_t::weight_type>& result, std::shared_ptr<gcuda::multi_context_t> context)
-   :outline:
+PPR (Personalized PageRank)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See :ref:`ppr.hxx <file_include_gunrock_algorithms_ppr.hxx>` for PPR algorithm documentation with multiple overloads.
+
+PR (PageRank)
+^^^^^^^^^^^^^
 
 .. doxygenfunction:: gunrock::pr::run
 
+SpGEMM
+^^^^^^
+
 .. doxygenfunction:: gunrock::spgemm::run
+
+SpMV
+^^^^
 
 .. doxygenfunction:: gunrock::spmv::run
 
+SSSP (Single-Source Shortest Path)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. doxygenfunction:: gunrock::sssp::run
+
+TC (Triangle Counting)
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. doxygenfunction:: gunrock::tc::run
 
