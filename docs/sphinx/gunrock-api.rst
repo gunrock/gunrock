@@ -8,9 +8,17 @@ Algorithms
 
 .. doxygenfunction:: gunrock::bfs::run
 
-.. doxygenfunction:: gunrock::bc::run(graph_t& G, bool collect_metrics, typename graph_t::weight_type* bc_values, int* edges_visited, int* search_depth)
+.. doxygenfunction:: gunrock::bc::run(graph_t& G, typename graph_t::vertex_type single_source, typename graph_t::weight_type* bc_values, std::shared_ptr<gcuda::multi_context_t> context)
+   :outline:
 
-.. doxygenfunction:: gunrock::color::run
+.. doxygenfunction:: gunrock::bc::run(graph_t& G, typename graph_t::weight_type* bc_values)
+   :outline:
+
+.. doxygenfunction:: gunrock::color::run(graph_t& G, param_t& param, result_t<typename graph_t::vertex_type>& result, std::shared_ptr<gcuda::multi_context_t> context)
+   :outline:
+
+.. doxygenfunction:: gunrock::color::run(graph_t& G, typename graph_t::vertex_type* colors, operators::filter_algorithm_t filter_algorithm, std::shared_ptr<gcuda::multi_context_t> context)
+   :outline:
 
 .. doxygenfunction:: gunrock::geo::run
 
@@ -20,7 +28,8 @@ Algorithms
 
 .. doxygenfunction:: gunrock::mst::run
 
-.. doxygenfunction:: gunrock::ppr::run
+.. doxygenfunction:: gunrock::ppr::run(graph_t& G, param_t<typename graph_t::vertex_type, typename graph_t::weight_type>& param, result_t<typename graph_t::weight_type>& result, std::shared_ptr<gcuda::multi_context_t> context)
+   :outline:
 
 .. doxygenfunction:: gunrock::pr::run
 

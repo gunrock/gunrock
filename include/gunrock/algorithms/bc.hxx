@@ -219,6 +219,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run Betweenness Centrality algorithm on a given graph from a single
+ * source vertex to compute BC values.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param single_source Source vertex to start BC computation.
+ * @param bc_values Output array of betweenness centrality values for each vertex.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type single_source,
@@ -256,6 +267,15 @@ float run(graph_t& G,
   // </boiler-plate>
 }
 
+/**
+ * @brief Run Betweenness Centrality algorithm on all vertices in the graph
+ * to compute BC values for the entire graph.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param bc_values Output array of betweenness centrality values for each vertex.
+ * @return float Total time taken to run the algorithm for all vertices.
+ */
 template <typename graph_t>
 float run(graph_t& G, typename graph_t::weight_type* bc_values) {
   using vertex_t = typename graph_t::vertex_type;
