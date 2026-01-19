@@ -284,6 +284,19 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run Sparse Matrix-Matrix Multiplication (SpGEMM) algorithm to compute
+ * the product C = A * B where A and B are sparse matrices represented as graphs.
+ *
+ * @tparam a_graph_t Type of the first input graph (matrix A).
+ * @tparam b_graph_t Type of the second input graph (matrix B).
+ * @tparam csr_t Type of the output CSR matrix (result C).
+ * @param A First input graph representing sparse matrix A.
+ * @param B Second input graph representing sparse matrix B.
+ * @param C Output CSR matrix to store the result C = A * B.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename a_graph_t, typename b_graph_t, typename csr_t>
 float run(a_graph_t& A,
           b_graph_t& B,

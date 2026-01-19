@@ -208,6 +208,18 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };
 
+/**
+ * @brief Run k-core decomposition algorithm on a given graph to compute
+ * the core number for each vertex.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param k_cores Output array of k-core values for each vertex.
+ * @param advance_load_balance Load balancing strategy for advance operator (default: block_mapped).
+ * @param filter_algorithm Filter algorithm to use (default: predicated).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           int* k_cores,  // Output
