@@ -12,6 +12,17 @@ namespace gunrock {
 namespace operators {
 namespace uniquify {
 
+/**
+ * @brief Remove duplicate elements from a frontier using a specified uniquify algorithm.
+ *
+ * @tparam type Uniquify algorithm type (uniquify_algorithm_t::unique or uniquify_algorithm_t::unique_copy).
+ * @tparam frontier_t Frontier type.
+ * @param input Input frontier to uniquify.
+ * @param output Output frontier to store unique elements.
+ * @param context Device context (@see gcuda::multi_context_t).
+ * @param best_effort_uniquification If true, skip sorting for best-effort uniquification (default: false).
+ * @param uniquification_percent Percentage of elements to uniquify (0-100, default: 100).
+ */
 template <uniquify_algorithm_t type, typename frontier_t>
 void execute(frontier_t* input,
              frontier_t* output,
@@ -30,7 +41,7 @@ void execute(frontier_t* input,
         input->sort(sort::order_t::ascending, single_context->stream());
       unique_copy::execute(input, output, *single_context);
     } else {
-      error::throw_if_exception(hipErrorUnknown, "Unqiue type not supported.");
+      error::throw_if_exception(hipErrorUnknown, "Unique type not supported.");
     }
   }
 
@@ -41,6 +52,17 @@ void execute(frontier_t* input,
   }
 }
 
+/**
+ * @brief Remove duplicate elements from the enactor's frontier using a specified uniquify algorithm.
+ *
+ * @tparam type Uniquify algorithm type (uniquify_algorithm_t::unique or uniquify_algorithm_t::unique_copy).
+ * @tparam enactor_type Enactor type.
+ * @param E Enactor containing input and output frontiers.
+ * @param context Device context (@see gcuda::multi_context_t).
+ * @param best_effort_uniquification If true, skip sorting for best-effort uniquification (default: false).
+ * @param uniquification_percent Percentage of elements to uniquify (0-100, default: 100).
+ * @param swap_buffers If true, swap input and output frontier buffers after execution (default: true).
+ */
 template <uniquify_algorithm_t type = uniquify_algorithm_t::unique,
           typename enactor_type>
 void execute(enactor_type* E,

@@ -128,6 +128,18 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
+/**
+ * @brief Run Triangle Counting algorithm on a given graph to count the number
+ * of triangles per vertex and optionally the total number of triangles.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param reduce_all_triangles If true, compute the total triangle count across all vertices.
+ * @param vertex_triangles_count Output array of triangle counts per vertex.
+ * @param total_triangles_count Output pointer to store the total number of triangles in the graph.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           bool reduce_all_triangles,

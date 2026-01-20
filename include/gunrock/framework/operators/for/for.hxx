@@ -21,9 +21,6 @@ namespace parallel_for {
  * @param f Frontiers to apply user-defined function to.
  * @param op User-defined function.
  * @param context Device context (@see gcuda::multi_context_t).
- * @return bool ignore the output, limitation of `__device__` lambda functions
- * require a template parameter to be named (see
- * https://github.com/neoblizz/enable_if_bug).
  */
 template <parallel_for_each_t type, typename func_t, typename frontier_t>
 std::enable_if_t<type == parallel_for_each_t::element>
@@ -53,9 +50,6 @@ execute(frontier_t& f, func_t op, gcuda::multi_context_t& context) {
  * @param G Graph to apply user-defined function to.
  * @param op User-defined function.
  * @param context Device context (@see gcuda::multi_context_t).
- * @return bool ignore the output, limitation of `__device__` lambda functions
- * require a template parameter to be named (see
- * https://github.com/neoblizz/enable_if_bug).
  */
 template <parallel_for_each_t type, typename func_t, typename graph_t>
 std::enable_if_t<type != parallel_for_each_t::element>

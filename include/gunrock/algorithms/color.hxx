@@ -189,6 +189,16 @@ float run(graph_t& G,
   return enactor.enact();
 }
 
+/**
+ * @brief Run Graph Coloring algorithm on a given graph with simplified parameters.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param colors Output array of color assignments for each vertex.
+ * @param filter_algorithm Filter algorithm to use (default: predicated).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type* colors,  // Output

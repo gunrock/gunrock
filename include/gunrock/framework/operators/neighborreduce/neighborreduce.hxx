@@ -26,10 +26,9 @@ namespace operators {
 namespace neighborreduce {
 
 /**
- * @brief Neighbor reduce is an operator that performs reduction on the segments
+ * @brief Neighbor reduce operator that performs reduction on the segments
  * of neighbors (or data associated with the neighbors), where each segment is
- * defined by the source vertex. Another simple way to understand this operator
- * is to perform advance and then reduction on the resultant traversal.
+ * defined by the source vertex.
  *
  * @par Overview
  * Neighbor reduce operator, built on top of segmented reduction. This is
@@ -37,20 +36,19 @@ namespace neighborreduce {
  * advance. It's only implemented on the entire graph (frontiers not yet
  * supported).
  *
- * @tparam input_t advance input type (advance_io_type_t::graph supported)
- * @tparam graph_t graph type.
- * @tparam enactor_t enactor type.
- * @tparam output_t output type.
- * @tparam operator_t user-defined lambda function.
- * @tparam arithmetic_t binary function, arithmetic operator such as sum, max,
- * min, etc.
- * @param G graph to perform advance-reduce on.
- * @param E enactor structure (not used as of right now).
- * @param output output buffer.
- * @param op user-defined lambda function.
- * @param arithmetic_op arithmetic operator (binary).
- * @param init_value initial value for the reduction.
- * @param context cuda context (@see gcuda::multi_context_t).
+ * @tparam input_t Advance input type (advance_io_type_t::graph supported).
+ * @tparam graph_t Graph type.
+ * @tparam enactor_t Enactor type.
+ * @tparam output_t Output type.
+ * @tparam operator_t User-defined lambda function type.
+ * @tparam arithmetic_t Binary function type (arithmetic operator such as sum, max, min, etc.).
+ * @param G Graph to perform advance-reduce on.
+ * @param E Enactor structure (not used as of right now).
+ * @param output Output buffer.
+ * @param op User-defined lambda function.
+ * @param arithmetic_op Arithmetic operator (binary).
+ * @param init_value Initial value for the reduction.
+ * @param context CUDA context (@see gcuda::multi_context_t).
  */
 template <advance_io_type_t input_t = advance_io_type_t::graph,
           typename graph_t,

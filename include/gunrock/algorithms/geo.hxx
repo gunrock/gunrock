@@ -399,6 +399,18 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   // </user-defined>
 };  // struct enactor_t
 
+/**
+ * @brief Run Graph Embedding algorithm on a given graph, G, to compute
+ * spatial coordinates using force-directed layout.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param coordinates Input/Output array of coordinates for each vertex.
+ * @param total_iterations Total number of iterations to run the algorithm.
+ * @param spatial_iterations Number of spatial optimization iterations per main iteration (default: 1000).
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           coordinates_t* coordinates,                    // Input/Output

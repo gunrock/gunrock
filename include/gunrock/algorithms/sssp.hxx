@@ -154,6 +154,19 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 };  // struct enactor_t
 
+/**
+ * @brief Run Single-Source Shortest Path (SSSP) algorithm on a given graph
+ * to compute shortest distances from a single source vertex.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param single_source Source vertex to start the shortest path search.
+ * @param distances Output array of shortest distances from source to each vertex.
+ * @param predecessors Output array of predecessor vertices in the shortest path tree.
+ * @param context Device context.
+ * @param advance_load_balance Load balancing strategy for advance operator (default: block_mapped).
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter

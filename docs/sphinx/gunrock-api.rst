@@ -3,32 +3,74 @@ Gunrock API Reference
 
 .. highlight:: c++
 
+This page provides quick access to commonly-used algorithm and operator functions.
+For complete API documentation including all overloads, see the auto-generated API reference.
+
 Algorithms
 ----------
 
+BFS (Breadth-First Search)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. doxygenfunction:: gunrock::bfs::run
 
-.. doxygenfunction:: gunrock::bc::run(graph_t& G, bool collect_metrics, typename graph_t::weight_type* bc_values, int* edges_visited, int* search_depth)
+BC (Betweenness Centrality)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. doxygenfunction:: gunrock::color::run
+See :ref:`bc.hxx <file_include_gunrock_algorithms_bc.hxx>` for BC algorithm documentation with multiple overloads.
+
+Color (Graph Coloring)
+^^^^^^^^^^^^^^^^^^^^^^
+
+See :ref:`color.hxx <file_include_gunrock_algorithms_color.hxx>` for graph coloring algorithm documentation with multiple overloads.
+
+Geo (Graph Embedding)
+^^^^^^^^^^^^^^^^^^^^^
 
 .. doxygenfunction:: gunrock::geo::run
 
+HITS
+^^^^
+
 .. doxygenfunction:: gunrock::hits::run
+
+K-Core
+^^^^^^
 
 .. doxygenfunction:: gunrock::kcore::run
 
+MST (Minimum Spanning Tree)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. doxygenfunction:: gunrock::mst::run
 
-.. doxygenfunction:: gunrock::ppr::run
+PPR (Personalized PageRank)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See :ref:`ppr.hxx <file_include_gunrock_algorithms_ppr.hxx>` for PPR algorithm documentation with multiple overloads.
+
+PR (PageRank)
+^^^^^^^^^^^^^
 
 .. doxygenfunction:: gunrock::pr::run
 
+SpGEMM
+^^^^^^
+
 .. doxygenfunction:: gunrock::spgemm::run
+
+SpMV
+^^^^
 
 .. doxygenfunction:: gunrock::spmv::run
 
+SSSP (Single-Source Shortest Path)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. doxygenfunction:: gunrock::sssp::run
+
+TC (Triangle Counting)
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. doxygenfunction:: gunrock::tc::run
 
