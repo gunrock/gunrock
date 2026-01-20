@@ -48,3 +48,8 @@ results/
 # Exclude datasets and externals
 datasets/
 externals/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
