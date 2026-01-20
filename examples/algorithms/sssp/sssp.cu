@@ -84,6 +84,10 @@ void test_sssp(int num_arguments, char** argument_array) {
 
     run_times.push_back(gunrock::sssp::run(G, param, result, context));
 
+    // Synchronize device before extracting metrics
+    // This is critical for managed memory coherence in benchmarking
+    hipDeviceSynchronize();
+    
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;
 
