@@ -68,6 +68,10 @@ void test_pr(int num_arguments, char** argument_array) {
   auto benchmark_metrics =
       std::vector<benchmark::host_benchmark_t>(arguments.num_runs);
   for (int i = 0; i < arguments.num_runs; i++) {
+    // Synchronize before each run to ensure clean state
+    // This is critical for multiple runs to prevent segfaults
+    context->get_context(0)->synchronize();
+    
     benchmark::INIT_BENCH();
 
     // Create param and result structs with CLI options
@@ -80,6 +84,9 @@ void test_pr(int num_arguments, char** argument_array) {
     benchmark_metrics[i] = metrics;
 
     benchmark::DESTROY_BENCH();
+    
+    // Synchronize after each run to ensure all operations complete
+    context->get_context(0)->synchronize();
   }
 
   // Placeholder since PR does not use sources

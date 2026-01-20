@@ -21,12 +21,20 @@ struct timer_t {
   timer_t() {
     hipEventCreate(&start_);
     hipEventCreate(&stop_);
-    hipEventRecord(start_);
   }
 
   ~timer_t() {
     hipEventDestroy(start_);
     hipEventDestroy(stop_);
+  }
+
+  // Reset timer by destroying and recreating events
+  // This is necessary for multiple runs to prevent HIP runtime issues
+  void reset() {
+    hipEventDestroy(start_);
+    hipEventDestroy(stop_);
+    hipEventCreate(&start_);
+    hipEventCreate(&stop_);
   }
 
   // Alias of each other, start the timer.

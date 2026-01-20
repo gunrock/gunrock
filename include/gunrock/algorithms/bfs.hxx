@@ -178,13 +178,7 @@ float run(graph_t& G,
   problem.reset();
   
   enactor_type enactor(&problem, context);
-  float runtime = enactor.enact();
-  
-  // Synchronize to ensure all GPU operations complete before returning
-  // This is critical for multiple runs to prevent segfaults
-  context->get_context(0)->synchronize();
-  
-  return runtime;
+  return enactor.enact();
 }
 
 /**

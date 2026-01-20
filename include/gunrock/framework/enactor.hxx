@@ -258,8 +258,12 @@ struct enactor_t {
     }
     
     auto single_context = context->get_context(0);
-    auto timer = single_context->timer();
+    auto& timer = single_context->timer();
     auto stream = single_context->stream();
+    
+    // Reset timer events for each run to prevent HIP runtime issues
+    // This is critical for multiple runs
+    timer.reset();
     
     // Record start event on the context's stream to ensure proper synchronization
     // This is critical for multiple runs - events must be on the same stream as work
