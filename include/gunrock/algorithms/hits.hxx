@@ -201,7 +201,18 @@ void dump_result(ForwardIterator auth_dest,
   thrust::swap(hub_dest, hub_src);
 }
 
-// qqq get rid of template for better control
+/**
+ * @brief Run HITS (Hyperlink-Induced Topic Search) algorithm on a given graph
+ * to compute authority and hub scores for each vertex.
+ *
+ * @tparam graph_t Graph type.
+ * @tparam result_t Result type containing authority and hub score arrays.
+ * @param G Graph object.
+ * @param max_iterations Maximum number of iterations to run the algorithm.
+ * @param result Algorithm results containing authority and hub scores.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t, typename result_t>
 float run(graph_t& G,
           unsigned int max_iterations,

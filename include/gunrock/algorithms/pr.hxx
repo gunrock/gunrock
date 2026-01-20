@@ -197,13 +197,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 /**
- * @brief Run PageRank algorithm on a given graph, G, with provided
- * parameters and results.
+ * @brief Run PageRank algorithm on a given graph to compute the rank score
+ * for each vertex using the power iteration method.
  *
  * @tparam graph_t Graph type.
  * @param G Graph object.
- * @param param Algorithm parameters (param_t) including alpha, tol, and options.
- * @param result Algorithm results (result_t) with output pointers.
+ * @param alpha Damping factor (typically 0.85).
+ * @param tol Convergence tolerance threshold.
+ * @param p Output array of PageRank scores for each vertex.
  * @param context Device context.
  * @return float Time taken to run the algorithm.
  */

@@ -404,13 +404,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 /**
- * @brief Run Geolocation algorithm on a given graph, G, with provided
- * parameters and results.
+ * @brief Run Graph Embedding algorithm on a given graph, G, to compute
+ * spatial coordinates using force-directed layout.
  *
  * @tparam graph_t Graph type.
  * @param G Graph object.
- * @param param Algorithm parameters (param_t) including iterations and options.
- * @param result Algorithm results (result_t) with output pointers.
+ * @param coordinates Input/Output array of coordinates for each vertex.
+ * @param total_iterations Total number of iterations to run the algorithm.
+ * @param spatial_iterations Number of spatial optimization iterations per main iteration (default: 1000).
  * @param context Device context.
  * @return float Time taken to run the algorithm.
  */

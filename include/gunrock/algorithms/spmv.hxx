@@ -140,13 +140,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 /**
- * @brief Run SpMV algorithm on a given graph, G, with provided
- * parameters and results.
+ * @brief Run Sparse Matrix-Vector Multiplication (SpMV) algorithm to compute
+ * y = A * x where A is the sparse adjacency matrix of the graph.
  *
  * @tparam graph_t Graph type.
- * @param G Graph object.
- * @param param Algorithm parameters (param_t) including input vector and options.
- * @param result Algorithm results (result_t) with output pointers.
+ * @param G Graph object representing the sparse matrix.
+ * @param x Input vector to multiply.
+ * @param y Output vector to store the result.
+ * @param advance_load_balance Load balancing strategy for advance operator (default: block_mapped).
  * @param context Device context.
  * @return float Time taken to run the algorithm.
  */

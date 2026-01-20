@@ -190,13 +190,12 @@ float run(graph_t& G,
 }
 
 /**
- * @brief Run Graph Coloring algorithm on a given graph, G.
- *
- * @note This is a legacy API that delegates to the new param/result API.
+ * @brief Run Graph Coloring algorithm on a given graph with simplified parameters.
  *
  * @tparam graph_t Graph type.
  * @param G Graph object.
- * @param colors Pointer to the colors array.
+ * @param colors Output array of color assignments for each vertex.
+ * @param filter_algorithm Filter algorithm to use (default: predicated).
  * @param context Device context.
  * @return float Time taken to run the algorithm.
  */

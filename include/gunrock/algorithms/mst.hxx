@@ -268,13 +268,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };
 
 /**
- * @brief Run Minimum Spanning Tree algorithm on a given graph, G, with provided
- * parameters and results.
+ * @brief Run Minimum Spanning Tree (MST) algorithm on a given graph to
+ * compute the total weight of the minimum spanning tree.
  *
  * @tparam graph_t Graph type.
  * @param G Graph object.
- * @param param Algorithm parameters (param_t) including options.
- * @param result Algorithm results (result_t) with output pointers.
+ * @param mst_weight Output pointer to store the total MST weight.
  * @param context Device context.
  * @return float Time taken to run the algorithm.
  */
