@@ -21,7 +21,6 @@ struct timer_t {
   timer_t() {
     hipEventCreate(&start_);
     hipEventCreate(&stop_);
-    hipEventRecord(start_);
   }
 
   ~timer_t() {
