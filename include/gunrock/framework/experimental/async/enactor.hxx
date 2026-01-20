@@ -55,11 +55,12 @@ struct enactor_t {
     auto single_context = context->get_context(0);
     prepare_frontier(q, *context);
     auto timer = single_context->timer();
-    timer.begin();
+    auto stream = single_context->stream();
+    timer.begin(stream);
     loop(*context);
     q.sync();  // !! Best way to synchronize w/ the `context` stream?  Do we
                // need to?
-    return timer.end();
+    return timer.end(stream);
   }
 };
 

@@ -259,10 +259,11 @@ struct enactor_t {
     
     auto single_context = context->get_context(0);
     auto timer = single_context->timer();
+    auto stream = single_context->stream();
     
-    // Record start event BEFORE prepare_frontier to ensure accurate timing
-    // and proper event ordering on the correct stream
-    timer.begin();
+    // Record start event on the context's stream to ensure proper synchronization
+    // This is critical for multiple runs - events must be on the same stream as work
+    timer.begin(stream);
     
     prepare_frontier(get_input_frontier(), *context);
     
@@ -272,13 +273,9 @@ struct enactor_t {
     }
     finalize(*context);
     
-    // Synchronize the context's stream before ending the timer
-    // The timer records events on the default stream (0), but our operations
-    // run on the context's non-blocking stream, so we need to ensure all
-    // operations complete before the timer measures elapsed time
-    single_context->synchronize();
-    
-    auto runtime = timer.end();
+    // Record stop event on the same stream and measure elapsed time
+    // The synchronization happens inside timer.end()
+    auto runtime = timer.end(stream);
 #if (ESSENTIALS_COLLECT_METRICS)
     benchmark::____.search_depth = iteration;
     benchmark::____.total_runtime = runtime;

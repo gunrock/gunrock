@@ -108,13 +108,15 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   float post_process() {
+    auto single_context = this->context->get_context(0);
+    auto stream = single_context->stream();
     util::timer_t timer;
-    timer.begin();
+    timer.begin(stream);
     auto P = this->get_problem();
     auto G = P->get_graph();
 
     if (P->param.reduce_all_triangles) {
-      auto policy = this->context->get_context(0)->execution_policy();
+      auto policy = single_context->execution_policy();
       *P->result.total_triangles_count = thrust::transform_reduce(
           policy, P->result.vertex_triangles_count,
           P->result.vertex_triangles_count + G.get_number_of_vertices(),
@@ -123,7 +125,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           },
           std::size_t{0}, thrust::plus<std::size_t>());
     }
-    return timer.end();
+    return timer.end(stream);
   }
 };  // struct enactor_t
 

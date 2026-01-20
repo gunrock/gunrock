@@ -30,18 +30,20 @@ struct timer_t {
   }
 
   // Alias of each other, start the timer.
-  void begin() { hipEventRecord(start_); }
-  void start() { this->begin(); }
+  // Records the start event on the specified stream (default stream 0).
+  void begin(hipStream_t stream = 0) { hipEventRecord(start_, stream); }
+  void start(hipStream_t stream = 0) { this->begin(stream); }
 
   // Alias of each other, stop the timer.
-  float end() {
-    hipEventRecord(stop_);
+  // Records the stop event on the specified stream (default stream 0).
+  float end(hipStream_t stream = 0) {
+    hipEventRecord(stop_, stream);
     hipEventSynchronize(stop_);
     hipEventElapsedTime(&time, start_, stop_);
 
     return milliseconds();
   }
-  float stop() { return this->end(); }
+  float stop(hipStream_t stream = 0) { return this->end(stream); }
 
   float seconds() { return time * 1e-3; }
   float milliseconds() { return time; }
