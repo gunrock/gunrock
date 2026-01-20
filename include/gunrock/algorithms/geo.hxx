@@ -241,9 +241,13 @@ __device__ __host__ void spatial_median(graph_t& G,
 struct param_t {
   unsigned int total_iterations;
   unsigned int spatial_iterations;
-  param_t(unsigned int _total_iterations, unsigned int _spatial_iterations)
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(unsigned int _total_iterations, unsigned int _spatial_iterations, 
+          options_t _options = options_t())
       : total_iterations(_total_iterations),
-        spatial_iterations(_spatial_iterations) {}
+        spatial_iterations(_spatial_iterations),
+        options(_options) {}
 };
 
 struct result_t {
@@ -413,22 +417,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
  */
 template <typename graph_t>
 float run(graph_t& G,
-          coordinates_t* coordinates,                    // Input/Output
-          const unsigned int total_iterations,           // Parameter
-          const unsigned int spatial_iterations = 1000,  // Parameter
+          param_t& param,
+          result_t& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using param_type = param_t;
   using result_type = result_t;
 
-  param_type param(total_iterations, spatial_iterations);
-  result_type result(coordinates);
-  // </user-defined>
-
-  // <boiler-plate>
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
@@ -442,7 +438,33 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context, props);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+/**
+ * @brief Run Geolocation algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param coordinates Pointer to the coordinates array.
+ * @param total_iterations Total number of iterations.
+ * @param spatial_iterations Number of spatial iterations.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          coordinates_t* coordinates,                    // Input/Output
+          const unsigned int total_iterations,           // Parameter
+          const unsigned int spatial_iterations = 1000,  // Parameter
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  param_t param(total_iterations, spatial_iterations);
+  result_t result(coordinates);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace geo

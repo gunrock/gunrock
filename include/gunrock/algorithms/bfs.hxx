@@ -17,10 +17,10 @@ namespace bfs {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  operators::load_balance_t advance_load_balance;
-  param_t(vertex_t _single_source, 
-          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped) 
-    : single_source(_single_source), advance_load_balance(_advance_load_balance) {}
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(vertex_t _single_source, options_t _options = options_t()) 
+    : single_source(_single_source), options(_options) {}
 };
 
 template <typename vertex_t>
@@ -50,14 +50,21 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> visited;  /// @todo not used.
 
-  void init() override {}
+  void init() override {
+    // Initialize visited vector (even though it's not currently used)
+    auto n_vertices = this->get_graph().get_number_of_vertices();
+    visited.resize(n_vertices);
+  }
 
   void reset() override {
+    // Execution policy for a given context (using single-gpu).
+    auto policy = this->context->get_context(0)->execution_policy();
+    
     auto n_vertices = this->get_graph().get_number_of_vertices();
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
+    thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<vertex_t>::max());
-    thrust::fill(thrust::device, d_distances + this->param.single_source,
+    thrust::fill(policy, d_distances + this->param.single_source,
                  d_distances + this->param.single_source + 1, 0);
   }
 };
@@ -73,6 +80,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
+  // Synchronize after enact to ensure all GPU operations complete
+  // Note: We can't override enact() since it's not virtual, but we can
+  // ensure synchronization happens in the run() function instead.
+
   void prepare_frontier(frontier_t* f,
                         gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
@@ -87,7 +98,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto single_source = P->param.single_source;
     auto distances = P->result.distances;
-    auto visited = P->visited.data().get();
+    // Note: visited is not currently used in BFS, but kept for future use
 
     auto iteration = this->iteration;
 
@@ -125,22 +136,58 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    auto advance_load_balance = P->param.advance_load_balance;
+    auto advance_load_balance = P->param.options.advance_load_balance;
     operators::advance::execute_runtime(G, E, search, advance_load_balance, context);
 
-    // Execute filter operator to remove the invalids.
-    // @todo: Add CLI option to enable or disable this.
-    // operators::filter::execute<operators::filter_algorithm_t::compact>(
-    // G, E, remove_invalids, context);
+    // Execute filter operator to remove the invalids (if enabled via options).
+    if (P->param.options.enable_filter) {
+      auto filter_algorithm = P->param.options.filter_algorithm;
+      operators::filter::execute_runtime(G, E, remove_invalids, filter_algorithm, context);
+    }
   }
 
 };  // struct enactor_t
+
+/**
+ * @brief Run Breadth-First Search algorithm on a given graph, G, with provided
+ * parameters and results.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param param Algorithm parameters (param_t) including source and options.
+ * @param result Algorithm results (result_t) with output pointers.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::vertex_type>& result,
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using vertex_t = typename graph_t::vertex_type;
+  using param_type = param_t<vertex_t>;
+  using result_type = result_t<vertex_t>;
+
+  using problem_type = problem_t<graph_t, param_type, result_type>;
+  using enactor_type = enactor_t<problem_type>;
+
+  problem_type problem(G, param, result, context);
+  problem.init();
+  problem.reset();
+  
+  enactor_type enactor(&problem, context);
+  return enactor.enact();
+}
 
 /**
  * @brief Run Breadth-First Search algorithm on a given graph, G, starting from
  * the source node, single_source. The resulting distances are stored in the
  * distances pointer. All data must be allocated by the user, on the device
  * (GPU) and passed in to this function.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
  *
  * @tparam graph_t Graph type.
  * @param G Graph object.
@@ -158,25 +205,13 @@ float run(graph_t& G,
           typename graph_t::vertex_type* predecessors,   // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0)),  // Context
-          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped
-) {
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
-  using param_type = param_t<vertex_t>;
-  using result_type = result_t<vertex_t>;
 
-  param_type param(single_source, advance_load_balance);
-  result_type result(distances, predecessors);
+  param_t<vertex_t> param(single_source);
+  result_t<vertex_t> result(distances, predecessors);
 
-  using problem_type = problem_t<graph_t, param_type, result_type>;
-  using enactor_type = enactor_t<problem_type>;
-
-  problem_type problem(G, param, result, context);
-  problem.init();
-  problem.reset();
-
-  enactor_type enactor(&problem, context);
-  return enactor.enact();
+  return run(G, param, result, context);
 }
 
 }  // namespace bfs

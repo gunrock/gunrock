@@ -57,19 +57,36 @@ void test_pr(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  // Get optimization options from CLI arguments
+  gunrock::options_t options = arguments.get_options();
+
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
   std::vector<float> run_times;
 
   auto benchmark_metrics =
       std::vector<benchmark::host_benchmark_t>(arguments.num_runs);
   for (int i = 0; i < arguments.num_runs; i++) {
+    // Synchronize before each run to ensure clean state
+    // This is critical for multiple runs to prevent segfaults
+    context->get_context(0)->synchronize();
+    
     benchmark::INIT_BENCH();
 
-    run_times.push_back(gunrock::pr::run(G, alpha, tol, p.data().get()));
+    // Create param and result structs with CLI options
+    gunrock::pr::param_t<weight_t> param(alpha, tol, options);
+    gunrock::pr::result_t<weight_t> result(p.data().get());
+
+    run_times.push_back(gunrock::pr::run(G, param, result, context));
 
     benchmark::host_benchmark_t metrics = benchmark::EXTRACT();
     benchmark_metrics[i] = metrics;
 
     benchmark::DESTROY_BENCH();
+    
+    // Synchronize after each run to ensure all operations complete
+    context->get_context(0)->synchronize();
   }
 
   // Placeholder since PR does not use sources

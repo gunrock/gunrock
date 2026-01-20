@@ -58,7 +58,14 @@ void test_kcore(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::kcore::run(G, k_cores.data().get());
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
+  // Create param and result structs (default options)
+  gunrock::kcore::param_t param;
+  gunrock::kcore::result_t<int> result(k_cores.data().get());
+
+  float gpu_elapsed = gunrock::kcore::run(G, param, result, context);
 
   // --
   // CPU Run

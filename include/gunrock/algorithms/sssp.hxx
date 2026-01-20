@@ -17,10 +17,10 @@ namespace sssp {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  operators::load_balance_t advance_load_balance;
-  param_t(vertex_t _single_source, 
-          operators::load_balance_t _advance_load_balance = operators::load_balance_t::block_mapped) 
-    : single_source(_single_source), advance_load_balance(_advance_load_balance) {}
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(vertex_t _single_source, options_t _options = options_t()) 
+    : single_source(_single_source), options(_options) {}
 };
 
 template <typename vertex_t, typename weight_t>
@@ -91,6 +91,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
+  // Synchronize after enact to ensure all GPU operations complete
+  // Note: We can't override enact() since it's not virtual, but we can
+  // ensure synchronization happens in the run() function instead.
+
   void prepare_frontier(frontier_t* f,
                         gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
@@ -138,18 +142,20 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    auto advance_load_balance = P->param.advance_load_balance;
+    auto advance_load_balance = P->param.options.advance_load_balance;
     operators::advance::execute_runtime(G, E, shortest_path, advance_load_balance, context);
 
     // Execute filter operator on the provided lambda
+    // SSSP uses bypass filter for visited vertices tracking
     operators::filter::execute<operators::filter_algorithm_t::bypass>(
         G, E, remove_completed_paths, context);
 
-    /// @brief Execute uniquify operator to deduplicate the frontier
-    /// @note Not required.
-    // // bool best_effort_uniquification = true;
-    // // operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(
-    // // E, context, best_effort_uniquification);
+    // Execute uniquify operator to deduplicate the frontier (if enabled via options)
+    if (P->param.options.enable_uniquify) {
+      operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(
+          E, context, P->param.options.best_effort_uniquify,
+          P->param.options.uniquify_percent);
+    }
   }
 
 };  // struct enactor_t
@@ -169,24 +175,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
  */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::vertex_type& single_source,  // Parameter
-          typename graph_t::weight_type* distances,      // Output
-          typename graph_t::vertex_type* predecessors,   // Output
+          param_t<typename graph_t::vertex_type>& param,
+          result_t<typename graph_t::vertex_type, typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0)),  // Context
-          operators::load_balance_t advance_load_balance = operators::load_balance_t::block_mapped
-) {
-  // <user-defined>
+                  new gcuda::multi_context_t(0))) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t, weight_t>;
-
-  param_type param(single_source, advance_load_balance);
-  result_type result(distances, predecessors, G.get_number_of_vertices());
-  // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -194,10 +192,41 @@ float run(graph_t& G,
   problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
-
+  
   enactor_type enactor(&problem, context);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+/**
+ * @brief Run Single-Source Shortest Path algorithm on a given graph, G,
+ * starting from the source node, single_source.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param single_source A vertex in the graph (integral type).
+ * @param distances Pointer to the distances array of size number of vertices.
+ * @param predecessors Pointer to the predecessors array of size number of
+ * vertices. (optional)
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::vertex_type& single_source,  // Parameter
+          typename graph_t::weight_type* distances,      // Output
+          typename graph_t::vertex_type* predecessors,   // Output
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  param_t<vertex_t> param(single_source);
+  result_t<vertex_t, weight_t> result(distances, predecessors, G.get_number_of_vertices());
+
+  return run(G, param, result, context);
 }
 
 }  // namespace sssp

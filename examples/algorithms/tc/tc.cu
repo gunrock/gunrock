@@ -93,9 +93,15 @@ void test_tc(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
+  // Create param and result structs
+  tc::param_t<vertex_t> param(arguments.reduce_all_triangles);
   std::size_t total_triangles = 0;
-  float gpu_elapsed = tc::run(G, arguments.reduce_all_triangles,
-                              triangles_count.data().get(), &total_triangles);
+  tc::result_t<vertex_t> result(triangles_count.data().get(), &total_triangles);
+
+  float gpu_elapsed = tc::run(G, param, result, context);
 
   // --
   // Log

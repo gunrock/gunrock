@@ -177,12 +177,14 @@ int main(int argc, char** argv) {
   std::size_t num_blocks = (m + num_threads - 1) / num_threads;
 
   util::timer_t timer;
-  timer.start();
-  spmm<<<num_blocks, num_threads>>>(nnz, A.row_offsets.data().get(),
+  // Using default stream (0) explicitly for kernel launch and timer
+  hipStream_t stream = 0;
+  timer.start(stream);
+  spmm<<<num_blocks, num_threads, 0, stream>>>(nnz, A.row_offsets.data().get(),
                                     A.column_indices.data().get(),
                                     A.nonzero_values.data().get(), B, C);
   cudaDeviceSynchronize();
-  auto gpu_elapsed = timer.end();
+  auto gpu_elapsed = timer.end(stream);
 
   std::cout << "GPU Elapsed (ms): " << gpu_elapsed << std::endl;
 

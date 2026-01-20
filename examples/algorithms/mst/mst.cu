@@ -94,7 +94,14 @@ void test_mst(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::mst::run(G, mst_weight.data().get());
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
+  // Create param and result structs
+  gunrock::mst::param_t<vertex_t> param;
+  gunrock::mst::result_t<vertex_t, weight_t> result(mst_weight.data().get());
+
+  float gpu_elapsed = gunrock::mst::run(G, param, result, context);
   thrust::host_vector<weight_t> h_mst_weight = mst_weight;
   std::cout << "GPU MST Weight: " << std::fixed << std::setprecision(4)
             << h_mst_weight[0] << std::endl;

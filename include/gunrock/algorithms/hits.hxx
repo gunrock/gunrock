@@ -23,8 +23,10 @@ namespace hits {
 
 struct param_t {
   unsigned int max_iterations;
-  param_t(unsigned int _max_iterations = 50)
-      : max_iterations(_max_iterations) {}
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
+  
+  param_t(unsigned int _max_iterations = 50, options_t _options = options_t())
+      : max_iterations(_max_iterations), options(_options) {}
 };  // end of param_t
 
 template <typename vertex_t, typename weight_t>

@@ -37,11 +37,19 @@ void test_hits(int num_arguments, char** argument_array) {
   hits::result_c<vertex_t, weight_t> result;
   unsigned int max_iter = 20;
 
+  // Get optimization options from CLI arguments
+  gunrock::options_t options = arguments.get_options();
+
   // --
   // GPU Run
 
+  // Create param struct with CLI options
+  gunrock::hits::param_t param(max_iter, options);
+
   auto time = gunrock::hits::run(G, max_iter, result);
   result.print_result();
+
+  std::cout << "GPU Elapsed Time : " << time << " (ms)" << std::endl;
 }
 
 int main(int argc, char** argv) {

@@ -55,7 +55,15 @@ void test_spmv(int num_arguments, char** argument_array) {
 
   // --
   // GPU Run
-  float gpu_elapsed = gunrock::spmv::run(G, x.data().get(), y.data().get());
+
+  // Create context
+  auto context = std::make_shared<gcuda::multi_context_t>(0);
+
+  // Create param and result structs
+  gunrock::spmv::param_t<weight_t> param(x.data().get());
+  gunrock::spmv::result_t<weight_t> result(y.data().get());
+
+  float gpu_elapsed = gunrock::spmv::run(G, param, result, context);
 
   // --
   // CPU Run

@@ -20,8 +20,10 @@ template <typename weight_t>
 struct param_t {
   weight_t alpha;
   weight_t tol;
+  options_t options;  ///< Optimization options (advance load-balance, filter, uniquify)
 
-  param_t(weight_t _alpha, weight_t _tol) : alpha(_alpha), tol(_tol) {}
+  param_t(weight_t _alpha, weight_t _tol, options_t _options = options_t()) 
+      : alpha(_alpha), tol(_tol), options(_options) {}
 };
 
 template <typename weight_t>
@@ -208,23 +210,15 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
  */
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::weight_type alpha,
-          typename graph_t::weight_type tol,
-          typename graph_t::weight_type* p,  // Output
+          param_t<typename graph_t::weight_type>& param,
+          result_t<typename graph_t::weight_type>& result,
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
-                  new gcuda::multi_context_t(0))  // Context
-) {
-  // <user-defined>
-  using vertex_t = typename graph_t::vertex_type;
+                  new gcuda::multi_context_t(0))) {
   using weight_t = typename graph_t::weight_type;
 
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
-
-  param_type param(alpha, tol);
-  result_type result(p);
-  // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
@@ -239,7 +233,35 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context, props);
   return enactor.enact();
-  // </boiler-plate>
+}
+
+/**
+ * @brief Run PageRank algorithm on a given graph.
+ *
+ * @note This is a legacy API that delegates to the new param/result API.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param alpha Damping factor.
+ * @param tol Convergence tolerance.
+ * @param p Pointer to the pagerank values.
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::weight_type alpha,
+          typename graph_t::weight_type tol,
+          typename graph_t::weight_type* p,  // Output
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))) {
+  using weight_t = typename graph_t::weight_type;
+
+  param_t<weight_t> param(alpha, tol);
+  result_t<weight_t> result(p);
+
+  return run(G, param, result, context);
 }
 
 }  // namespace pr
