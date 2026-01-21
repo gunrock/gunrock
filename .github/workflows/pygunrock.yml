@@ -108,7 +108,8 @@ jobs:
         run: |
           docker run --rm \
             -v ${{github.workspace}}:/workspace \
+            -w /workspace/python \
             ${{matrix.container}} \
             bash -c "
-              python -c 'import sys; sys.path.insert(0, \"/workspace/python/src\"); import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
+              python -c 'import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
             "
