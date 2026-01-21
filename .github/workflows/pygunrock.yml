@@ -92,10 +92,14 @@ jobs:
               python -m pip install --upgrade pip
               pip install nanobind scikit-build-core pytest pytest-cov
               
+              # Get nanobind CMake directory
+              NANOBIND_CMAKE=\$(python -c 'import nanobind; print(nanobind.cmake_dir())')
+              echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
+              
               # Build PyGunrock
               echo '=== Building PyGunrock ==='
               cd /workspace/python
-              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}}' pip install -e . -v
+              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE pip install -e . -v
               
               # Verify installation
               echo '=== Verifying PyGunrock installation ==='
