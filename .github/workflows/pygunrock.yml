@@ -19,13 +19,13 @@ jobs:
   build:
     strategy:
       matrix:
-        backend: [nvidia, amd]
+        backend: [amd] # Only enabled for AMD
         include:
-          # - backend: nvidia
-          #   container: nvcr.io/nvidia/pytorch:25.06-py3
-          #   architectures: "90"
-          #   cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
-          #   cmake_prefix_path: "/usr/local/cuda"
+          - backend: nvidia
+            container: nvcr.io/nvidia/pytorch:25.06-py3
+            architectures: "90"
+            cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
+            cmake_prefix_path: "/usr/local/cuda"
           - backend: amd
             container: rocm/pytorch:rocm7.1_ubuntu24.04_py3.12_pytorch_release_2.8.0
             architectures: "gfx950"
@@ -87,25 +87,17 @@ jobs:
               python -c 'import torch; print(f\"CUDA/ROCm available: {torch.cuda.is_available()}\")'
             "
 
-      # Install build dependencies
-      - name: Install Python dependencies in container
-        run: |
-          docker run --rm \
-            -v ${{github.workspace}}:/workspace \
-            ${{matrix.container}} \
-            bash -c "
-              python -m pip install --upgrade pip
-              pip install nanobind scikit-build-core
-            "
-
-      # Build PyGunrock
-      - name: Build PyGunrock in container
+      # Install dependencies and build PyGunrock
+      - name: Install dependencies and build PyGunrock in container
         run: |
           docker run --rm \
             -v ${{github.workspace}}:/workspace \
             -w /workspace/python \
             ${{matrix.container}} \
             bash -c "
+              set -e
+              python -m pip install --upgrade pip
+              pip install nanobind scikit-build-core
               NANOBIND_CMAKE=\$(python -c 'import nanobind; print(nanobind.cmake_dir())')
               echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
               CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE pip install -e . -v
