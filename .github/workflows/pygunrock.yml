@@ -87,8 +87,8 @@ jobs:
               python -c 'import torch; print(f\"CUDA/ROCm available: {torch.cuda.is_available()}\")'
             "
 
-      # Install dependencies and build PyGunrock
-      - name: Install dependencies and build PyGunrock in container
+      # Install dependencies, build, and verify PyGunrock
+      - name: Install dependencies, build, and verify PyGunrock in container
         run: |
           docker run --rm \
             -v ${{github.workspace}}:/workspace \
@@ -101,15 +101,6 @@ jobs:
               NANOBIND_CMAKE=\$(python -c 'import nanobind; print(nanobind.cmake_dir())')
               echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
               CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE pip install -e . -v
-            "
-
-      # Verify installation
-      - name: Verify PyGunrock installation
-        run: |
-          docker run --rm \
-            -v ${{github.workspace}}:/workspace \
-            -w /workspace/python \
-            ${{matrix.container}} \
-            bash -c "
+              echo \"=== Verifying PyGunrock installation ===\"
               python -c 'import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
             "
