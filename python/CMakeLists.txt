@@ -70,7 +70,9 @@ target_compile_definitions(_pygunrock PRIVATE
 
 # Set SM_TARGET based on HIP architecture
 # Note: The SM_TARGET_FLAG macro adds sm_ prefix, so we just use the gfx number
-if(CMAKE_HIP_ARCHITECTURES MATCHES "gfx942")
+if(CMAKE_HIP_ARCHITECTURES MATCHES "gfx950")
+    target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx950)
+elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx942")
     target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx942)
 elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx90a")
     target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx90a)
