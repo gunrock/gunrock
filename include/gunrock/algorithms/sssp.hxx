@@ -134,6 +134,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
 
       if (distance_to_neighbor < recover_distance) {
+        // Note: Non-atomic write is acceptable here because any predecessor
+        // that leads to the minimum distance is a valid predecessor in the
+        // shortest path tree. In cases of ties, any valid parent is acceptable.
         predecessors[neighbor] = source;
       }
       return (distance_to_neighbor < recover_distance);
