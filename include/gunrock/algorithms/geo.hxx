@@ -215,10 +215,10 @@ __device__ __host__ void spatial_median(graph_t& G,
       // ... I hate myself too.
       rinv = (r == 0) ? 0 : (num_zeros / r);
 
-      y1.latitude = max(0.0f, 1 - rinv) * T.latitude +
-                    min(1.0f, rinv) * y.latitude;  // latitude
-      y1.longitude = max(0.0f, 1 - rinv) * T.longitude +
-                     min(1.0f, rinv) * y.longitude;  // longitude
+      y1.latitude = math::max(0.0f, 1 - rinv) * T.latitude +
+                    math::min(1.0f, rinv) * y.latitude;  // latitude
+      y1.longitude = math::max(0.0f, 1 - rinv) * T.longitude +
+                     math::min(1.0f, rinv) * y.longitude;  // longitude
     }
 
     tmp.latitude = y.latitude - y1.latitude;

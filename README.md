@@ -1,5 +1,6 @@
 # Gunrock: CUDA/C++ GPU Graph Analytics
-[![Ubuntu](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/gunrock/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml) [![Documentation](https://github.com/gunrock/gunrock/actions/workflows/pages.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/pages.yml)
+[![Ubuntu](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/gunrock/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml) [![Documentation](https://github.com/gunrock/gunrock/actions/workflows/pages.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/pages.yml) [![pygunrock](https://img.shields.io/badge/Python-pygunrock-8A2BE2?logo=python&logoColor=white&labelColor=2B2B2B)](python/README.md)
+
 
 | [**Examples**](https://github.com/gunrock/gunrock/tree/main/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://gunrock.github.io/gunrock/) | [**Deprecated Documentation**](https://gunrock.github.io/docs/#/) | [**GitHub Actions**](https://github.com/gunrock/gunrock/actions) |
 |--------------|----------------------|-------------------|-------------------|---------------|
@@ -108,50 +109,6 @@ make examples
           --filter_algorithm compact \
           --num_runs 10
 ```
-
-### Available CLI Options
-
-All algorithms support the following optimization options via command-line:
-
-- `--advance_load_balance`: Load balancing strategy (`thread_mapped`, `block_mapped`, `merge_path`, `merge_path_v2`, etc.)
-- `--filter_algorithm`: Filter algorithm (`remove`, `predicated`, `compact`, `bypass`)
-- `--enable_filter`: Enable filter operator
-- `--enable_uniquify`: Enable uniquify operator
-- `--uniquify_algorithm`: Uniquify algorithm (`unique`, `unique_copy`)
-- `--best_effort_uniquify`: Best-effort uniquification (skip sorting)
-- `--uniquify_percent`: Percentage of elements to uniquify (0-100)
-
-### Building in Docker (NVIDIA)
-
-For NVIDIA builds in a Docker container:
-
-```shell
-docker run --rm -v $(pwd):/gunrock -w /gunrock \
-  nvidia/cuda:13.1.0-devel-ubuntu24.04 \
-  bash -c "apt-get update && apt-get install -y cmake git && \
-           mkdir -p build && cd build && \
-           cmake .. -DCMAKE_BUILD_TYPE=Release \
-                    -DESSENTIALS_AMD_BACKEND=OFF \
-                    -DESSENTIALS_NVIDIA_BACKEND=ON \
-                    -DCMAKE_CUDA_ARCHITECTURES=75 && \
-           make -j8 bfs sssp"
-```
-
-### Troubleshooting
-
-**CMake version too old:**
-```shell
-# Install CMake 3.24+ from https://cmake.org/download/
-# Or use the instructions in CMakeLists.txt
-```
-
-**Build fails with "Failed to find ROCm root directory":**
-- Ensure ROCm is properly installed and `ROCM_PATH` is set
-- Or use `-DESSENTIALS_AMD_BACKEND=OFF -DESSENTIALS_NVIDIA_BACKEND=ON` for NVIDIA builds
-
-**Segmentation fault with multiple runs:**
-- This has been fixed in recent commits. Ensure you're using the latest code.
-- If issues persist, try running with `--num_runs 1` first to verify correctness.
 
 ## Implementing Graph Algorithms
 For a detailed explanation, please see the full [documentation](https://github.com/gunrock/gunrock/wiki/How-to-write-a-new-graph-algorithm). The following example shows simple APIs using Gunrock's data-centric, bulk-synchronous programming model, we implement Breadth-First Search on GPUs. This example skips the setup phase of creating a `problem_t` and `enactor_t` struct and jumps straight into the actual algorithm.

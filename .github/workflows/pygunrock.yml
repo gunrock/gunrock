@@ -1,0 +1,105 @@
+# PyGunrock Python Interface Workflow
+name: PyGunrock
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+  
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - backend: nvidia
+            container: nvcr.io/nvidia/pytorch:25.06-py3
+            architectures: "90"
+            cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
+            cmake_prefix_path: "/usr/local/cuda"
+          - backend: amd
+            container: rocm/pytorch:rocm7.1_ubuntu24.04_py3.12_pytorch_release_2.8.0
+            architectures: "gfx950"
+            cmake_arch_flag: "-DCMAKE_HIP_ARCHITECTURES=gfx950"
+            cmake_prefix_path: "/opt/rocm"
+        
+    # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
+    if: "!contains(github.event.commits[0].message, '[skip pygunrock]')"
+    runs-on: ubuntu-latest
+    name: Build PyGunrock (${{matrix.backend}})
+
+    steps:
+      # Free up disk space before pulling large Docker images
+      # ROCm PyTorch images are ~12GB, NVIDIA PyTorch images are ~8-10GB
+      # Standard GitHub runners have ~14GB free, which is not enough
+      - name: Free up disk space
+        uses: insightsengineering/disk-space-reclaimer@v1
+        with:
+          tools-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Check available disk space (before)
+        run: df -h
+
+      - uses: actions/checkout@v6
+
+      # Pull the Docker image
+      - name: Pull Docker image
+        run: docker pull ${{matrix.container}}
+
+      - name: Check available disk space (after pull)
+        run: df -h
+
+      # Verify backend installation
+      - name: Check CUDA/HIP version in container
+        run: |
+          docker run --rm \
+            ${{matrix.container}} \
+            bash -c "
+              if [ '${{matrix.backend}}' = 'nvidia' ]; then
+                nvcc --version
+              else
+                hipcc --version
+              fi
+            "
+
+      # Verify PyTorch installation
+      - name: Verify PyTorch installation in container
+        run: |
+          docker run --rm \
+            ${{matrix.container}} \
+            bash -c "
+              python -c 'import torch; print(f\"PyTorch version: {torch.__version__}\")'
+              python -c 'import torch; print(f\"CUDA/ROCm available: {torch.cuda.is_available()}\")'
+            "
+
+      # Install dependencies, build, and verify PyGunrock
+      - name: Install dependencies, build, and verify PyGunrock in container
+        run: |
+          docker run --rm \
+            -v ${{github.workspace}}:/workspace \
+            -w /workspace/python \
+            ${{matrix.container}} \
+            bash -c "
+              set -e
+              python -m pip install --upgrade pip
+              pip install nanobind scikit-build-core
+              NANOBIND_CMAKE=\$(python -c 'import nanobind; print(nanobind.cmake_dir())')
+              echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
+              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE pip install -e . -v
+              echo \"=== Verifying PyGunrock installation ===\"
+              python -c 'import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
+            "

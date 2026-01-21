@@ -1,0 +1,89 @@
+# Copyright (c) 2024, The Regents of the University of California
+# SPDX-License-Identifier: BSD-3-Clause
+
+[build-system]
+requires = [
+    "scikit-build-core>=0.5",
+    "nanobind>=2.0.0"
+]
+build-backend = "scikit_build_core.build"
+
+# NOTE: Building this package requires ROCm/HIP to be installed on your system.
+# ROCm cannot be installed via pip and must be installed separately.
+# See: https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html
+# Ensure CMAKE_PREFIX_PATH includes ROCm (default: /opt/rocm)
+
+[project]
+name = "pygunrock"
+dynamic = ["version"]
+description = "Python bindings for Gunrock GPU Graph Analytics"
+readme = "../README.md"
+requires-python = ">=3.9"
+license = {text = "BSD-3-Clause"}
+authors = [
+    {name = "The Regents of the University of California"}
+]
+dependencies = [
+    "nanobind>=2.0.0",
+    "torch>=2.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.scikit-build]
+wheel.packages = ["src/gunrock"]
+cmake.version = ">=3.25"
+build.verbose = true
+# CMake source directory - use current directory (python/) which contains CMakeLists.txt
+# The python/CMakeLists.txt will automatically build gunrock from parent directory
+cmake.source-dir = "."
+cmake.build-type = "Release"
+# Disable Ninja - use Unix Makefiles instead
+ninja.make-fallback = false
+# CMake arguments
+# CMAKE_PREFIX_PATH should include ROCm and nanobind paths
+# CMAKE_HIP_ARCHITECTURES should be set for your GPU
+cmake.args = [
+    "-DCMAKE_BUILD_TYPE:STRING=Release",
+    "-DCMAKE_HIP_ARCHITECTURES:STRING=gfx942",
+]
+# CMake defines - these can be overridden via environment
+# CMAKE_PREFIX_PATH will be used by python/CMakeLists.txt
+cmake.define = { }
+# Dynamic version from __init__.py
+metadata.version.provider = "scikit_build_core.metadata.regex"
+metadata.version.input = "src/gunrock/__init__.py"
+metadata.version.regex = '^__version__\s*=\s*["\x27](?P<value>[^"\x27]+)["\x27]'
+sdist.exclude = [
+    "../../*",
+    "../*",
+    "*.md",
+    "*.sh",
+    "build/*",
+    "*.egg-info/*",
+]
+wheel.exclude = [
+    "../../*",
+    "../*",
+    "*.md",
+    "*.sh",
+    "tests/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests that require hardware",
+]
+addopts = [
+    "-ra",
+    "--strict-markers",
+]

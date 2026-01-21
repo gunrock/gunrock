@@ -15,6 +15,8 @@ import sys
 import textwrap
 
 sys.path.insert(0, os.path.abspath('.'))
+# Add Python package path for autodoc
+sys.path.insert(0, os.path.abspath('../../python/src'))
 
 
 # -- Project information -----------------------------------------------------
@@ -35,6 +37,7 @@ sys.path.append(os.path.abspath('_extensions'))
 # ones.
 extensions = [
     'sphinx.ext.mathjax', 'sphinx.ext.intersphinx', 'sphinx.ext.viewcode', 'sphinx.ext.graphviz',
+    'sphinx.ext.autodoc', 'sphinx.ext.napoleon',  # For Python API documentation
     'sphinxcontrib.bibtex',
     'sphinx_toolbox.more_autodoc.overloads',
     # 'sphinx_book_theme', 
