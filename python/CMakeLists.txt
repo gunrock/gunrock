@@ -101,10 +101,15 @@ else()
     )
     
     # Add compile definitions for CUDA/NVIDIA
+    # Use INTERFACE scope like main repo to ensure propagation
     target_compile_definitions(_pygunrock PRIVATE
-        __HIP_PLATFORM_NVIDIA__
-        HIP_BACKEND=1
         NB_SHARED
+    )
+    
+    # Add CUDA-specific compile options with definitions
+    target_compile_options(_pygunrock PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:-D__HIP_PLATFORM_NVIDIA__>
+        $<$<COMPILE_LANGUAGE:CUDA>:-DHIP_BACKEND=1>
     )
 endif()
 
