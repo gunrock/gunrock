@@ -19,13 +19,13 @@ jobs:
   build:
     strategy:
       matrix:
-        backend: [amd] # Only enabled for AMD
         include:
-          - backend: nvidia
-            container: nvcr.io/nvidia/pytorch:25.06-py3
-            architectures: "90"
-            cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
-            cmake_prefix_path: "/usr/local/cuda"
+          # Uncomment to enable NVIDIA backend
+          # - backend: nvidia
+          #   container: nvcr.io/nvidia/pytorch:25.06-py3
+          #   architectures: "90"
+          #   cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
+          #   cmake_prefix_path: "/usr/local/cuda"
           - backend: amd
             container: rocm/pytorch:rocm7.1_ubuntu24.04_py3.12_pytorch_release_2.8.0
             architectures: "gfx950"
