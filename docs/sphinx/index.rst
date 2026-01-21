@@ -66,6 +66,13 @@
 .. toctree::
    :hidden:
    :maxdepth: 2
+   :caption: Python API
+   
+   pygunrock-api.rst
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
    :caption: Developers Corner
 
    gunrock.wiki/Modern-CPP-Features.md
