@@ -100,8 +100,10 @@ else()
         ${GUNROCK_INCLUDE_DIR}
     )
     
-    # Add compile definitions
+    # Add compile definitions for CUDA/NVIDIA
     target_compile_definitions(_pygunrock PRIVATE
+        __HIP_PLATFORM_NVIDIA__
+        HIP_BACKEND=1
         NB_SHARED
     )
 endif()
