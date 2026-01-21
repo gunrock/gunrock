@@ -8,8 +8,12 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/ndarray.h>
 
-// For PyTorch tensor support
+// Backend-specific runtime headers
+#ifdef __HIP_PLATFORM_AMD__
 #include <hip/hip_runtime.h>
+#else
+#include <cuda_runtime.h>
+#endif
 
 // Gunrock headers
 #include <gunrock/algorithms/algorithms.hxx>
