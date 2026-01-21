@@ -3,13 +3,29 @@
 
 cmake_minimum_required(VERSION 3.25.2)
 
-project(pygunrock VERSION 2.1.0 LANGUAGES CXX HIP)
+# Detect backend: Check for CUDA first, then HIP
+if(DEFINED CMAKE_CUDA_ARCHITECTURES)
+    project(pygunrock VERSION 2.1.0 LANGUAGES CXX CUDA)
+    set(GUNROCK_BACKEND "CUDA")
+    message(STATUS "Building pygunrock with CUDA backend")
+elseif(DEFINED CMAKE_HIP_ARCHITECTURES)
+    project(pygunrock VERSION 2.1.0 LANGUAGES CXX HIP)
+    set(GUNROCK_BACKEND "HIP")
+    message(STATUS "Building pygunrock with HIP backend")
+else()
+    # Default to CUDA if neither is specified
+    project(pygunrock VERSION 2.1.0 LANGUAGES CXX CUDA)
+    set(GUNROCK_BACKEND "CUDA")
+    message(STATUS "No backend specified, defaulting to CUDA")
+endif()
 
 # Find Python
 find_package(Python 3.9 COMPONENTS Interpreter Development.Module REQUIRED)
 
-# Find HIP
-find_package(hip REQUIRED)
+# Find backend-specific packages
+if(GUNROCK_BACKEND STREQUAL "HIP")
+    find_package(hip REQUIRED)
+endif()
 
 # Find nanobind
 find_package(nanobind CONFIG REQUIRED)
@@ -30,70 +46,121 @@ else()
     set(PYTHON_INSTALL_DIR "${Python_SITEARCH}/gunrock")
 endif()
 
-# Create Python module - compile with HIP
+# Create Python module
 nanobind_add_module(_pygunrock "${CMAKE_CURRENT_SOURCE_DIR}/src/gunrock/bindings.cu")
 
-# Set source file to compile as HIP
-set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/src/gunrock/bindings.cu" PROPERTIES LANGUAGE HIP)
+# Set source file language based on backend
+if(GUNROCK_BACKEND STREQUAL "HIP")
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/src/gunrock/bindings.cu" PROPERTIES LANGUAGE HIP)
+else()
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/src/gunrock/bindings.cu" PROPERTIES LANGUAGE CUDA)
+endif()
 
 set_target_properties(_pygunrock PROPERTIES 
     OUTPUT_NAME "gunrock"
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
-    HIP_STANDARD 17
-    HIP_STANDARD_REQUIRED ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
     POSITION_INDEPENDENT_CODE ON
 )
 
-# Include Gunrock headers
-target_include_directories(_pygunrock PRIVATE 
-    ${GUNROCK_INCLUDE_DIR}
-    ${hip_INCLUDE_DIRS}
-)
-
-# Link against HIP
-target_link_libraries(_pygunrock PRIVATE hip::host hip::device)
-
-# Use HIP linker for the module
-set_target_properties(_pygunrock PROPERTIES
-    LINKER_LANGUAGE HIP
-)
-
-# Add compile definitions
-target_compile_definitions(_pygunrock PRIVATE
-    __HIP_PLATFORM_AMD__
-    NB_SHARED
-)
-
-# Set SM_TARGET based on HIP architecture
-# Note: The SM_TARGET_FLAG macro adds sm_ prefix, so we just use the gfx number
-if(CMAKE_HIP_ARCHITECTURES MATCHES "gfx950")
-    target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx950)
-elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx942")
-    target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx942)
-elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx90a")
-    target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx90a)
-elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx908")
-    target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx908)
+# Backend-specific settings
+if(GUNROCK_BACKEND STREQUAL "HIP")
+    set_target_properties(_pygunrock PROPERTIES
+        HIP_STANDARD 17
+        HIP_STANDARD_REQUIRED ON
+        LINKER_LANGUAGE HIP
+    )
+    
+    # Include Gunrock headers
+    target_include_directories(_pygunrock PRIVATE 
+        ${GUNROCK_INCLUDE_DIR}
+        ${hip_INCLUDE_DIRS}
+    )
+    
+    # Link against HIP
+    target_link_libraries(_pygunrock PRIVATE hip::host hip::device)
+    
+    # Add compile definitions
+    target_compile_definitions(_pygunrock PRIVATE
+        __HIP_PLATFORM_AMD__
+        NB_SHARED
+    )
 else()
-    # Fallback to all architectures
-    target_compile_definitions(_pygunrock PRIVATE SM_TARGET=fallback)
+    set_target_properties(_pygunrock PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        LINKER_LANGUAGE CUDA
+    )
+    
+    # Include Gunrock headers
+    target_include_directories(_pygunrock PRIVATE 
+        ${GUNROCK_INCLUDE_DIR}
+    )
+    
+    # Add compile definitions
+    target_compile_definitions(_pygunrock PRIVATE
+        NB_SHARED
+    )
 endif()
 
-# Add HIP compile options
-target_compile_options(_pygunrock PRIVATE
-    $<$<COMPILE_LANGUAGE:HIP>:-fgpu-rdc>
-    $<$<COMPILE_LANGUAGE:HIP>:--offload-arch=${CMAKE_HIP_ARCHITECTURES}>
-)
-
-# Add HIP link options
-target_link_options(_pygunrock PRIVATE
-    -fgpu-rdc
-    --offload-arch=${CMAKE_HIP_ARCHITECTURES}
-)
+# Set SM_TARGET based on architecture
+# Note: The SM_TARGET_FLAG macro adds sm_ prefix
+if(GUNROCK_BACKEND STREQUAL "HIP")
+    # HIP/AMD architectures
+    if(CMAKE_HIP_ARCHITECTURES MATCHES "gfx950")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx950)
+    elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx942")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx942)
+    elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx90a")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx90a)
+    elseif(CMAKE_HIP_ARCHITECTURES MATCHES "gfx908")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=gfx908)
+    else()
+        # Fallback to all architectures
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=fallback)
+    endif()
+    
+    # Add HIP compile options
+    target_compile_options(_pygunrock PRIVATE
+        $<$<COMPILE_LANGUAGE:HIP>:-fgpu-rdc>
+        $<$<COMPILE_LANGUAGE:HIP>:--offload-arch=${CMAKE_HIP_ARCHITECTURES}>
+    )
+    
+    # Add HIP link options
+    target_link_options(_pygunrock PRIVATE
+        -fgpu-rdc
+        --offload-arch=${CMAKE_HIP_ARCHITECTURES}
+    )
+else()
+    # CUDA/NVIDIA architectures
+    if(CMAKE_CUDA_ARCHITECTURES MATCHES "90")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=90)
+    elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "89")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=89)
+    elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "87")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=87)
+    elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "86")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=86)
+    elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "80")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=80)
+    elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "75")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=75)
+    elseif(CMAKE_CUDA_ARCHITECTURES MATCHES "70")
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=70)
+    else()
+        # Fallback to all architectures
+        target_compile_definitions(_pygunrock PRIVATE SM_TARGET=fallback)
+    endif()
+    
+    # Add CUDA compile options
+    target_compile_options(_pygunrock PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+    )
+endif()
 
 # Optional warnings
 option(GUNROCK_PYTHON_ENABLE_WARNINGS 
