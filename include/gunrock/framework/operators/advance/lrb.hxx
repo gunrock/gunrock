@@ -232,8 +232,8 @@ __global__ void count_sorted_bins_kernel(int32_t* sorted_bin_membership,
 }
 
 /**
- * @brief Kernel to process small bins using indirect indexing (Phase 1 optimized).
- * Uses simple per-thread processing without vertex reordering.
+ * @brief Kernel to process small bins using warp-level primitives (Phase 4 optimized).
+ * Uses warp-level operations for better efficiency on small-degree vertices.
  *
  * @tparam graph_t Graph type
  * @tparam operator_t Operator type
@@ -266,45 +266,48 @@ __global__ void process_small_bins_kernel(graph_t G,
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
   
-  int sorted_pos = threadIdx.x + blockIdx.x * blockDim.x + start_idx;
+  // Phase 4: Use warp-level processing
+  // Each warp processes multiple vertices cooperatively
+  constexpr int WARP_SIZE = 32;
+  int warp_id = (threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE;
+  int lane_id = threadIdx.x % WARP_SIZE;
+  int num_warps = (gridDim.x * blockDim.x) / WARP_SIZE;
   
-  if (sorted_pos >= end_idx)
-    return;
-  
-  // Get the original index of this vertex
-  int orig_idx = sorted_indices[sorted_pos];
-  
-  // Get the vertex from original input
-  vertex_t v;
-  if constexpr (input_type == advance_io_type_t::graph) {
-    v = static_cast<vertex_t>(orig_idx);
-  } else {
-    v = input[orig_idx];
-  }
-  
-  if (!gunrock::util::limits::is_valid(v))
-    return;
-  
-  // Use original segments (no recomputation needed!)
-  edge_t output_start = segments[orig_idx];
-  edge_t output_end = segments[orig_idx + 1];
-  edge_t degree = output_end - output_start;
-  
-  // Get the starting edge in the graph for this vertex
-  edge_t graph_edge_start = G.get_starting_edge(v);
-  
-  // Process all edges for this vertex
-  for (edge_t local_e = 0; local_e < degree; local_e++) {
-    edge_t graph_e = graph_edge_start + local_e;
-    edge_t output_pos = output_start + local_e;
+  // Grid-stride loop over vertices
+  for (int sorted_pos = start_idx + warp_id; sorted_pos < end_idx; sorted_pos += num_warps) {
+    // Get the original index of this vertex
+    int orig_idx = sorted_indices[sorted_pos];
     
-    vertex_t n = G.get_destination_vertex(graph_e);
-    weight_t w = G.get_edge_weight(graph_e);
+    // Get the vertex from original input
+    vertex_t v;
+    if constexpr (input_type == advance_io_type_t::graph) {
+      v = static_cast<vertex_t>(orig_idx);
+    } else {
+      v = input[orig_idx];
+    }
     
-    bool cond = op(v, n, graph_e, w);
+    if (!gunrock::util::limits::is_valid(v))
+      continue;
     
-    if constexpr (output_type != advance_io_type_t::none) {
-      output[output_pos] = cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
+    // Use original segments (no recomputation needed!)
+    edge_t output_start = segments[orig_idx];
+    edge_t output_end = segments[orig_idx + 1];
+    edge_t degree = output_end - output_start;
+    edge_t graph_edge_start = G.get_starting_edge(v);
+    
+    // Warp cooperates to process this vertex's edges
+    for (edge_t local_e = lane_id; local_e < degree; local_e += WARP_SIZE) {
+      edge_t graph_e = graph_edge_start + local_e;
+      edge_t output_pos = output_start + local_e;
+      
+      vertex_t n = G.get_destination_vertex(graph_e);
+      weight_t w = G.get_edge_weight(graph_e);
+      
+      bool cond = op(v, n, graph_e, w);
+      
+      if constexpr (output_type != advance_io_type_t::none) {
+        output[output_pos] = cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
+      }
     }
   }
 }
@@ -557,7 +560,7 @@ void execute(graph_t& G,
   // Copy prefix bins to host to determine bin boundaries
   thrust::host_vector<int32_t> h_prefix_bins(prefix_bins);
   
-  // Step 5: Process bins with appropriate strategies (Phase 1 optimized)
+  // Step 5: Process bins with appropriate strategies (Phase 2: Stream parallelism)
   // Note: Bins are indexed from 0 (largest degrees) to NUM_BINS-1 (smallest)
   // We use sorted_indices to access vertices, and original segments for output positions
   
@@ -565,11 +568,18 @@ void execute(graph_t& G,
                         ? nullptr
                         : input.data();
   
-  // Process large bins (bins 0 to BIN_LARGE_START)
-  // These have degrees from 2^(31-BIN_LARGE_START) to 2^31
-  // For now, use medium bin strategy (Phase 3 will add CUB)
+  // Phase 2: Create multiple streams for parallel bin processing
+  // Use 4 streams to overlap kernel execution
+  constexpr int NUM_STREAMS = 4;
+  gcuda::stream_t streams[NUM_STREAMS];
+  for (int i = 0; i < NUM_STREAMS; i++) {
+    hipStreamCreateWithFlags(&streams[i], hipStreamNonBlocking);
+  }
   
-  // Process medium bins (bins BIN_LARGE_START to BIN_MEDIUM_START)
+  int stream_idx = 0;
+  
+  // Process all bins from 0 to BIN_MEDIUM_START (large and medium bins)
+  // Use stream parallelism for concurrent execution (Phase 2)
   for (int bin = 0; bin <= BIN_MEDIUM_START; bin++) {
     int start = h_prefix_bins[bin];
     int end = h_prefix_bins[bin + 1];
@@ -580,21 +590,26 @@ void execute(graph_t& G,
     int num_vertices = end - start;
     int blocks = (num_vertices + 255) / 256;
     
+    // Round-robin stream assignment for parallelism
+    auto& stream = streams[stream_idx % NUM_STREAMS];
+    stream_idx++;
+    
     if (input_type == advance_io_type_t::graph) {
       process_medium_bins_kernel<256, output_type, advance_io_type_t::graph>
-          <<<blocks, 256, 0, context.stream()>>>(
+          <<<blocks, 256, 0, stream>>>(
               G, op, thrust::make_counting_iterator<vertex_t>(0),
               sorted_indices.data().get(), output.data(),
               segments.data().get(), start, end);
     } else {
       process_medium_bins_kernel<256, output_type, advance_io_type_t::vertices>
-          <<<blocks, 256, 0, context.stream()>>>(
+          <<<blocks, 256, 0, stream>>>(
               G, op, input_data, sorted_indices.data().get(),
               output.data(), segments.data().get(), start, end);
     }
   }
   
   // Process small bins (bins BIN_MEDIUM_START+1 to NUM_BINS-1)
+  // Continue using streams for parallelism
   for (int bin = BIN_MEDIUM_START + 1; bin < NUM_BINS; bin++) {
     int start = h_prefix_bins[bin];
     int end = h_prefix_bins[bin + 1];
@@ -605,18 +620,28 @@ void execute(graph_t& G,
     int num_vertices = end - start;
     int blocks = (num_vertices + 255) / 256;
     
+    // Round-robin stream assignment
+    auto& stream = streams[stream_idx % NUM_STREAMS];
+    stream_idx++;
+    
     if (input_type == advance_io_type_t::graph) {
       process_small_bins_kernel<output_type, advance_io_type_t::graph>
-          <<<blocks, 256, 0, context.stream()>>>(
+          <<<blocks, 256, 0, stream>>>(
               G, op, thrust::make_counting_iterator<vertex_t>(0),
               sorted_indices.data().get(), output.data(),
               segments.data().get(), start, end);
     } else {
       process_small_bins_kernel<output_type, advance_io_type_t::vertices>
-          <<<blocks, 256, 0, context.stream()>>>(
+          <<<blocks, 256, 0, stream>>>(
               G, op, input_data, sorted_indices.data().get(),
               output.data(), segments.data().get(), start, end);
     }
+  }
+  
+  // Synchronize and destroy all streams
+  for (int i = 0; i < NUM_STREAMS; i++) {
+    hipStreamSynchronize(streams[i]);
+    hipStreamDestroy(streams[i]);
   }
   
   context.synchronize();
