@@ -515,19 +515,28 @@ void execute(graph_t& G,
   }
   
   // Step 1: Compute bin membership for each vertex (Phase 1 optimization)
-  int membership_blocks = (input_size + 255) / 256;
-  if (membership_blocks > 0) {
-    auto input_data = (input_type == advance_io_type_t::graph)
-                          ? nullptr
-                          : input.data();
-    
+  using namespace gcuda::launch_box;
+  using launch_t = launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<256>>>;
+  
+  launch_t lb;
+  lb.calculate_grid_dimensions_strided(input_size);
+  
+  auto input_data = (input_type == advance_io_type_t::graph)
+                        ? nullptr
+                        : input.data();
+  
+  if (input_size > 0) {
     if (input_type == advance_io_type_t::graph) {
-      compute_bin_membership_kernel<<<membership_blocks, 256, 0, context.stream()>>>(
-          G, thrust::make_counting_iterator<vertex_t>(0),
-          bin_membership.data().get(), input_size);
+      auto membership_kernel = compute_bin_membership_kernel<graph_t, 
+                                 thrust::counting_iterator<vertex_t>>;
+      lb.launch(context, membership_kernel, G,
+               thrust::make_counting_iterator<vertex_t>(0),
+               bin_membership.data().get(), input_size);
     } else {
-      compute_bin_membership_kernel<<<membership_blocks, 256, 0, context.stream()>>>(
-          G, input_data, bin_membership.data().get(), input_size);
+      auto membership_kernel = compute_bin_membership_kernel<graph_t,
+                                 typename frontier_t::type_t*>;
+      lb.launch(context, membership_kernel, G, input_data,
+               bin_membership.data().get(), input_size);
     }
   }
   
@@ -547,15 +556,19 @@ void execute(graph_t& G,
   thrust::fill(context.execution_policy(), bins.begin(), bins.end(), 0);
   
   // Count how many vertices in each bin (after sorting)
-  int count_blocks = (input_size + 255) / 256;
-  if (count_blocks > 0) {
-    count_sorted_bins_kernel<<<count_blocks, 256, 0, context.stream()>>>(
-        bin_membership.data().get(), bins.data().get(), input_size);
+  if (input_size > 0) {
+    lb.calculate_grid_dimensions_strided(input_size);
+    auto count_kernel = count_sorted_bins_kernel;
+    lb.launch(context, count_kernel,
+             bin_membership.data().get(), bins.data().get(), input_size);
   }
   
-  // Compute prefix sum over bins
-  bin_prefix_kernel<<<1, 1, 0, context.stream()>>>(bins.data().get(),
-                                                     prefix_bins.data().get());
+  // Compute prefix sum over bins (single thread is fine for 33 bins)
+  using launch_single_t = launch_box_t<launch_params_t<fallback, dim3_t<1>, dim3_t<1>>>;
+  launch_single_t lb_single;
+  auto prefix_kernel = bin_prefix_kernel;
+  lb_single.launch(context, prefix_kernel,
+                  bins.data().get(), prefix_bins.data().get());
   
   // Copy prefix bins to host to determine bin boundaries
   thrust::host_vector<int32_t> h_prefix_bins(prefix_bins);
@@ -564,10 +577,6 @@ void execute(graph_t& G,
   // Note: Bins are indexed from 0 (largest degrees) to NUM_BINS-1 (smallest)
   // We use sorted_indices to access vertices, and original segments for output positions
   
-  auto input_data = (input_type == advance_io_type_t::graph)
-                        ? nullptr
-                        : input.data();
-  
   // Phase 2: Create multiple streams for parallel bin processing
   // Use 4 streams to overlap kernel execution
   constexpr int NUM_STREAMS = 4;
@@ -575,6 +584,9 @@ void execute(graph_t& G,
   for (int i = 0; i < NUM_STREAMS; i++) {
     hipStreamCreateWithFlags(&streams[i], hipStreamNonBlocking);
   }
+  
+  // Create launch_box for grid dimension calculation
+  launch_t lb_bins;
   
   int stream_idx = 0;
   
@@ -588,21 +600,25 @@ void execute(graph_t& G,
       continue;
     
     int num_vertices = end - start;
-    int blocks = (num_vertices + 255) / 256;
     
-    // Round-robin stream assignment for parallelism
+    // Calculate grid dimensions using launch_box
+    lb_bins.calculate_grid_dimensions_strided(num_vertices);
+    dim3 grid_dim = lb_bins.grid_dimensions;
+    dim3 block_dim = lb_bins.block_dimensions;
+    
+    // Get stream for round-robin assignment
     auto& stream = streams[stream_idx % NUM_STREAMS];
     stream_idx++;
     
     if (input_type == advance_io_type_t::graph) {
       process_medium_bins_kernel<256, output_type, advance_io_type_t::graph>
-          <<<blocks, 256, 0, stream>>>(
+          <<<grid_dim, block_dim, 0, stream>>>(
               G, op, thrust::make_counting_iterator<vertex_t>(0),
               sorted_indices.data().get(), output.data(),
               segments.data().get(), start, end);
     } else {
       process_medium_bins_kernel<256, output_type, advance_io_type_t::vertices>
-          <<<blocks, 256, 0, stream>>>(
+          <<<grid_dim, block_dim, 0, stream>>>(
               G, op, input_data, sorted_indices.data().get(),
               output.data(), segments.data().get(), start, end);
     }
@@ -618,21 +634,25 @@ void execute(graph_t& G,
       continue;
     
     int num_vertices = end - start;
-    int blocks = (num_vertices + 255) / 256;
     
-    // Round-robin stream assignment
+    // Calculate grid dimensions using launch_box
+    lb_bins.calculate_grid_dimensions_strided(num_vertices);
+    dim3 grid_dim = lb_bins.grid_dimensions;
+    dim3 block_dim = lb_bins.block_dimensions;
+    
+    // Get stream for round-robin assignment
     auto& stream = streams[stream_idx % NUM_STREAMS];
     stream_idx++;
     
     if (input_type == advance_io_type_t::graph) {
       process_small_bins_kernel<output_type, advance_io_type_t::graph>
-          <<<blocks, 256, 0, stream>>>(
+          <<<grid_dim, block_dim, 0, stream>>>(
               G, op, thrust::make_counting_iterator<vertex_t>(0),
               sorted_indices.data().get(), output.data(),
               segments.data().get(), start, end);
     } else {
       process_small_bins_kernel<output_type, advance_io_type_t::vertices>
-          <<<blocks, 256, 0, stream>>>(
+          <<<grid_dim, block_dim, 0, stream>>>(
               G, op, input_data, sorted_indices.data().get(),
               output.data(), segments.data().get(), start, end);
     }
