@@ -53,7 +53,7 @@ enum load_balance_t {
   thread_mapped,  ///< 1 element per thread
   warp_mapped,    ///< (wip) Equal # of elements per warp
   block_mapped,   ///< Equal # of elements per block
-  bucketing,      ///< (wip) Davidson et al. (SSSP)
+  lrb,            ///< Logarithmic Radix Binning (Fox et al., HPEC 2019)
   merge_path,     ///< Merrill & Garland (SpMV):: DEPRECATED (use merge_path_v2)
   merge_path_v2,  ///< Merrill & Garland (SpMV):: CUSTOM
   work_stealing,  ///< (wip) <cite>

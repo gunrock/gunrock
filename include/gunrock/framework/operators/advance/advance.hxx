@@ -20,7 +20,7 @@
 
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
-#include <gunrock/framework/operators/advance/bucketing.hxx>
+#include <gunrock/framework/operators/advance/lrb.hxx>
 #include <gunrock/framework/operators/advance/merge_path.hxx>
 
 #if __HIP_PLATFORM_NVIDIA__
@@ -122,6 +122,9 @@ void execute(graph_t& G,
     } else if (lb == load_balance_t::block_mapped) {
       block_mapped::execute<direction, input_type, output_type>(
           G, op, *input, *output, *context0);
+    } else if (lb == load_balance_t::lrb) {
+      lrb::execute<direction, input_type, output_type>(
+          G, op, *input, *output, segments, *context0);
     } else {
       error::throw_if_exception(hipErrorUnknown, "Advance type not supported.");
     }
@@ -269,6 +272,10 @@ void execute_runtime(graph_t& G,
             advance_io_type_t::vertices, advance_io_type_t::vertices>(
         G, E, op, context, swap_buffers);
 #endif
+  } else if (lb == load_balance_t::lrb) {
+    execute<load_balance_t::lrb, advance_direction_t::forward,
+            advance_io_type_t::vertices, advance_io_type_t::vertices>(
+        G, E, op, context, swap_buffers);
   } else {
     error::throw_if_exception(hipErrorUnknown, "Load balance type not supported.");
   }
