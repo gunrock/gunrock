@@ -577,12 +577,17 @@ void execute(graph_t& G,
   // Note: Bins are indexed from 0 (largest degrees) to NUM_BINS-1 (smallest)
   // We use sorted_indices to access vertices, and original segments for output positions
   
-  // Phase 2: Create multiple streams for parallel bin processing
-  // Use 4 streams to overlap kernel execution
+  // Optimization: Skip stream parallelism for small graphs (overhead dominates)
+  constexpr std::size_t STREAM_THRESHOLD = 10000;  // Use streams only for graphs > 10K vertices
+  bool use_streams = (input_size > STREAM_THRESHOLD);
+  
+  // Phase 2: Create multiple streams for parallel bin processing (if beneficial)
   constexpr int NUM_STREAMS = 4;
   gcuda::stream_t streams[NUM_STREAMS];
-  for (int i = 0; i < NUM_STREAMS; i++) {
-    hipStreamCreateWithFlags(&streams[i], hipStreamNonBlocking);
+  if (use_streams) {
+    for (int i = 0; i < NUM_STREAMS; i++) {
+      hipStreamCreateWithFlags(&streams[i], hipStreamNonBlocking);
+    }
   }
   
   // Create launch_box for grid dimension calculation
@@ -606,9 +611,9 @@ void execute(graph_t& G,
     dim3 grid_dim = lb_bins.grid_dimensions;
     dim3 block_dim = lb_bins.block_dimensions;
     
-    // Get stream for round-robin assignment
-    auto& stream = streams[stream_idx % NUM_STREAMS];
-    stream_idx++;
+    // Get stream for round-robin assignment (or use default stream for small graphs)
+    auto stream = use_streams ? streams[stream_idx % NUM_STREAMS] : context.stream();
+    if (use_streams) stream_idx++;
     
     if (input_type == advance_io_type_t::graph) {
       process_medium_bins_kernel<256, output_type, advance_io_type_t::graph>
@@ -658,10 +663,12 @@ void execute(graph_t& G,
     }
   }
   
-  // Synchronize and destroy all streams
-  for (int i = 0; i < NUM_STREAMS; i++) {
-    hipStreamSynchronize(streams[i]);
-    hipStreamDestroy(streams[i]);
+  // Synchronize and destroy all streams (if created)
+  if (use_streams) {
+    for (int i = 0; i < NUM_STREAMS; i++) {
+      hipStreamSynchronize(streams[i]);
+      hipStreamDestroy(streams[i]);
+    }
   }
   
   context.synchronize();
