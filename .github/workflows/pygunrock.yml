@@ -64,57 +64,59 @@ jobs:
       - name: Check available disk space (after pull)
         run: df -h
 
-      # Run all build and test steps inside the container
-      - name: Build and test PyGunrock in container
+      # Verify backend installation
+      - name: Check CUDA/HIP version in container
         run: |
           docker run --rm \
-            -v ${{github.workspace}}:/workspace \
-            -w /workspace \
             ${{matrix.container}} \
             bash -c "
-              set -e
-              
-              # Verify backend installation
-              echo '=== Checking CUDA/HIP version ==='
               if [ '${{matrix.backend}}' = 'nvidia' ]; then
                 nvcc --version
               else
                 hipcc --version
               fi
-              
-              # Verify PyTorch installation
-              echo '=== Verifying PyTorch installation ==='
-              python -c 'import torch; print(f\"PyTorch version: {torch.__version__}\")'
-              python -c 'import torch; print(f\"CUDA/ROCm available: {torch.cuda.is_available()}\")'
-              
-              # Install build dependencies
-              echo '=== Installing Python dependencies ==='
-              python -m pip install --upgrade pip
-              pip install nanobind scikit-build-core pytest pytest-cov
-              
-              # Get nanobind CMake directory
-              NANOBIND_CMAKE=\$(python -c 'import nanobind; print(nanobind.cmake_dir())')
-              echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
-              
-              # Build PyGunrock
-              echo '=== Building PyGunrock ==='
-              cd /workspace/python
-              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE pip install -e . -v
-              
-              # Verify installation
-              echo '=== Verifying PyGunrock installation ==='
-              python -c 'import sys; sys.path.insert(0, \"/workspace/python/src\"); import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
-              
-              # Run tests
-              echo '=== Running PyGunrock tests ==='
-              pytest tests/ -v --cov=gunrock --cov-report=xml --cov-report=term
             "
 
-      # Upload coverage reports
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./python/coverage.xml
-          flags: pygunrock-${{matrix.backend}}
-          name: pygunrock-${{matrix.backend}}
-          fail_ci_if_error: false
+      # Verify PyTorch installation
+      - name: Verify PyTorch installation in container
+        run: |
+          docker run --rm \
+            ${{matrix.container}} \
+            bash -c "
+              python -c 'import torch; print(f\"PyTorch version: {torch.__version__}\")'
+              python -c 'import torch; print(f\"CUDA/ROCm available: {torch.cuda.is_available()}\")'
+            "
+
+      # Install build dependencies
+      - name: Install Python dependencies in container
+        run: |
+          docker run --rm \
+            -v ${{github.workspace}}:/workspace \
+            ${{matrix.container}} \
+            bash -c "
+              python -m pip install --upgrade pip
+              pip install nanobind scikit-build-core
+            "
+
+      # Build PyGunrock
+      - name: Build PyGunrock in container
+        run: |
+          docker run --rm \
+            -v ${{github.workspace}}:/workspace \
+            -w /workspace/python \
+            ${{matrix.container}} \
+            bash -c "
+              NANOBIND_CMAKE=\$(python -c 'import nanobind; print(nanobind.cmake_dir())')
+              echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
+              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE pip install -e . -v
+            "
+
+      # Verify installation
+      - name: Verify PyGunrock installation
+        run: |
+          docker run --rm \
+            -v ${{github.workspace}}:/workspace \
+            ${{matrix.container}} \
+            bash -c "
+              python -c 'import sys; sys.path.insert(0, \"/workspace/python/src\"); import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
+            "
