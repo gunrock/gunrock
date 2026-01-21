@@ -35,50 +35,76 @@ jobs:
     # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
     if: "!contains(github.event.commits[0].message, '[skip pygunrock]')"
     runs-on: ubuntu-latest
-    container:
-      image: ${{matrix.container}}
-      options: --user root
     name: Build PyGunrock (${{matrix.backend}})
 
     steps:
+      # Free up disk space before pulling large Docker images
+      # ROCm PyTorch images are ~12GB, NVIDIA PyTorch images are ~8-10GB
+      # Standard GitHub runners have ~14GB free, which is not enough
+      - name: Free up disk space
+        uses: insightsengineering/disk-space-reclaimer@v1
+        with:
+          tools-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Check available disk space (before)
+        run: df -h
+
       - uses: actions/checkout@v6
 
-      # Verify backend installation
-      - name: Check CUDA/HIP version
-        run: |
-          if [ "${{matrix.backend}}" = "nvidia" ]; then
-            nvcc --version
-          else
-            hipcc --version
-          fi
+      # Pull the Docker image
+      - name: Pull Docker image
+        run: docker pull ${{matrix.container}}
 
-      - name: Verify PyTorch installation
-        run: |
-          python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
-          python -c "import torch; print(f'CUDA/ROCm available: {torch.cuda.is_available()}')"
+      - name: Check available disk space (after pull)
+        run: df -h
 
-      # Install build dependencies
-      - name: Install Python dependencies
+      # Run all build and test steps inside the container
+      - name: Build and test PyGunrock in container
         run: |
-          python -m pip install --upgrade pip
-          pip install nanobind scikit-build-core pytest pytest-cov
-
-      # Build PyGunrock with pip install
-      - name: Build PyGunrock
-        working-directory: ${{github.workspace}}/python
-        run: |
-          CMAKE_ARGS="${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}}" pip install -e . -v
-
-      # Verify installation
-      - name: Verify PyGunrock installation
-        run: |
-          python -c "import sys; sys.path.insert(0, 'python/src'); import gunrock; print(f'PyGunrock version: {gunrock.__version__}')"
-
-      # Run tests
-      - name: Run PyGunrock tests
-        working-directory: ${{github.workspace}}/python
-        run: |
-          pytest tests/ -v --cov=gunrock --cov-report=xml --cov-report=term
+          docker run --rm \
+            -v ${{github.workspace}}:/workspace \
+            -w /workspace \
+            ${{matrix.container}} \
+            bash -c "
+              set -e
+              
+              # Verify backend installation
+              echo '=== Checking CUDA/HIP version ==='
+              if [ '${{matrix.backend}}' = 'nvidia' ]; then
+                nvcc --version
+              else
+                hipcc --version
+              fi
+              
+              # Verify PyTorch installation
+              echo '=== Verifying PyTorch installation ==='
+              python -c 'import torch; print(f\"PyTorch version: {torch.__version__}\")'
+              python -c 'import torch; print(f\"CUDA/ROCm available: {torch.cuda.is_available()}\")'
+              
+              # Install build dependencies
+              echo '=== Installing Python dependencies ==='
+              python -m pip install --upgrade pip
+              pip install nanobind scikit-build-core pytest pytest-cov
+              
+              # Build PyGunrock
+              echo '=== Building PyGunrock ==='
+              cd /workspace/python
+              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}}' pip install -e . -v
+              
+              # Verify installation
+              echo '=== Verifying PyGunrock installation ==='
+              python -c 'import sys; sys.path.insert(0, \"/workspace/python/src\"); import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
+              
+              # Run tests
+              echo '=== Running PyGunrock tests ==='
+              pytest tests/ -v --cov=gunrock --cov-report=xml --cov-report=term
+            "
 
       # Upload coverage reports
       - name: Upload coverage to Codecov
