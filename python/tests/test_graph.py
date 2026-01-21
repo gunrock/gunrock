@@ -5,7 +5,6 @@
 
 import pytest
 import gunrock
-import numpy as np
 
 
 @pytest.mark.integration

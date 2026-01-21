@@ -218,7 +218,7 @@ Algorithms
 SSSP (Single-Source Shortest Path)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: gunrock.sssp(graph, source, distances, predecessors, context, options=None)
+.. py:function:: gunrock.sssp(graph, source, distances, predecessors, context=None, options=None)
 
    Run Single-Source Shortest Path algorithm with PyTorch tensors.
    
@@ -230,7 +230,7 @@ SSSP (Single-Source Shortest Path)
    :type distances: torch.Tensor
    :param predecessors: Output predecessor tensor (int32, on GPU)
    :type predecessors: torch.Tensor
-   :param context: GPU context
+   :param context: GPU context (optional, default: device 0)
    :type context: gunrock.multi_context_t
    :param options: Algorithm options (optional)
    :type options: gunrock.options_t
@@ -271,7 +271,7 @@ SSSP (Single-Source Shortest Path)
 BFS (Breadth-First Search)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:function:: gunrock.bfs(graph, source, distances, predecessors, context, options=None)
+.. py:function:: gunrock.bfs(graph, source, distances, predecessors, context=None, options=None)
 
    Run Breadth-First Search algorithm with PyTorch tensors.
    
@@ -283,7 +283,7 @@ BFS (Breadth-First Search)
    :type distances: torch.Tensor
    :param predecessors: Output predecessor tensor (int32, on GPU)
    :type predecessors: torch.Tensor
-   :param context: GPU context
+   :param context: GPU context (optional, default: device 0)
    :type context: gunrock.multi_context_t
    :param options: Algorithm options (optional)
    :type options: gunrock.options_t
@@ -392,16 +392,16 @@ PR (PageRank)
 PPR (Personalized PageRank)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:class:: gunrock.ppr_param_t(single_source, alpha=0.85, tol=1e-6, options=None)
+.. py:class:: gunrock.ppr_param_t(seed, alpha=0.85, epsilon=1e-6, options=None)
 
    Personalized PageRank algorithm parameters.
    
-   :param single_source: Source vertex ID
-   :type single_source: int
+   :param seed: Source vertex ID (seed vertex for personalized PageRank)
+   :type seed: int
    :param alpha: Damping factor (default: 0.85)
    :type alpha: float
-   :param tol: Convergence tolerance (default: 1e-6)
-   :type tol: float
+   :param epsilon: Convergence tolerance (default: 1e-6)
+   :type epsilon: float
    :param options: Algorithm options (optional)
    :type options: gunrock.options_t
 
@@ -429,18 +429,21 @@ PPR (Personalized PageRank)
 TC (Triangle Counting)
 ^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:class:: gunrock.tc_param_t(options=None)
+.. py:class:: gunrock.tc_param_t(reduce_all_triangles=False, options=None)
 
    Triangle Counting algorithm parameters.
    
+   :param reduce_all_triangles: Whether to reduce all triangles to a single count (default: False)
+   :type reduce_all_triangles: bool
    :param options: Algorithm options (optional)
    :type options: gunrock.options_t
 
-.. py:class:: gunrock.tc_result_t(total_triangles)
+.. py:class:: gunrock.tc_result_t(vertex_triangles_count, total_triangles_count)
 
    TC algorithm results.
    
-   :param total_triangles: Output total triangle count (int32 pointer)
+   :param vertex_triangles_count: Output per-vertex triangle counts (int32 pointer)
+   :param total_triangles_count: Output total triangle count (uint64 pointer)
 
 .. py:function:: gunrock.tc_run(graph, param, result, context=None)
 

@@ -6,8 +6,6 @@
 import pytest
 import gunrock
 import torch
-import os
-import tempfile
 
 
 @pytest.fixture
