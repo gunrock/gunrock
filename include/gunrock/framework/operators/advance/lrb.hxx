@@ -666,8 +666,10 @@ void execute(graph_t& G,
   // Synchronize and destroy all streams (if created)
   if (use_streams) {
     for (int i = 0; i < NUM_STREAMS; i++) {
-      hipStreamSynchronize(streams[i]);
-      hipStreamDestroy(streams[i]);
+      auto sync_err = hipStreamSynchronize(streams[i]);
+      (void)sync_err;  // Suppress nodiscard warning
+      auto destroy_err = hipStreamDestroy(streams[i]);
+      (void)destroy_err;  // Suppress nodiscard warning
     }
   }
   
