@@ -54,8 +54,8 @@ enum load_balance_t {
   warp_mapped,    ///< (wip) Equal # of elements per warp
   block_mapped,   ///< Equal # of elements per block
   lrb,            ///< Logarithmic Radix Binning (Fox et al., HPEC 2019)
-  merge_path,     ///< Merrill & Garland (SpMV):: DEPRECATED (use merge_path_v2)
-  merge_path_v2,  ///< Merrill & Garland (SpMV):: CUSTOM
+  merge_path,     ///< Merrill & Garland (SpMV)
+  merge_path_v2,  ///< Merrill & Garland (SpMV):: Not Supported
   work_stealing,  ///< (wip) <cite>
 };
 
