@@ -95,7 +95,9 @@ __device__ __host__ __forceinline__ int compute_bin(edge_t degree) {
   if (degree == 0)
     return NUM_BINS - 1;  // Empty vertices go to last bin
   
-  // Use count-leading-zeros intrinsic
+  // Use count-leading-zeros intrinsic (device) or builtin (host)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+  // Device code: use CUDA/HIP intrinsics
   if constexpr (sizeof(edge_t) == 4) {
     return __clz((int)degree);
   } else if constexpr (sizeof(edge_t) == 8) {
@@ -104,6 +106,17 @@ __device__ __host__ __forceinline__ int compute_bin(edge_t degree) {
     // Fallback for other sizes
     return __clz((int)degree);
   }
+#else
+  // Host code: use compiler builtins
+  if constexpr (sizeof(edge_t) == 4) {
+    return __builtin_clz((unsigned int)degree);
+  } else if constexpr (sizeof(edge_t) == 8) {
+    return __builtin_clzll((unsigned long long)degree);
+  } else {
+    // Fallback for other sizes
+    return __builtin_clz((unsigned int)degree);
+  }
+#endif
 }
 
 /**
