@@ -1,7 +1,9 @@
 # Gunrock/Essentials Ubuntu Workflow - Sparse Checkout Test
-# This workflow tests fetching ROCm libraries via git sparse-checkout from the
-# rocm-libraries monorepo instead of system packages.
-# Fetched via sparse checkout: rocprim, rocthrust, hipcub, hiprand, hipsparse, rocrand
+# This workflow tests fetching ROCm HEADER-ONLY libraries via git sparse-checkout
+# from the rocm-libraries monorepo instead of system packages.
+#
+# Fetched via sparse checkout (header-only): rocprim, rocthrust, hipcub
+# Installed via system packages (compiled libs): hiprand, hipsparse, rocrand
 name: Ubuntu Sparse Checkout Test
 
 # Controls when the workflow will run
@@ -36,30 +38,40 @@ jobs:
     name: Build (AMD - Sparse Checkout)
 
     steps:
-      # Install ROCm for AMD backend - ONLY runtime, no library dev packages
-      # All library packages are fetched via git sparse-checkout from rocm-libraries:
-      # rocprim-dev, rocthrust-dev, hipcub-dev, hiprand-dev, hipsparse-dev, rocrand
-      - name: Install ROCm (runtime only)
+      # Install ROCm for AMD backend
+      # Header-only libs (rocprim, rocthrust, hipcub) are fetched via sparse-checkout
+      # Compiled libs (hiprand, hipsparse, rocrand) must be installed as system packages
+      - name: Install ROCm
         uses: loostrum/rocm-installer@v0.2
         with:
           version: latest
-          # Only install runtime and tracer - all libraries fetched via cmake
-          packages: rocm-hip-runtime-dev roctracer
+          # Runtime + compiled libraries (header-only libs fetched via cmake)
+          packages: rocm-hip-runtime-dev hiprand-dev hipsparse-dev rocrand roctracer
 
       - name: Check hipcc version
         run: hipcc --version
 
-      - name: Verify ROCm libraries NOT installed (will be fetched via cmake)
+      - name: Verify header-only libs NOT installed (will be fetched via cmake)
         run: |
-          echo "Verifying that library headers are NOT installed via system packages..."
-          echo "These will all be fetched via cmake sparse-checkout from rocm-libraries"
+          echo "Verifying that HEADER-ONLY library headers are NOT installed via system packages..."
+          echo "These will be fetched via cmake sparse-checkout from rocm-libraries"
           echo ""
           
-          for lib in "rocprim" "thrust" "hipcub" "hiprand" "hipsparse" "rocrand"; do
+          for lib in "rocprim" "thrust" "hipcub"; do
             if [ -d "/opt/rocm/include/$lib" ]; then
               echo "WARNING: $lib appears to be installed via system packages"
             else
               echo "OK: $lib not found in system - will be fetched via cmake"
+            fi
+          done
+          
+          echo ""
+          echo "Compiled libraries should be installed via system packages:"
+          for lib in "hiprand" "hipsparse" "rocrand"; do
+            if [ -d "/opt/rocm/include/$lib" ]; then
+              echo "OK: $lib installed via system packages"
+            else
+              echo "WARNING: $lib not found - may cause link errors"
             fi
           done
         
