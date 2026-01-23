@@ -73,9 +73,12 @@ if(EXISTS "${ROCPRIM_VERSION_HPP_IN}" AND NOT EXISTS "${ROCPRIM_VERSION_HPP}")
   if(NOT EXISTS "${ROCPRIM_VERSION_HPP}")
     file(READ "${ROCPRIM_VERSION_HPP_IN}" template_content)
     # Replace CMake variables with reasonable defaults
+    # ROCPRIM_VERSION is used for inline namespace versioning (token pasting)
+    # Format: MAJOR * 10000 + MINOR * 100 + PATCH = 30300 for 3.3.0
     string(REPLACE "@rocprim_VERSION_MAJOR@" "3" template_content "${template_content}")
     string(REPLACE "@rocprim_VERSION_MINOR@" "3" template_content "${template_content}")
     string(REPLACE "@rocprim_VERSION_PATCH@" "0" template_content "${template_content}")
+    string(REPLACE "@rocprim_VERSION@" "30300" template_content "${template_content}")
     file(WRITE "${ROCPRIM_VERSION_HPP}" "${template_content}")
     message(STATUS "Generated ${ROCPRIM_VERSION_HPP} from template")
   endif()
