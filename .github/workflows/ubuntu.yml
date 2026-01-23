@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        backend: [nvidia, amd]
+        backend: [nvidia, amd, amd-sparse]
         include:
           - backend: nvidia
             architectures: "90"
@@ -29,6 +29,10 @@ jobs:
           - backend: amd
             architectures: "gfx950"
             cmake_backend_flag: "-DESSENTIALS_AMD_BACKEND=ON -DESSENTIALS_NVIDIA_BACKEND=OFF"
+            cmake_arch_flag: "-DCMAKE_HIP_ARCHITECTURES=gfx950"
+          - backend: amd-sparse
+            architectures: "gfx950"
+            cmake_backend_flag: "-DESSENTIALS_AMD_BACKEND=ON -DESSENTIALS_NVIDIA_BACKEND=OFF -DESSENTIALS_FETCH_ROCM_LIBS=ON"
             cmake_arch_flag: "-DCMAKE_HIP_ARCHITECTURES=gfx950"
         
     # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
@@ -94,14 +98,21 @@ jobs:
           version: latest
           packages: rocm-hip-runtime-dev rocprim-dev rocthrust-dev hipcub-dev hiprand-dev hipsparse-dev rocrand roctracer
 
+      - name: Install ROCm (sparse)
+        if: matrix.backend == 'amd-sparse'
+        uses: loostrum/rocm-installer@v0.2
+        with:
+          version: latest
+          packages: rocm-hip-runtime-dev hiprand-dev hipsparse-dev rocrand roctracer
+
       - name: Check hipcc version
-        if: matrix.backend == 'amd'
+        if: matrix.backend == 'amd' || matrix.backend == 'amd-sparse'
         run: hipcc --version
         
       - uses: actions/checkout@v6
         
       - name: Configure cmake
-        if: matrix.backend == 'amd'
+        if: matrix.backend == 'amd' || matrix.backend == 'amd-sparse'
         env:
           LD_LIBRARY_PATH: /opt/rocm/lib
         run: |
