@@ -46,17 +46,16 @@ else()
   message(STATUS "Successfully cloned rocm-libraries with sparse-checkout")
 endif()
 
-# Helper function to extract version from CMakeLists.txt and set variables
-# Sets both lowercase (rocprim_VERSION) and uppercase (ROCPRIM_VERSION) variants
-# since different templates use different naming conventions
-function(extract_version_from_cmake cmake_file prefix)
+# Helper function to extract version from CMakeLists.txt
+# Returns version components via output variables
+function(extract_version_from_cmake cmake_file out_major out_minor out_patch)
   set(major 3)
   set(minor 3)
   set(patch 0)
   
   if(EXISTS "${cmake_file}")
     file(READ "${cmake_file}" cmake_content)
-    # Try to find VERSION in project() call or set() calls
+    # Try to find VERSION in project() call
     string(REGEX MATCH "VERSION[ \t]+([0-9]+)\\.([0-9]+)\\.([0-9]+)" version_match "${cmake_content}")
     if(version_match)
       set(major ${CMAKE_MATCH_1})
@@ -65,20 +64,28 @@ function(extract_version_from_cmake cmake_file prefix)
     endif()
   endif()
   
+  set(${out_major} ${major} PARENT_SCOPE)
+  set(${out_minor} ${minor} PARENT_SCOPE)
+  set(${out_patch} ${patch} PARENT_SCOPE)
+endfunction()
+
+# Helper function to write version header directly (avoids configure_file issues)
+function(write_version_header header_path prefix major minor patch)
   math(EXPR version_num "${major} * 10000 + ${minor} * 100 + ${patch}")
-  
-  # Set lowercase variants (e.g., rocprim_VERSION_MAJOR)
-  set(${prefix}_VERSION_MAJOR ${major} PARENT_SCOPE)
-  set(${prefix}_VERSION_MINOR ${minor} PARENT_SCOPE)
-  set(${prefix}_VERSION_PATCH ${patch} PARENT_SCOPE)
-  set(${prefix}_VERSION ${version_num} PARENT_SCOPE)
-  
-  # Set uppercase variants (e.g., ROCPRIM_VERSION_MAJOR)
   string(TOUPPER "${prefix}" PREFIX_UPPER)
-  set(${PREFIX_UPPER}_VERSION_MAJOR ${major} PARENT_SCOPE)
-  set(${PREFIX_UPPER}_VERSION_MINOR ${minor} PARENT_SCOPE)
-  set(${PREFIX_UPPER}_VERSION_PATCH ${patch} PARENT_SCOPE)
-  set(${PREFIX_UPPER}_VERSION ${version_num} PARENT_SCOPE)
+  
+  file(WRITE "${header_path}" 
+"// Auto-generated version header
+#ifndef ${PREFIX_UPPER}_VERSION_HPP_
+#define ${PREFIX_UPPER}_VERSION_HPP_
+
+#define ${PREFIX_UPPER}_VERSION_MAJOR ${major}
+#define ${PREFIX_UPPER}_VERSION_MINOR ${minor}
+#define ${PREFIX_UPPER}_VERSION_PATCH ${patch}
+#define ${PREFIX_UPPER}_VERSION ${version_num}
+
+#endif // ${PREFIX_UPPER}_VERSION_HPP_
+")
 endfunction()
 
 # ============================================================================
@@ -90,13 +97,13 @@ if(NOT EXISTS "${ROCPRIM_INCLUDE_DIR}/rocprim")
 endif()
 set(ROCPRIM_INCLUDE_DIR "${ROCPRIM_INCLUDE_DIR}" CACHE PATH "rocPRIM include directory" FORCE)
 
-# Generate rocprim_version.hpp using configure_file
-extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/rocprim/CMakeLists.txt" rocprim)
+# Generate rocprim_version.hpp directly (avoids configure_file template issues)
 set(ROCPRIM_VERSION_HPP "${ROCPRIM_INCLUDE_DIR}/rocprim/rocprim_version.hpp")
-set(ROCPRIM_VERSION_HPP_IN "${ROCPRIM_INCLUDE_DIR}/rocprim/rocprim_version.hpp.in")
-if(EXISTS "${ROCPRIM_VERSION_HPP_IN}" AND NOT EXISTS "${ROCPRIM_VERSION_HPP}")
-  configure_file("${ROCPRIM_VERSION_HPP_IN}" "${ROCPRIM_VERSION_HPP}" @ONLY)
-  message(STATUS "Generated rocprim_version.hpp (version ${rocprim_VERSION_MAJOR}.${rocprim_VERSION_MINOR}.${rocprim_VERSION_PATCH})")
+if(NOT EXISTS "${ROCPRIM_VERSION_HPP}")
+  extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/rocprim/CMakeLists.txt" 
+    ROCPRIM_MAJOR ROCPRIM_MINOR ROCPRIM_PATCH)
+  write_version_header("${ROCPRIM_VERSION_HPP}" "rocprim" ${ROCPRIM_MAJOR} ${ROCPRIM_MINOR} ${ROCPRIM_PATCH})
+  message(STATUS "Generated rocprim_version.hpp (version ${ROCPRIM_MAJOR}.${ROCPRIM_MINOR}.${ROCPRIM_PATCH})")
 endif()
 message(STATUS "rocPRIM include: ${ROCPRIM_INCLUDE_DIR}")
 
@@ -109,16 +116,26 @@ if(NOT EXISTS "${THRUST_INCLUDE_DIR}/thrust")
 endif()
 set(THRUST_INCLUDE_DIR "${THRUST_INCLUDE_DIR}" CACHE PATH "rocThrust include directory" FORCE)
 
-# Generate rocthrust_version.hpp using configure_file
-extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/rocthrust/CMakeLists.txt" rocthrust)
+# Generate rocthrust_version.hpp directly
 set(ROCTHRUST_VERSION_HPP "${THRUST_INCLUDE_DIR}/thrust/rocthrust_version.hpp")
-set(ROCTHRUST_VERSION_HPP_IN "${THRUST_INCLUDE_DIR}/thrust/rocthrust_version.hpp.in")
-if(EXISTS "${ROCTHRUST_VERSION_HPP_IN}" AND NOT EXISTS "${ROCTHRUST_VERSION_HPP}")
-  # rocthrust uses VERSION_NUMBER which is the same as VERSION (both cases)
-  set(rocthrust_VERSION_NUMBER ${rocthrust_VERSION})
-  set(ROCTHRUST_VERSION_NUMBER ${ROCTHRUST_VERSION})
-  configure_file("${ROCTHRUST_VERSION_HPP_IN}" "${ROCTHRUST_VERSION_HPP}" @ONLY)
-  message(STATUS "Generated rocthrust_version.hpp (version ${rocthrust_VERSION_MAJOR}.${rocthrust_VERSION_MINOR}.${rocthrust_VERSION_PATCH})")
+if(NOT EXISTS "${ROCTHRUST_VERSION_HPP}")
+  extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/rocthrust/CMakeLists.txt"
+    ROCTHRUST_MAJOR ROCTHRUST_MINOR ROCTHRUST_PATCH)
+  math(EXPR ROCTHRUST_VERSION_NUM "${ROCTHRUST_MAJOR} * 10000 + ${ROCTHRUST_MINOR} * 100 + ${ROCTHRUST_PATCH}")
+  file(WRITE "${ROCTHRUST_VERSION_HPP}"
+"// Auto-generated version header
+#ifndef ROCTHRUST_VERSION_HPP_
+#define ROCTHRUST_VERSION_HPP_
+
+#define ROCTHRUST_VERSION_MAJOR ${ROCTHRUST_MAJOR}
+#define ROCTHRUST_VERSION_MINOR ${ROCTHRUST_MINOR}
+#define ROCTHRUST_VERSION_PATCH ${ROCTHRUST_PATCH}
+#define ROCTHRUST_VERSION ${ROCTHRUST_VERSION_NUM}
+#define ROCTHRUST_VERSION_NUMBER ${ROCTHRUST_VERSION_NUM}
+
+#endif // ROCTHRUST_VERSION_HPP_
+")
+  message(STATUS "Generated rocthrust_version.hpp (version ${ROCTHRUST_MAJOR}.${ROCTHRUST_MINOR}.${ROCTHRUST_PATCH})")
 endif()
 message(STATUS "rocThrust include: ${THRUST_INCLUDE_DIR}")
 
@@ -132,13 +149,13 @@ endif()
 set(HIPCUB_INCLUDE_DIR "${HIPCUB_INCLUDE_DIR}" CACHE PATH "hipCUB include directory" FORCE)
 set(CUB_INCLUDE_DIR "${HIPCUB_INCLUDE_DIR}/hipcub/backend/cub" CACHE PATH "CUB include directory" FORCE)
 
-# Generate hipcub_version.hpp if template exists
-extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/hipcub/CMakeLists.txt" hipcub)
+# Generate hipcub_version.hpp directly
 set(HIPCUB_VERSION_HPP "${HIPCUB_INCLUDE_DIR}/hipcub/hipcub_version.hpp")
-set(HIPCUB_VERSION_HPP_IN "${HIPCUB_INCLUDE_DIR}/hipcub/hipcub_version.hpp.in")
-if(EXISTS "${HIPCUB_VERSION_HPP_IN}" AND NOT EXISTS "${HIPCUB_VERSION_HPP}")
-  configure_file("${HIPCUB_VERSION_HPP_IN}" "${HIPCUB_VERSION_HPP}" @ONLY)
-  message(STATUS "Generated hipcub_version.hpp (version ${hipcub_VERSION_MAJOR}.${hipcub_VERSION_MINOR}.${hipcub_VERSION_PATCH})")
+if(NOT EXISTS "${HIPCUB_VERSION_HPP}")
+  extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/hipcub/CMakeLists.txt"
+    HIPCUB_MAJOR HIPCUB_MINOR HIPCUB_PATCH)
+  write_version_header("${HIPCUB_VERSION_HPP}" "hipcub" ${HIPCUB_MAJOR} ${HIPCUB_MINOR} ${HIPCUB_PATCH})
+  message(STATUS "Generated hipcub_version.hpp (version ${HIPCUB_MAJOR}.${HIPCUB_MINOR}.${HIPCUB_PATCH})")
 endif()
 message(STATUS "hipCUB include: ${HIPCUB_INCLUDE_DIR}")
 
