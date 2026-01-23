@@ -1,6 +1,7 @@
 # Gunrock/Essentials Ubuntu Workflow - Sparse Checkout Test
-# This workflow tests fetching ROCm libraries (rocThrust, rocPRIM, hipCUB) via
-# git sparse-checkout instead of system packages, similar to how NVIDIA's CCCL is fetched.
+# This workflow tests fetching ROCm libraries via git sparse-checkout from the
+# rocm-libraries monorepo instead of system packages.
+# Fetched via sparse checkout: rocprim, rocthrust, hipcub, hiprand, hipsparse, rocrand
 name: Ubuntu Sparse Checkout Test
 
 # Controls when the workflow will run
@@ -36,41 +37,31 @@ jobs:
 
     steps:
       # Install ROCm for AMD backend - ONLY runtime, no library dev packages
-      # rocprim-dev, rocthrust-dev, hipcub-dev are intentionally omitted
-      # They will be fetched via git sparse-checkout from rocm-libraries repo
+      # All library packages are fetched via git sparse-checkout from rocm-libraries:
+      # rocprim-dev, rocthrust-dev, hipcub-dev, hiprand-dev, hipsparse-dev, rocrand
       - name: Install ROCm (runtime only)
         uses: loostrum/rocm-installer@v0.2
         with:
           version: latest
-          # Only install runtime - library headers will be fetched via cmake
-          packages: rocm-hip-runtime-dev hiprand-dev hipsparse-dev rocrand roctracer
+          # Only install runtime and tracer - all libraries fetched via cmake
+          packages: rocm-hip-runtime-dev roctracer
 
       - name: Check hipcc version
         run: hipcc --version
 
-      - name: Verify rocThrust/rocPRIM NOT installed (will be fetched via cmake)
+      - name: Verify ROCm libraries NOT installed (will be fetched via cmake)
         run: |
-          echo "Checking that rocThrust headers are NOT installed..."
-          if [ -f "/opt/rocm/include/thrust/thrust.h" ] || [ -d "/opt/rocm/include/thrust" ]; then
-            echo "WARNING: rocThrust appears to be installed via system packages"
-            echo "This test is meant to verify sparse-checkout fetching works"
-          else
-            echo "OK: rocThrust not found in system - will be fetched via cmake"
-          fi
+          echo "Verifying that library headers are NOT installed via system packages..."
+          echo "These will all be fetched via cmake sparse-checkout from rocm-libraries"
+          echo ""
           
-          echo "Checking that rocPRIM headers are NOT installed..."
-          if [ -f "/opt/rocm/include/rocprim/rocprim.hpp" ] || [ -d "/opt/rocm/include/rocprim" ]; then
-            echo "WARNING: rocPRIM appears to be installed via system packages"
-          else
-            echo "OK: rocPRIM not found in system - will be fetched via cmake"
-          fi
-          
-          echo "Checking that hipCUB headers are NOT installed..."
-          if [ -f "/opt/rocm/include/hipcub/hipcub.hpp" ] || [ -d "/opt/rocm/include/hipcub" ]; then
-            echo "WARNING: hipCUB appears to be installed via system packages"
-          else
-            echo "OK: hipCUB not found in system - will be fetched via cmake"
-          fi
+          for lib in "rocprim" "thrust" "hipcub" "hiprand" "hipsparse" "rocrand"; do
+            if [ -d "/opt/rocm/include/$lib" ]; then
+              echo "WARNING: $lib appears to be installed via system packages"
+            else
+              echo "OK: $lib not found in system - will be fetched via cmake"
+            fi
+          done
         
       - uses: actions/checkout@v6
 

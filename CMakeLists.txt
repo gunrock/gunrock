@@ -142,7 +142,7 @@ if(${ESSENTIALS_AMD_BACKEND})
     # Use sparse-checkout only version - bypasses find_package entirely
     # Useful for CI testing without system-installed ROCm dev packages
     message(STATUS "ESSENTIALS_FORCE_GIT_FETCH_ROCM=ON: Using git sparse-checkout for ROCm libraries")
-    include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB_SparseOnly.cmake)
+    include(${PROJECT_SOURCE_DIR}/cmake/FetchROCmLibs.cmake)
   else()
     include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
   endif()
