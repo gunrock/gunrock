@@ -79,9 +79,11 @@ namespace lrb {
 constexpr int NUM_BINS = 33;
 
 // Bin thresholds for different processing strategies
-constexpr int BIN_LARGE_START = 20;   // 2^20 = ~1M edges, use CUB
-constexpr int BIN_MEDIUM_START = 28;  // 2^28+, use block kernels
-constexpr int BIN_SMALL_START = 31;   // 2^31+, use simple kernels
+// Higher bin number = smaller degree (bin = 32 - log2(degree))
+// Bin 0 = degree 2^31+, Bin 26 = degree 32-63, Bin 27 = degree 16-31, etc.
+constexpr int BIN_LARGE_START = 20;   // Bins 0-20: degree 2K+, use CUB (TODO)
+constexpr int BIN_MEDIUM_START = 26;  // Bins 0-26: degree 32+, use block kernels
+constexpr int BIN_SMALL_START = 31;   // Bins 27-31: degree 1-31, use warp kernels
 
 /**
  * @brief Compute bin index for a given degree using count-leading-zeros.
@@ -280,8 +282,13 @@ __global__ void process_small_bins_kernel(graph_t G,
   using weight_t = typename graph_t::weight_type;
   
   // Phase 4: Use warp-level processing
-  // Each warp processes multiple vertices cooperatively
+  // Each warp/wavefront processes multiple vertices cooperatively
+  // AMD: 64-thread wavefronts, NVIDIA: 32-thread warps
+#if defined(__HIP_PLATFORM_AMD__)
+  constexpr int WARP_SIZE = 64;
+#else
   constexpr int WARP_SIZE = 32;
+#endif
   int warp_id = (threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE;
   int lane_id = threadIdx.x % WARP_SIZE;
   int num_warps = (gridDim.x * blockDim.x) / WARP_SIZE;
@@ -302,11 +309,16 @@ __global__ void process_small_bins_kernel(graph_t G,
     if (!gunrock::util::limits::is_valid(v))
       continue;
     
-    // Use original segments (no recomputation needed!)
-    edge_t output_start = segments[orig_idx];
-    edge_t output_end = segments[orig_idx + 1];
-    edge_t degree = output_end - output_start;
+    // Get degree and graph edge start
+    edge_t degree = G.get_number_of_neighbors(v);
+    if (degree == 0)
+      continue;
+    
     edge_t graph_edge_start = G.get_starting_edge(v);
+    
+    // Use pre-computed segments for output position based on original vertex index
+    // segments[orig_idx] gives the starting output position for this vertex
+    edge_t output_start = segments[orig_idx];
     
     // Warp cooperates to process this vertex's edges
     for (edge_t local_e = lane_id; local_e < degree; local_e += WARP_SIZE) {
@@ -385,9 +397,8 @@ __global__ void process_medium_bins_kernel(graph_t G,
     vertices[local_idx] = v;
     
     if (gunrock::util::limits::is_valid(v)) {
-      // Use original segments - no recomputation!
-      output_starts[local_idx] = segments[orig_idx];
-      degrees[local_idx] = segments[orig_idx + 1] - segments[orig_idx];
+      // Get degree directly from graph
+      degrees[local_idx] = G.get_number_of_neighbors(v);
       graph_edge_starts[local_idx] = G.get_starting_edge(v);
     } else {
       degrees[local_idx] = 0;
@@ -402,6 +413,20 @@ __global__ void process_medium_bins_kernel(graph_t G,
   for (int i = 0; i < THREADS_PER_BLOCK; i++) {
     total_work += degrees[i];
   }
+  
+  // Use pre-computed segments for output positions
+  // Each vertex's output_start comes from segments[orig_idx]
+  if (local_idx == 0) {
+    for (int i = 0; i < THREADS_PER_BLOCK; i++) {
+      if (sorted_pos + i < end_idx) {
+        int orig_idx_i = sorted_indices[sorted_pos + i];
+        output_starts[i] = segments[orig_idx_i];
+      } else {
+        output_starts[i] = 0;
+      }
+    }
+  }
+  __syncthreads();
   
   // Each thread processes multiple edges
   for (edge_t work_idx = local_idx; work_idx < total_work; work_idx += THREADS_PER_BLOCK) {
@@ -511,10 +536,14 @@ void execute(graph_t& G,
   thrust::device_vector<int32_t> bin_membership(input_size);  // Which bin each vertex belongs to
   thrust::device_vector<int32_t> sorted_indices(input_size);  // Indices sorted by bin
   
-  // Compute output offsets for the original frontier (used directly, no recomputation needed)
+  
+  // Compute output offsets for the original frontier (used for segment info)
   std::size_t computed_output_size = compute_output_offsets(
       G, &input, segments, context,
       (input_type == advance_io_type_t::graph));
+  
+  // Ensure segments are fully computed before proceeding
+  context.synchronize();
   
   // Verify output size matches
   if constexpr (output_type != advance_io_type_t::none) {
@@ -557,6 +586,9 @@ void execute(graph_t& G,
   thrust::sequence(context.execution_policy(), 
                    sorted_indices.begin(), sorted_indices.end());
   
+  // Synchronize after bin membership to ensure all vertices are assigned before sorting
+  context.synchronize();
+  
   // Step 3: Sort indices by bin membership (stable sort preserves order within bins)
   // This gives us indices grouped by bin, but we don't move the actual vertices
   thrust::stable_sort_by_key(
@@ -568,6 +600,9 @@ void execute(graph_t& G,
   // Step 4: Count bins and compute prefix sum
   thrust::fill(context.execution_policy(), bins.begin(), bins.end(), 0);
   
+  // Synchronize to ensure fill and sort complete before counting
+  context.synchronize();
+  
   // Count how many vertices in each bin (after sorting)
   if (input_size > 0) {
     lb.calculate_grid_dimensions_strided(input_size);
@@ -576,6 +611,9 @@ void execute(graph_t& G,
              bin_membership.data().get(), bins.data().get(), input_size);
   }
   
+  // Synchronize to ensure count completes before reading bins to host
+  context.synchronize();
+  
   // Compute prefix sum over bins (single thread is fine for 33 bins)
   using launch_single_t = launch_box_t<launch_params_t<fallback, dim3_t<1>, dim3_t<1>>>;
   launch_single_t lb_single;
@@ -583,25 +621,25 @@ void execute(graph_t& G,
   lb_single.launch(context, prefix_kernel,
                   bins.data().get(), prefix_bins.data().get());
   
+  // Synchronize to ensure prefix sum completes before copying to host
+  context.synchronize();
+  
   // Copy prefix bins to host to determine bin boundaries
   thrust::host_vector<int32_t> h_prefix_bins(prefix_bins);
   
-  // Step 5: Process bins with appropriate strategies (Phase 2: Stream parallelism)
+  // Final sync before kernel launches
+  context.synchronize();
+  
+  // Step 5: Process bins with appropriate strategies
   // Note: Bins are indexed from 0 (largest degrees) to NUM_BINS-1 (smallest)
-  // We use sorted_indices to access vertices, and original segments for output positions
+  // We use sorted_indices to access vertices
   
-  // Optimization: Skip stream parallelism for small graphs (overhead dominates)
-  constexpr std::size_t STREAM_THRESHOLD = 10000;  // Use streams only for graphs > 10K vertices
-  bool use_streams = (input_size > STREAM_THRESHOLD);
+  // Disable stream parallelism for correctness - use default stream for all operations
+  bool use_streams = false;
   
-  // Phase 2: Create multiple streams for parallel bin processing (if beneficial)
+  // Placeholder for stream array (not used when use_streams = false)
   constexpr int NUM_STREAMS = 4;
   gcuda::stream_t streams[NUM_STREAMS];
-  if (use_streams) {
-    for (int i = 0; i < NUM_STREAMS; i++) {
-      hipStreamCreateWithFlags(&streams[i], hipStreamNonBlocking);
-    }
-  }
   
   // Create launch_box for grid dimension calculation
   launch_t lb_bins;
@@ -642,9 +680,9 @@ void execute(graph_t& G,
     }
   }
   
-  // Process small bins (bins BIN_MEDIUM_START+1 to NUM_BINS-1)
-  // Continue using streams for parallelism
-  for (int bin = BIN_MEDIUM_START + 1; bin < NUM_BINS; bin++) {
+  // Process small bins (bins BIN_MEDIUM_START+1 to NUM_BINS-2)
+  // Skip bin NUM_BINS-1 (bin 32) which contains invalid/zero-degree vertices
+  for (int bin = BIN_MEDIUM_START + 1; bin < NUM_BINS - 1; bin++) {
     int start = h_prefix_bins[bin];
     int end = h_prefix_bins[bin + 1];
     
@@ -653,14 +691,20 @@ void execute(graph_t& G,
     
     int num_vertices = end - start;
     
-    // Calculate grid dimensions using launch_box
-    lb_bins.calculate_grid_dimensions_strided(num_vertices);
+    // Calculate grid dimensions - need at least one wavefront per vertex
+    // since each wavefront processes one vertex in the grid-stride loop
+#if defined(__HIP_PLATFORM_AMD__)
+    int wavefront_size = 64;
+#else
+    int wavefront_size = 32;
+#endif
+    lb_bins.calculate_grid_dimensions_strided(num_vertices * wavefront_size);
     dim3 grid_dim = lb_bins.grid_dimensions;
     dim3 block_dim = lb_bins.block_dimensions;
     
-    // Get stream for round-robin assignment
-    auto& stream = streams[stream_idx % NUM_STREAMS];
-    stream_idx++;
+    // Get stream for round-robin assignment (or use default stream for small graphs)
+    auto stream = use_streams ? streams[stream_idx % NUM_STREAMS] : context.stream();
+    if (use_streams) stream_idx++;
     
     if (input_type == advance_io_type_t::graph) {
       process_small_bins_kernel<output_type, advance_io_type_t::graph>
@@ -687,6 +731,9 @@ void execute(graph_t& G,
   }
   
   context.synchronize();
+  
+  // Output size is already set from computed_output_size
+  // No need to update since we're using pre-computed segments
 }
 
 }  // namespace lrb
