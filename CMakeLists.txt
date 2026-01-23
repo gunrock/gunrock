@@ -60,6 +60,10 @@ option(ESSENTIALS_NVIDIA_BACKEND
   "If on, builds essentials with CUDA backend for NVIDIA GPUs."
   OFF)
 
+option(ESSENTIALS_FETCH_ROCM_LIBS
+  "If on, fetches rocPRIM/rocThrust/hipCUB via sparse-checkout instead of using system packages."
+  OFF)
+
 if((${ESSENTIALS_AMD_BACKEND} AND ${ESSENTIALS_NVIDIA_BACKEND}))
   message(FATAL_ERROR "Both NVIDIA and AMD backends specified [ON], select one: -DESSENTIALS_AMD_BACKEND=ON or -DESSENTIALS_NVIDIA_BACKEND=ON.")
 endif()
@@ -134,7 +138,7 @@ set(PROJECT_DEPS_DIR externals)
 # begin /* Include cmake modules */
 if(${ESSENTIALS_AMD_BACKEND})
   include(${PROJECT_SOURCE_DIR}/cmake/FetchROCMHIP.cmake)
-  include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchROCmLibs.cmake)
 else()
   include(${PROJECT_SOURCE_DIR}/cmake/FetchCCCL.cmake)
 endif()
