@@ -53,6 +53,34 @@ endif()
 set(ROCPRIM_INCLUDE_DIR "${ROCPRIM_INCLUDE_DIR}" CACHE PATH "rocPRIM include directory" FORCE)
 message(STATUS "rocPRIM include: ${ROCPRIM_INCLUDE_DIR}")
 
+# Generate rocprim_version.hpp from template if it doesn't exist
+# This file is needed by rocPRIM headers but is normally generated during rocPRIM build
+set(ROCPRIM_VERSION_HPP "${ROCPRIM_INCLUDE_DIR}/rocprim/rocprim_version.hpp")
+set(ROCPRIM_VERSION_HPP_IN "${ROCPRIM_INCLUDE_DIR}/rocprim/rocprim_version.hpp.in")
+if(EXISTS "${ROCPRIM_VERSION_HPP_IN}" AND NOT EXISTS "${ROCPRIM_VERSION_HPP}")
+  # Try to get version from system installation first
+  if(EXISTS "${ROCM_PATH}/include/rocprim/rocprim_version.hpp")
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy
+        "${ROCM_PATH}/include/rocprim/rocprim_version.hpp"
+        "${ROCPRIM_VERSION_HPP}"
+      RESULT_VARIABLE copy_result
+      ERROR_QUIET
+    )
+  endif()
+  
+  # If copy failed, generate a minimal version from template
+  if(NOT EXISTS "${ROCPRIM_VERSION_HPP}")
+    file(READ "${ROCPRIM_VERSION_HPP_IN}" template_content)
+    # Replace CMake variables with reasonable defaults
+    string(REPLACE "@rocprim_VERSION_MAJOR@" "3" template_content "${template_content}")
+    string(REPLACE "@rocprim_VERSION_MINOR@" "3" template_content "${template_content}")
+    string(REPLACE "@rocprim_VERSION_PATCH@" "0" template_content "${template_content}")
+    file(WRITE "${ROCPRIM_VERSION_HPP}" "${template_content}")
+    message(STATUS "Generated ${ROCPRIM_VERSION_HPP} from template")
+  endif()
+endif()
+
 # rocThrust - Thrust include path should point to the parent directory so that
 # #include <thrust/...> works correctly
 set(THRUST_INCLUDE_DIR "${rocm_libraries_SOURCE_DIR}/projects/rocthrust")
