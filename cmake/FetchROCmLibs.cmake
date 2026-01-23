@@ -46,26 +46,39 @@ else()
   message(STATUS "Successfully cloned rocm-libraries with sparse-checkout")
 endif()
 
-# Helper function to extract version from CMakeLists.txt
+# Helper function to extract version from CMakeLists.txt and set variables
+# Sets both lowercase (rocprim_VERSION) and uppercase (ROCPRIM_VERSION) variants
+# since different templates use different naming conventions
 function(extract_version_from_cmake cmake_file prefix)
+  set(major 3)
+  set(minor 3)
+  set(patch 0)
+  
   if(EXISTS "${cmake_file}")
     file(READ "${cmake_file}" cmake_content)
     # Try to find VERSION in project() call or set() calls
     string(REGEX MATCH "VERSION[ \t]+([0-9]+)\\.([0-9]+)\\.([0-9]+)" version_match "${cmake_content}")
     if(version_match)
-      set(${prefix}_VERSION_MAJOR ${CMAKE_MATCH_1} PARENT_SCOPE)
-      set(${prefix}_VERSION_MINOR ${CMAKE_MATCH_2} PARENT_SCOPE)
-      set(${prefix}_VERSION_PATCH ${CMAKE_MATCH_3} PARENT_SCOPE)
-      math(EXPR version_num "${CMAKE_MATCH_1} * 10000 + ${CMAKE_MATCH_2} * 100 + ${CMAKE_MATCH_3}")
-      set(${prefix}_VERSION ${version_num} PARENT_SCOPE)
-      return()
+      set(major ${CMAKE_MATCH_1})
+      set(minor ${CMAKE_MATCH_2})
+      set(patch ${CMAKE_MATCH_3})
     endif()
   endif()
-  # Default version if not found
-  set(${prefix}_VERSION_MAJOR 3 PARENT_SCOPE)
-  set(${prefix}_VERSION_MINOR 3 PARENT_SCOPE)
-  set(${prefix}_VERSION_PATCH 0 PARENT_SCOPE)
-  set(${prefix}_VERSION 30300 PARENT_SCOPE)
+  
+  math(EXPR version_num "${major} * 10000 + ${minor} * 100 + ${patch}")
+  
+  # Set lowercase variants (e.g., rocprim_VERSION_MAJOR)
+  set(${prefix}_VERSION_MAJOR ${major} PARENT_SCOPE)
+  set(${prefix}_VERSION_MINOR ${minor} PARENT_SCOPE)
+  set(${prefix}_VERSION_PATCH ${patch} PARENT_SCOPE)
+  set(${prefix}_VERSION ${version_num} PARENT_SCOPE)
+  
+  # Set uppercase variants (e.g., ROCPRIM_VERSION_MAJOR)
+  string(TOUPPER "${prefix}" PREFIX_UPPER)
+  set(${PREFIX_UPPER}_VERSION_MAJOR ${major} PARENT_SCOPE)
+  set(${PREFIX_UPPER}_VERSION_MINOR ${minor} PARENT_SCOPE)
+  set(${PREFIX_UPPER}_VERSION_PATCH ${patch} PARENT_SCOPE)
+  set(${PREFIX_UPPER}_VERSION ${version_num} PARENT_SCOPE)
 endfunction()
 
 # ============================================================================
@@ -101,8 +114,9 @@ extract_version_from_cmake("${rocm_libraries_SOURCE_DIR}/projects/rocthrust/CMak
 set(ROCTHRUST_VERSION_HPP "${THRUST_INCLUDE_DIR}/thrust/rocthrust_version.hpp")
 set(ROCTHRUST_VERSION_HPP_IN "${THRUST_INCLUDE_DIR}/thrust/rocthrust_version.hpp.in")
 if(EXISTS "${ROCTHRUST_VERSION_HPP_IN}" AND NOT EXISTS "${ROCTHRUST_VERSION_HPP}")
-  # rocthrust uses VERSION_NUMBER which is the same as VERSION
+  # rocthrust uses VERSION_NUMBER which is the same as VERSION (both cases)
   set(rocthrust_VERSION_NUMBER ${rocthrust_VERSION})
+  set(ROCTHRUST_VERSION_NUMBER ${ROCTHRUST_VERSION})
   configure_file("${ROCTHRUST_VERSION_HPP_IN}" "${ROCTHRUST_VERSION_HPP}" @ONLY)
   message(STATUS "Generated rocthrust_version.hpp (version ${rocthrust_VERSION_MAJOR}.${rocthrust_VERSION_MINOR}.${rocthrust_VERSION_PATCH})")
 endif()
