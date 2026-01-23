@@ -60,6 +60,10 @@ option(ESSENTIALS_NVIDIA_BACKEND
   "If on, builds essentials with CUDA backend for NVIDIA GPUs."
   OFF)
 
+option(ESSENTIALS_FORCE_GIT_FETCH_ROCM
+  "If on, always fetches ROCm libraries (rocThrust, rocPRIM, hipCUB) via git sparse-checkout instead of using find_package. Useful for testing without system-installed ROCm dev packages."
+  OFF)
+
 if((${ESSENTIALS_AMD_BACKEND} AND ${ESSENTIALS_NVIDIA_BACKEND}))
   message(FATAL_ERROR "Both NVIDIA and AMD backends specified [ON], select one: -DESSENTIALS_AMD_BACKEND=ON or -DESSENTIALS_NVIDIA_BACKEND=ON.")
 endif()
@@ -134,7 +138,14 @@ set(PROJECT_DEPS_DIR externals)
 # begin /* Include cmake modules */
 if(${ESSENTIALS_AMD_BACKEND})
   include(${PROJECT_SOURCE_DIR}/cmake/FetchROCMHIP.cmake)
-  include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+  if(${ESSENTIALS_FORCE_GIT_FETCH_ROCM})
+    # Use sparse-checkout only version - bypasses find_package entirely
+    # Useful for CI testing without system-installed ROCm dev packages
+    message(STATUS "ESSENTIALS_FORCE_GIT_FETCH_ROCM=ON: Using git sparse-checkout for ROCm libraries")
+    include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB_SparseOnly.cmake)
+  else()
+    include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+  endif()
 else()
   include(${PROJECT_SOURCE_DIR}/cmake/FetchCCCL.cmake)
 endif()

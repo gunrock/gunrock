@@ -1,0 +1,111 @@
+# Gunrock/Essentials Ubuntu Workflow - Sparse Checkout Test
+# This workflow tests fetching ROCm libraries (rocThrust, rocPRIM, hipCUB) via
+# git sparse-checkout instead of system packages, similar to how NVIDIA's CCCL is fetched.
+name: Ubuntu Sparse Checkout Test
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master and dev branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+  
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        backend: [amd]
+        include:
+          - backend: amd
+            architectures: "gfx950"
+            cmake_backend_flag: "-DESSENTIALS_AMD_BACKEND=ON -DESSENTIALS_NVIDIA_BACKEND=OFF"
+            cmake_arch_flag: "-DCMAKE_HIP_ARCHITECTURES=gfx950"
+        
+    # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
+    if: "!contains(github.event.commits[0].message, '[skip ubuntu]')"
+    runs-on: ${{matrix.os}}
+    name: Build (AMD - Sparse Checkout)
+
+    steps:
+      # Install ROCm for AMD backend - ONLY runtime, no library dev packages
+      # rocprim-dev, rocthrust-dev, hipcub-dev are intentionally omitted
+      # They will be fetched via git sparse-checkout from rocm-libraries repo
+      - name: Install ROCm (runtime only)
+        uses: loostrum/rocm-installer@v0.2
+        with:
+          version: latest
+          # Only install runtime - library headers will be fetched via cmake
+          packages: rocm-hip-runtime-dev hiprand-dev hipsparse-dev rocrand roctracer
+
+      - name: Check hipcc version
+        run: hipcc --version
+
+      - name: Verify rocThrust/rocPRIM NOT installed (will be fetched via cmake)
+        run: |
+          echo "Checking that rocThrust headers are NOT installed..."
+          if [ -f "/opt/rocm/include/thrust/thrust.h" ] || [ -d "/opt/rocm/include/thrust" ]; then
+            echo "WARNING: rocThrust appears to be installed via system packages"
+            echo "This test is meant to verify sparse-checkout fetching works"
+          else
+            echo "OK: rocThrust not found in system - will be fetched via cmake"
+          fi
+          
+          echo "Checking that rocPRIM headers are NOT installed..."
+          if [ -f "/opt/rocm/include/rocprim/rocprim.hpp" ] || [ -d "/opt/rocm/include/rocprim" ]; then
+            echo "WARNING: rocPRIM appears to be installed via system packages"
+          else
+            echo "OK: rocPRIM not found in system - will be fetched via cmake"
+          fi
+          
+          echo "Checking that hipCUB headers are NOT installed..."
+          if [ -f "/opt/rocm/include/hipcub/hipcub.hpp" ] || [ -d "/opt/rocm/include/hipcub" ]; then
+            echo "WARNING: hipCUB appears to be installed via system packages"
+          else
+            echo "OK: hipCUB not found in system - will be fetched via cmake"
+          fi
+        
+      - uses: actions/checkout@v6
+
+      - name: Configure cmake (force sparse checkout)
+        env:
+          LD_LIBRARY_PATH: /opt/rocm/lib
+        run: |
+          cmake -B ${{github.workspace}}/build \
+            -DESSENTIALS_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DESSENTIALS_FORCE_GIT_FETCH_ROCM=ON \
+            ${{matrix.cmake_backend_flag}} \
+            ${{matrix.cmake_arch_flag}}
+            
+      - name: Verify sparse checkout was used
+        run: |
+          echo "Checking if rocm-libraries was cloned via sparse-checkout..."
+          if [ -d "${{github.workspace}}/build/externals/rocm_libraries-src" ]; then
+            echo "OK: Found rocm_libraries-src directory"
+            ls -la ${{github.workspace}}/build/externals/rocm_libraries-src/
+            if [ -d "${{github.workspace}}/build/externals/rocm_libraries-src/projects" ]; then
+              echo "Projects directory contents:"
+              ls -la ${{github.workspace}}/build/externals/rocm_libraries-src/projects/
+            fi
+          else
+            # Try alternative location
+            EXTERNAL_DIR=$(find ${{github.workspace}} -name "rocm_libraries-src" -type d 2>/dev/null | head -1)
+            if [ -n "$EXTERNAL_DIR" ]; then
+              echo "OK: Found rocm_libraries-src at $EXTERNAL_DIR"
+              ls -la "$EXTERNAL_DIR"
+            else
+              echo "ERROR: rocm_libraries-src not found - sparse checkout may have failed"
+              exit 1
+            fi
+          fi
+        
+      - name: Build all applications
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
