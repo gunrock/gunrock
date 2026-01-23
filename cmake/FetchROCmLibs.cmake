@@ -159,21 +159,8 @@ if(NOT EXISTS "${HIPCUB_VERSION_HPP}")
 endif()
 message(STATUS "hipCUB include: ${HIPCUB_INCLUDE_DIR}")
 
-# ============================================================================
-# libcudacxx - find in ROCm installation (still needed from system)
-# ============================================================================
-find_path(LIBCUDACXX_INCLUDE_DIR 
-  NAMES cuda/std/type_traits
-  PATHS ${ROCM_PATH}/include ${ROCM_PATH}/lib/llvm/lib/clang/*/include
-  NO_DEFAULT_PATH
-)
-if(NOT LIBCUDACXX_INCLUDE_DIR)
-  set(LIBCUDACXX_INCLUDE_DIR "${ROCM_PATH}/include")
-endif()
-
 message(STATUS "")
 message(STATUS "ROCm libraries setup complete:")
 message(STATUS "  Header-only (via sparse-checkout): rocprim, rocthrust, hipcub")
 message(STATUS "  Compiled libs (via system packages): hiprand, hipsparse, rocrand")
 message(STATUS "  rocm-libraries source: ${rocm_libraries_SOURCE_DIR}")
-message(STATUS "  libcudacxx include: ${LIBCUDACXX_INCLUDE_DIR}")
