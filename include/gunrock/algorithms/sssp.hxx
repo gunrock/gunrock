@@ -75,6 +75,12 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, d_distances + single_source,
                  d_distances + single_source + 1, 0);
 
+    auto d_predecessors = thrust::device_pointer_cast(this->result.predecessors);
+    thrust::fill(policy, d_predecessors + 0, d_predecessors + n_vertices, -1);
+
+    thrust::fill(policy, d_predecessors + single_source,
+                 d_predecessors + single_source + 1, single_source);
+
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
   }
@@ -109,11 +115,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto single_source = P->param.single_source;
     auto distances = P->result.distances;
+    auto predecessors = P->result.predecessors;
     auto visited = P->visited.data().get();
 
     auto iteration = this->iteration;
 
-    auto shortest_path = [distances, single_source] __host__ __device__(
+    auto shortest_path = [distances, single_source, predecessors] __host__ __device__(
                              vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
                              edge_t const& edge,        // edge
@@ -126,6 +133,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       weight_t recover_distance =
           math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
 
+      if (distance_to_neighbor < recover_distance) {
+        // Note: Non-atomic write is acceptable here because any predecessor
+        // that leads to the minimum distance is a valid predecessor in the
+        // shortest path tree. In cases of ties, any valid parent is acceptable.
+        predecessors[neighbor] = source;
+      }
       return (distance_to_neighbor < recover_distance);
     };
 
