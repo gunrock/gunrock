@@ -9,7 +9,7 @@ set(FETCHCONTENT_BASE_DIR ${FC_BASE})
 FetchContent_Declare(
   json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        develop
+    GIT_TAG        v3.11.3
 )
 
 FetchContent_GetProperties(json)
