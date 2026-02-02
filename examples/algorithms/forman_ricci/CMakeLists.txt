@@ -1,0 +1,4 @@
+set(APPLICATION_NAME forman_ricci)
+set(APPLICATION_SOURCE ${APPLICATION_NAME}.cu)
+
+add_essentials_example(${APPLICATION_NAME} ${APPLICATION_SOURCE})
