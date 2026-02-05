@@ -148,6 +148,14 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
   // Build graph
   auto G = graph::build(properties, csr);
 
+  // Ensure CSR adjacency lists are sorted (required by two-pointer merge)
+  // from_coo does not guarantee sorted column indices
+  for (index_t i = 0; i < number_of_rows; i++) {
+      thrust::sort(thrust::device,
+        csr.column_indices.begin() + csr.row_offsets[i],
+        csr.column_indices.begin() + csr.row_offsets[i + 1]);
+  }
+
   vertex_t n_vertices = G.get_number_of_vertices();
   edge_t n_total_edges = G.get_number_of_edges();
 

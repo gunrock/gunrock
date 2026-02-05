@@ -18,15 +18,15 @@ constexpr float STEP_SCALE = 1.1f;
 // =============================================================================
 struct param_t {
   int n_iterations;
-  int* edge_src;        // COO source array (device pointer)
-  int* edge_dst;        // COO destination array (device pointer)
+  vertex_t* edge_src;        // COO source array (device pointer)
+  vertex_t* edge_dst;        // COO destination array (device pointer)
   int n_undirected_edges;
   
   param_t(int _n_iterations,
-          int* _edge_src,
-          int* _edge_dst,
+          vertex_t* _edge_src,
+          vertex_t* _edge_dst,
           int _n_undirected_edges)
-      : n_iterations(_n_iterations),
+      : n_iterations(_n_iterations), 
         edge_src(_edge_src),
         edge_dst(_edge_dst),
         n_undirected_edges(_n_undirected_edges) {}
@@ -169,12 +169,15 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         }
       }
 
+      // edge_src/edge_dst are pre-filtered (u < v) from symmetric CSR,
+      // so all edges are guaranteed to be found. Defensive check only.
       if (idx_v1_v2 < 0 || idx_v2_v1 < 0) {
         return true;  // Keep in frontier but skip
       }
 
       // Edge weight
-      weight_t w_e = max(edge_weights[idx_v1_v2], (weight_t)MIN_WEIGHT);
+      // weight_t w_e = max(edge_weights[idx_v1_v2], (weight_t)MIN_WEIGHT);
+      weight_t w_e = fmaxf(edge_weights[idx_v1_v2], (weight_t)MIN_WEIGHT);
 
       // Vertex contribution
       weight_t sum_ve = 2.0f / w_e;
@@ -196,24 +199,24 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
         if (n1 == n2) {
           // Common neighbor - triangle
-          weight_t w1 = max(edge_weights[i1], (weight_t)MIN_WEIGHT);
-          weight_t w2 = max(edge_weights[i2], (weight_t)MIN_WEIGHT);
+          weight_t w1 = fmaxf(edge_weights[i1], (weight_t)MIN_WEIGHT);
+          weight_t w2 = fmaxf(edge_weights[i2], (weight_t)MIN_WEIGHT);
 
           // Heron's formula
           weight_t s = (w_e + w1 + w2) / 2.0f;
           weight_t area_sq = fabs(s * (s - w_e) * (s - w1) * (s - w2));
-          weight_t w_tri = sqrt(max(area_sq, (weight_t)MIN_AREA));
+          weight_t w_tri = sqrt(fmaxf(area_sq, (weight_t)MIN_AREA));
           triangle_contrib += w_e / w_tri;
 
           i1++; i2++;
         } else if (n1 < n2) {
           // Parallel edge from v1
-          weight_t w_ep = max(edge_weights[i1], (weight_t)MIN_WEIGHT);
+          weight_t w_ep = fmaxf(edge_weights[i1], (weight_t)MIN_WEIGHT);
           sum_veeh += 1.0f / sqrt(w_e * w_ep);
           i1++;
         } else {
           // Parallel edge from v2
-          weight_t w_ep = max(edge_weights[i2], (weight_t)MIN_WEIGHT);
+          weight_t w_ep = fmaxf(edge_weights[i2], (weight_t)MIN_WEIGHT);
           sum_veeh += 1.0f / sqrt(w_e * w_ep);
           i2++;
         }
@@ -222,7 +225,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Remaining neighbors of v1
       while (i1 < end_v1) {
         if (G.get_destination_vertex(i1) != v2) {
-          weight_t w_ep = max(edge_weights[i1], (weight_t)MIN_WEIGHT);
+          weight_t w_ep = fmaxf(edge_weights[i1], (weight_t)MIN_WEIGHT);
           sum_veeh += 1.0f / sqrt(w_e * w_ep);
         }
         i1++;
@@ -231,7 +234,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Remaining neighbors of v2
       while (i2 < end_v2) {
         if (G.get_destination_vertex(i2) != v1) {
-          weight_t w_ep = max(edge_weights[i2], (weight_t)MIN_WEIGHT);
+          weight_t w_ep = fmaxf(edge_weights[i2], (weight_t)MIN_WEIGHT);
           sum_veeh += 1.0f / sqrt(w_e * w_ep);
         }
         i2++;
@@ -239,7 +242,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
       // Final curvature
       weight_t curvature = w_e * (triangle_contrib + sum_ve - sum_veeh);
-      curvature = min((weight_t)MAX_CURVATURE, max((weight_t)-MAX_CURVATURE, curvature));
+      // curvature = min((weight_t)MAX_CURVATURE, max((weight_t)-MAX_CURVATURE, curvature));
+      curvature = fminf((weight_t)MAX_CURVATURE, fmaxf((weight_t)-MAX_CURVATURE, curvature));
 
       edge_curvature[idx_v1_v2] = curvature;
       edge_curvature[idx_v2_v1] = curvature;
@@ -264,9 +268,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     P->max_curvature = max_curv;
     weight_t step_size = 1.0f / (STEP_SCALE * max_curv + 1e-10f);
-    step_size = min(step_size, (weight_t)1.0);
+    // step_size = min(step_size, (weight_t)1.0);
+    step_size = fminf(step_size, (weight_t)1.0);
 
-    printf("Iter %d: max_curv=%.2f, step=%.6f\n", current_iteration, max_curv, step_size);
+    // printf("Iter %d: max_curv=%.2f, step=%.6f\n", current_iteration, max_curv, step_size);
 
     // =========================================================================
     // Step 3: Update weights
@@ -301,7 +306,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
       if (idx_v1_v2 >= 0) {
         weight_t w_new = edge_weights[idx_v1_v2] * (1.0f - step_size * edge_curvature[idx_v1_v2]);
-        w_new = max(w_new, (weight_t)MIN_WEIGHT);
+        // w_new = max(w_new, (weight_t)MIN_WEIGHT);
+        w_new = fmaxf(w_new, (weight_t)MIN_WEIGHT);
 
         edge_weights[idx_v1_v2] = w_new;
         if (idx_v2_v1 >= 0) {
@@ -330,7 +336,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                         return w * scale;
                       });
 
-    printf("Iter %d: sum_weights = %.4f\n", current_iteration, total_weight);
+    // printf("Iter %d: sum_weights = %.4f\n", current_iteration, total_weight);
 
     current_iteration++;
   }
