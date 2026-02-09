@@ -1,5 +1,6 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/forman_ricci.hxx>
+#include <gunrock/algorithms/forman_ricci_cpu.hxx>
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
@@ -13,83 +14,6 @@
 using namespace gunrock;
 using namespace memory;
 
-// =============================================================================
-// Community detection using BFS (threshold-based) - CPU version
-// =============================================================================
-template <typename vertex_t, typename edge_t, typename weight_t>
-int find_communities_cpu(
-    vertex_t* h_row_offsets,
-    vertex_t* h_column_indices,
-    weight_t* h_edge_weights,
-    weight_t threshold,
-    int* h_component_ids,
-    vertex_t n_vertices) {
-  
-  for (vertex_t i = 0; i < n_vertices; i++) {
-    h_component_ids[i] = -1;
-  }
-  
-  std::vector<vertex_t> queue;
-  int n_components = 0;
-  
-  for (vertex_t start = 0; start < n_vertices; start++) {
-    if (h_component_ids[start] != -1) continue;
-    
-    queue.clear();
-    queue.push_back(start);
-    h_component_ids[start] = n_components;
-    size_t queue_idx = 0;
-    
-    while (queue_idx < queue.size()) {
-      vertex_t node = queue[queue_idx++];
-      
-      for (edge_t edge = h_row_offsets[node]; edge < h_row_offsets[node + 1]; edge++) {
-        vertex_t neighbor = h_column_indices[edge];
-        weight_t w = h_edge_weights[edge];
-        
-        if (w < threshold && h_component_ids[neighbor] == -1) {
-          h_component_ids[neighbor] = n_components;
-          queue.push_back(neighbor);
-        }
-      }
-    }
-    n_components++;
-  }
-  
-  return n_components;
-}
-
-// =============================================================================
-// Modularity calculation - CPU version
-// =============================================================================
-template <typename vertex_t, typename edge_t>
-double calculate_modularity_cpu(
-    vertex_t* h_row_offsets,
-    vertex_t* h_column_indices,
-    int* h_component_ids,
-    vertex_t n_vertices,
-    edge_t n_undirected_edges) {
-  
-  double modularity = 0.0;
-  edge_t m = n_undirected_edges;
-  
-  for (vertex_t u = 0; u < n_vertices; u++) {
-    int k_u = h_row_offsets[u + 1] - h_row_offsets[u];
-    
-    for (edge_t edge = h_row_offsets[u]; edge < h_row_offsets[u + 1]; edge++) {
-      vertex_t v = h_column_indices[edge];
-      int k_v = h_row_offsets[v + 1] - h_row_offsets[v];
-      
-      if (h_component_ids[u] == h_component_ids[v]) {
-        modularity += 1.0 - (double)(k_u * k_v) / (2.0 * m);
-      } else {
-        modularity += 0.0 - (double)(k_u * k_v) / (2.0 * m);
-      }
-    }
-  }
-  
-  return modularity / (2.0 * m);
-}
 
 // =============================================================================
 // Main test function
@@ -102,7 +26,6 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
 
   using vertex_t = int;
   using edge_t = int;
-  // using weight_t = float;
   using weight_t = double;
 
   std::string filename = argument_array[1];
@@ -113,51 +36,23 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto [properties, coo] = mm.load(filename);
 
-  // Keep COO arrays (edge_src, edge_dst)
-  // thrust::device_vector<vertex_t> d_edge_src = coo.row_indices;
-  // thrust::device_vector<vertex_t> d_edge_dst = coo.column_indices;
-  // edge_t n_undirected_edges = coo.row_indices.size();
-  // edge_t n_undirected_edges = coo.row_indices.size() / 2;
-
-  // Filter for unique undirected edges (u < v only)
-  std::vector<vertex_t> h_unique_src;
-  std::vector<vertex_t> h_unique_dst;
-  h_unique_src.reserve(coo.row_indices.size() / 2);
-  h_unique_dst.reserve(coo.column_indices.size() / 2);
-
-  for (size_t i = 0; i < coo.row_indices.size(); ++i) {
-      vertex_t u = coo.row_indices[i];
-      vertex_t v = coo.column_indices[i];
-      if (u < v) {
-          h_unique_src.push_back(u);
-          h_unique_dst.push_back(v);
-      }
-  }
-
-  edge_t n_undirected_edges = h_unique_src.size();
-  thrust::device_vector<vertex_t> d_edge_src = h_unique_src;
-  thrust::device_vector<vertex_t> d_edge_dst = h_unique_dst;
-  
-  std::cout << "Filtered unique edges (u < v): " << n_undirected_edges << std::endl;
-
-
   // Convert to CSR
   format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
   csr.from_coo(coo);
 
-  // Build graph
-  auto G = graph::build(properties, csr);
-
-  // Ensure CSR adjacency lists are sorted (required by two-pointer merge)
-  // from_coo does not guarantee sorted column indices
-  for (index_t i = 0; i < number_of_rows; i++) {
+  vertex_t n_verts = csr.row_offsets.size() - 1;
+  thrust::host_vector<vertex_t> h_offsets = csr.row_offsets;
+  for (vertex_t i = 0; i < n_verts; i++) {
       thrust::sort(thrust::device,
-        csr.column_indices.begin() + csr.row_offsets[i],
-        csr.column_indices.begin() + csr.row_offsets[i + 1]);
+        csr.column_indices.begin() + h_offsets[i],
+        csr.column_indices.begin() + h_offsets[i + 1]);
   }
 
+  // Build graph
+  auto G = graph::build(properties, csr);
   vertex_t n_vertices = G.get_number_of_vertices();
   edge_t n_total_edges = G.get_number_of_edges();
+  edge_t n_undirected_edges = n_total_edges / 2;
 
   std::cout << "=== Graph Info ===" << std::endl;
   std::cout << "Vertices: " << n_vertices << std::endl;
@@ -172,17 +67,13 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
   // ==========================================================================
   // Run Forman-Ricci flow using Gunrock pattern
   // ==========================================================================
-  int n_iterations = 20;
+  int n_iterations = 10;
 
-  std::cout << "\n=== Running Forman-Ricci Flow ===" << std::endl;
-  
+  // std::cout << "\n=== Running Forman-Ricci Flow ===" << std::endl;
+  std::cout << "\n=== Running Forman-Ricci Flow (" << n_iterations << " iterations) ===" << std::endl;
+ 
   float gpu_time = gunrock::forman_ricci::run(
-      G,
-      n_iterations,
-      d_edge_src.data().get(),
-      d_edge_dst.data().get(),
-      n_undirected_edges,
-      d_edge_weights.data().get());
+    G, n_iterations, d_edge_weights.data().get());
 
   std::cout << "\nRicci flow time: " << gpu_time << " ms" << std::endl;
 
@@ -258,7 +149,7 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
   for (int cutoff_idx = 0; cutoff_idx < n_cutoff; cutoff_idx++) {
     weight_t threshold = cutoff_list[cutoff_idx];
     
-    int n_communities = find_communities_cpu<vertex_t, edge_t, weight_t>(
+    int n_communities = gunrock::forman_ricci::cpu::find_communities_cpu<vertex_t, edge_t, weight_t>(
         h_row_offsets.data(),
         h_column_indices.data(),
         h_edge_weights.data(),
@@ -268,7 +159,7 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
     
     if (n_communities < 2 || n_communities > n_vertices / 2) continue;
     
-    double modularity = calculate_modularity_cpu<vertex_t, edge_t>(
+    double modularity = gunrock::forman_ricci::cpu::calculate_modularity_cpu<vertex_t, edge_t>(
         h_row_offsets.data(),
         h_column_indices.data(),
         h_component_ids.data(),
@@ -294,7 +185,7 @@ void test_forman_ricci(int num_arguments, char** argument_array) {
   // ==========================================================================
   
   // Rerun with best threshold
-  find_communities_cpu<vertex_t, edge_t, weight_t>(
+  gunrock::forman_ricci::cpu::find_communities_cpu<vertex_t, edge_t, weight_t>(
       h_row_offsets.data(),
       h_column_indices.data(),
       h_edge_weights.data(),
