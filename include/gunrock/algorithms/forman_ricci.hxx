@@ -69,10 +69,22 @@ struct problem_t : gunrock::problem_t<graph_t> {
     // Copy CSR arrays to host (one-time cost)
     std::vector<edge_t> h_offsets(n_vertices + 1);
     std::vector<vertex_t> h_indices(n_edges);
-    cudaMemcpy(h_offsets.data(), g.get_row_offsets(),
-              (n_vertices + 1) * sizeof(edge_t), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_indices.data(), g.get_column_indices(),
-              n_edges * sizeof(vertex_t), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(h_offsets.data(), g.get_row_offsets(),
+    //           (n_vertices + 1) * sizeof(edge_t), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(h_indices.data(), g.get_column_indices(),
+    //           n_edges * sizeof(vertex_t), cudaMemcpyDeviceToHost);
+    // thrust::copy(g.get_row_offsets(),
+    //          g.get_row_offsets() + (n_vertices + 1),
+    //          h_offsets.data());
+    // thrust::copy(g.get_column_indices(),
+    //             g.get_column_indices() + n_edges,
+    //             h_indices.data());
+    thrust::copy(thrust::device_pointer_cast(g.get_row_offsets()),
+             thrust::device_pointer_cast(g.get_row_offsets()) + (n_vertices + 1),
+             h_offsets.data());
+    thrust::copy(thrust::device_pointer_cast(g.get_column_indices()),
+                thrust::device_pointer_cast(g.get_column_indices()) + n_edges,
+                h_indices.data());
 
     std::vector<vertex_t> src_vec, dst_vec;
     src_vec.reserve(n_edges / 2);
