@@ -247,7 +247,7 @@ operators::load_balance_t parse_load_balance(std::string str) {
   if (str == "thread_mapped") return operators::load_balance_t::thread_mapped;
   if (str == "warp_mapped") return operators::load_balance_t::warp_mapped;
   if (str == "block_mapped") return operators::load_balance_t::block_mapped;
-  if (str == "bucketing") return operators::load_balance_t::bucketing;
+  if (str == "lrb") return operators::load_balance_t::lrb;
   if (str == "merge_path") return operators::load_balance_t::merge_path;
   if (str == "merge_path_v2") return operators::load_balance_t::merge_path_v2;
   if (str == "work_stealing") return operators::load_balance_t::work_stealing;

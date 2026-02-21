@@ -8,7 +8,7 @@ High-performance graph algorithms on GPUs using ROCm/HIP.
 """
 
 try:
-    # Import the compiled module directly
+    # Import the compiled extension module
     from . import gunrock as _gunrock
     
     # Re-export everything from the compiled module
@@ -17,6 +17,30 @@ try:
         memory_space_t,
         multi_context_t,
         options_t,
+        
+        # Operator enums (types)
+        load_balance_t,
+        filter_algorithm_t,
+        uniquify_algorithm_t,
+        
+        # Load balance enum values (exported via .export_values())
+        thread_mapped,
+        warp_mapped,
+        block_mapped,
+        lrb,
+        merge_path,
+        merge_path_v2,
+        work_stealing,
+        
+        # Filter algorithm enum values
+        remove,
+        predicated,
+        compact,
+        bypass,
+        
+        # Uniquify algorithm enum values
+        unique,
+        unique_copy,
         
         # Graph structures
         graph_properties_t,
@@ -113,6 +137,30 @@ __all__ = [
     "memory_space_t",
     "multi_context_t",
     "options_t",
+    
+    # Operator enums (types)
+    "load_balance_t",
+    "filter_algorithm_t",
+    "uniquify_algorithm_t",
+    
+    # Load balance enum values
+    "thread_mapped",
+    "warp_mapped",
+    "block_mapped",
+    "lrb",
+    "merge_path",
+    "merge_path_v2",
+    "work_stealing",
+    
+    # Filter algorithm enum values
+    "remove",
+    "predicated",
+    "compact",
+    "bypass",
+    
+    # Uniquify algorithm enum values
+    "unique",
+    "unique_copy",
     
     # Graph structures
     "graph_properties_t",

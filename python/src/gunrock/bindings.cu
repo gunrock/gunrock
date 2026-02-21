@@ -17,6 +17,7 @@
 
 // Gunrock headers
 #include <gunrock/algorithms/algorithms.hxx>
+#include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/algorithms/bfs.hxx>
 #include <gunrock/algorithms/sssp.hxx>
 #include <gunrock/algorithms/bc.hxx>
@@ -147,11 +148,39 @@ NB_MODULE(gunrock, m) {
       ctx.get_context(0)->synchronize();
     }, "Synchronize GPU operations");
 
+  // Load balance enum
+  nb::enum_<operators::load_balance_t>(m, "load_balance_t")
+    .value("thread_mapped", operators::load_balance_t::thread_mapped)
+    .value("warp_mapped", operators::load_balance_t::warp_mapped)
+    .value("block_mapped", operators::load_balance_t::block_mapped)
+    .value("lrb", operators::load_balance_t::lrb)
+    .value("merge_path", operators::load_balance_t::merge_path)
+    .value("merge_path_v2", operators::load_balance_t::merge_path_v2)
+    .value("work_stealing", operators::load_balance_t::work_stealing)
+    .export_values();
+
+  // Filter algorithm enum
+  nb::enum_<operators::filter_algorithm_t>(m, "filter_algorithm_t")
+    .value("remove", operators::filter_algorithm_t::remove)
+    .value("predicated", operators::filter_algorithm_t::predicated)
+    .value("compact", operators::filter_algorithm_t::compact)
+    .value("bypass", operators::filter_algorithm_t::bypass)
+    .export_values();
+
+  // Uniquify algorithm enum
+  nb::enum_<operators::uniquify_algorithm_t>(m, "uniquify_algorithm_t")
+    .value("unique", operators::uniquify_algorithm_t::unique)
+    .value("unique_copy", operators::uniquify_algorithm_t::unique_copy)
+    .export_values();
+
   // Options
   nb::class_<options_t>(m, "options_t")
     .def(nb::init<>())
     .def_rw("advance_load_balance", &options_t::advance_load_balance)
+    .def_rw("filter_algorithm", &options_t::filter_algorithm)
+    .def_rw("enable_filter", &options_t::enable_filter)
     .def_rw("enable_uniquify", &options_t::enable_uniquify)
+    .def_rw("uniquify_algorithm", &options_t::uniquify_algorithm)
     .def_rw("best_effort_uniquify", &options_t::best_effort_uniquify)
     .def_rw("uniquify_percent", &options_t::uniquify_percent);
 
