@@ -33,12 +33,15 @@ float run(csr_t& csr,
   vertex_t* column_indices = _column_indices.data();
   weight_t* nonzero_values = _nonzero_values.data();
 
-  for (vertex_t i = 0; i < csr.number_of_rows; i++)
+  for (vertex_t i = 0; i < csr.number_of_rows; i++) {
     distances[i] = std::numeric_limits<weight_t>::max();
+    predecessors[i] = -1;
+  }
 
   auto t_start = high_resolution_clock::now();
 
   distances[single_source] = 0;
+  predecessors[single_source] = single_source;
 
   priority_queue<pair<vertex_t, weight_t>,
                  std::vector<pair<vertex_t, weight_t>>,
@@ -61,6 +64,7 @@ float run(csr_t& csr,
       weight_t new_dist = curr_dist + nonzero_values[offset];
       if (new_dist < distances[neib]) {
         distances[neib] = new_dist;
+        predecessors[neib] = curr_node;
         pq.push(make_pair(neib, new_dist));
       }
     }

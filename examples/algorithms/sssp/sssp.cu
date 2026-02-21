@@ -109,6 +109,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   // Log
 
   print::head(distances, 40, "GPU distances");
+  print::head(predecessors, 40, "GPU predecessors");
   std::cout << "GPU Elapsed Time : " << run_times[arguments.num_runs - 1]
             << " (ms)" << std::endl;
 
@@ -125,10 +126,15 @@ void test_sssp(int num_arguments, char** argument_array) {
     int n_errors =
         util::compare(distances.data().get(), h_distances.data(), n_vertices);
 
+    int n_predecessor_errors =
+        util::compare(predecessors.data().get(), h_predecessors.data(), n_vertices);
+
     print::head(h_distances, 40, "CPU Distances");
+    print::head(h_predecessors, 40, "CPU Predecessors");
 
     std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-    std::cout << "Number of errors : " << n_errors << std::endl;
+    std::cout << "Number of errors (distances): " << n_errors << std::endl;
+    std::cout << "Number of errors (predecessors): " << n_predecessor_errors << std::endl;
   }
 }
 
