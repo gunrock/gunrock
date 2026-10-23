@@ -1,5 +1,5 @@
-# Functional AMD GPU coverage on a CPU-only runner. See tests/rocjitsu/README.md.
-name: rocjitsu smoke
+# Functional AMD GPU tests on a CPU-only runner. See tests/rocjitsu/README.md.
+name: rocjitsu tests
 
 on:
   pull_request:
@@ -9,9 +9,10 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       - "docker/rocjitsu/**"
-      - "examples/**"
       - "include/**"
+      - "tests/data/**"
       - "tests/rocjitsu/**"
+      - "tests/unit/**"
   push:
     branches: [main]
     paths:
@@ -19,9 +20,10 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       - "docker/rocjitsu/**"
-      - "examples/**"
       - "include/**"
+      - "tests/data/**"
       - "tests/rocjitsu/**"
+      - "tests/unit/**"
   workflow_dispatch:
 
 permissions:
@@ -32,8 +34,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  smoke:
-    name: gfx942/gfx950 BFS correctness
+  suite:
+    name: gfx950 suite and gfx942 compatibility
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -58,31 +60,27 @@ jobs:
       - name: Build rocjitsu image
         run: docker build --pull -t "$IMAGE" docker/rocjitsu
 
-      - name: Build and validate BFS on simulated AMD GPUs
+      - name: Run tests and enforce host coverage
         run: |
           mkdir -p results/rocjitsu
-          for arch in gfx942 gfx950; do
-            mkdir -p "results/rocjitsu/$arch"
-            timeout --signal=TERM 25m \
-              docker run --rm --init --shm-size 4g \
-                --user "$(id -u):$(id -g)" \
-                -e HOME=/tmp/home \
-                -e RJ_THREADS=2 \
-                -e RJ_BUILD_JOBS=2 \
-                -v "$PWD:/work" \
-                -w /work \
-                "$IMAGE" \
-                rjsim "$arch" -- \
-                tests/rocjitsu/run-smoke.sh "results/rocjitsu/$arch" \
-              2>&1 | tee "results/rocjitsu/$arch/ci.log"
-            status=${PIPESTATUS[0]}
-            [[ $status -eq 0 ]] || exit "$status"
-          done
+          timeout --signal=TERM 30m \
+            docker run --rm --init --shm-size 4g \
+              --user "$(id -u):$(id -g)" \
+              -e HOME=/tmp/home \
+              -e RJ_THREADS=2 \
+              -e RJ_BUILD_JOBS=2 \
+              -v "$PWD:/work" \
+              -w /work \
+              "$IMAGE" \
+              tests/rocjitsu/run-tests.sh results/rocjitsu \
+            2>&1 | tee results/rocjitsu/ci.log
+          status=${PIPESTATUS[0]}
+          [[ $status -eq 0 ]] || exit "$status"
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: rocjitsu-amd-smoke
+          name: rocjitsu-results
           path: results/rocjitsu/
           retention-days: 14
