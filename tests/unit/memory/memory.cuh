@@ -4,36 +4,34 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
+
 template <std::size_t N>
-__global__ void kernel(int* a) {
+__global__ void write_sequence(int* values) {
   int idx = threadIdx.x + (blockDim.x * blockIdx.x);
   if (idx >= N)
     return;
-  a[idx] = idx;
-  printf("a[%i] = %i\n", idx, a[idx]);
+  values[idx] = idx * idx;
 }
 
-TEST(memory, memory) {
-  using namespace gunrock;
-  using T = int;
-
-  error::error_t status = hipSuccess;
-  memory::memory_space_t location = memory::memory_space_t::device;
-
+TEST(memory, device_allocation_round_trips_values) {
   constexpr std::size_t N = 10;
-  constexpr std::size_t bytes = N * sizeof(T);
+  constexpr std::size_t bytes = N * sizeof(int);
+  auto* device_values = gunrock::memory::allocate<int>(bytes);
+  ASSERT_NE(device_values, nullptr);
 
-  T* device_ptr = memory::allocate<T>(bytes, location);
+  write_sequence<N><<<1, N>>>(device_values);
+  ASSERT_EQ(hipGetLastError(), hipSuccess);
+  ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
 
-  status = hipDeviceSynchronize();
-  if (hipSuccess != status)
-    throw error::exception_t(status);
+  std::array<int, N> host_values{};
+  ASSERT_EQ(hipMemcpy(host_values.data(), device_values, bytes,
+                      hipMemcpyDeviceToHost),
+            hipSuccess);
+  for (std::size_t index = 0; index < N; ++index) {
+    EXPECT_EQ(host_values[index], static_cast<int>(index * index));
+  }
 
-  kernel<N><<<1, N>>>(device_ptr);
-
-  status = hipDeviceSynchronize();
-  if (hipSuccess != status)
-    throw error::exception_t(status);
-
-  memory::free(device_ptr, location);
+  gunrock::memory::free(device_values);
+  EXPECT_EQ(gunrock::memory::allocate<int>(0), nullptr);
 }

@@ -8,50 +8,48 @@
  *
  */
 
-#include <gunrock/error.hxx>
-#include <gunrock/compat/runtime_api.h>
 #include <gunrock/container/array.hxx>
 
 #include <gtest/gtest.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 
-template <std::size_t N>
-__global__ void kernel() {
-  int idx = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (idx >= N)
-    return;
-
-  gunrock::array<float, N> a;
-  a[idx] = (float)idx;
+__global__ void inspect_device_array(int* result) {
+  gunrock::array<int, 4> values{};
+  for (int index = 0; index < 4; ++index) {
+    values[index] = index * 3;
+  }
+  result[0] = values[2];
+  result[1] = static_cast<int>(values.size());
+  result[2] = values.empty() ? 1 : 0;
 }
 
-TEST(containers, array) {
-  using namespace gunrock;
+TEST(containers, array_matches_fixed_size_contract) {
+  gunrock::array<int, 4> values{};
+  EXPECT_FALSE(values.empty());
+  EXPECT_EQ(values.size(), 4);
+  EXPECT_EQ(values.max_size(), 4);
+  EXPECT_NE(values.data(), nullptr);
 
-  error::error_t status = hipSuccess;
-
-  constexpr std::size_t N = 10;
-  gunrock::array<float, N> a;
-  float* pointer = a.data();
-  const float* const_pointer = a.data();
-  std::size_t size = a.size();
-  std::size_t max_size = a.max_size();
-  bool is_empty = a.empty();
-
-  ASSERT_EQ(is_empty, false);
-  ASSERT_EQ(size, N);
-  ASSERT_EQ(max_size, N);
-
-  for (std::size_t i = 0; i < N; ++i) {
-    a[i] = (float)i;
+  for (int index = 0; index < 4; ++index) {
+    values[index] = index + 10;
   }
+  gunrock::array<int, 4> const& const_values = values;
+  EXPECT_EQ(const_values.data(), values.data());
+  expect_values(const_values, {10, 11, 12, 13});
 
-  status = hipDeviceSynchronize();
-  ASSERT_EQ(status, hipSuccess)
-      << "HIP error: " << hipGetErrorString(status);
+  gunrock::array<int, 0> empty{};
+  EXPECT_TRUE(empty.empty());
+  EXPECT_EQ(empty.size(), 0);
+  EXPECT_EQ(empty.data(), nullptr);
+}
 
-  kernel<N><<<1, N>>>();
+TEST(containers, array_works_in_device_code) {
+  thrust::device_vector<int> result(3, -1);
+  inspect_device_array<<<1, 1>>>(result.data().get());
+  ASSERT_EQ(hipGetLastError(), hipSuccess);
+  ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
 
-  status = hipDeviceSynchronize();
-  ASSERT_EQ(status, hipSuccess)
-      << "HIP error: " << hipGetErrorString(status);
+  thrust::host_vector<int> host_result(result);
+  expect_values(host_result, {6, 4, 0});
 }

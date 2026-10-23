@@ -9,7 +9,7 @@
  */
 
 /// Add your test to the following header file:
-#include "unittests.hxx"
+#include "gunrock_tests.hxx"
 
 /// Main Google test driver.
 // int main(int argc, char** argv) {

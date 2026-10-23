@@ -1,23 +1,15 @@
 #include <gunrock/cuda/context.hxx>
-#include <gunrock/error.hxx>  // error checking
-
 #include <gtest/gtest.h>
 
-TEST(cuda, context) {
-  using namespace gunrock;
+TEST(cuda, context_owns_stream_event_and_device) {
+  gunrock::gcuda::multi_context_t context(0);
+  ASSERT_EQ(context.size(), 1);
 
-  // List of devices we care about
-  std::vector<gcuda::device_id_t> devices;
-
-  // Initialize
-  devices.push_back(0);
-  // devices.push_back(1);
-
-  // Create contexts for all the devices
-  gcuda::multi_context_t multi_context(devices);
-
-  auto context_device_0 = multi_context.get_context(0);
-  // auto context_device_1 = multi_context.get_context(0);
-
-  context_device_0->print_properties();
+  auto* device_context = context.get_context(0);
+  ASSERT_NE(device_context, nullptr);
+  EXPECT_EQ(device_context->ordinal(), 0);
+  EXPECT_NE(device_context->stream(), nullptr);
+  EXPECT_NE(device_context->event(), nullptr);
+  EXPECT_FALSE(device_context->props().name[0] == '\0');
+  EXPECT_NO_THROW(device_context->synchronize());
 }

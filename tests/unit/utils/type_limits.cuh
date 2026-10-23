@@ -1,56 +1,45 @@
-#include <iostream>
-
 #include <gunrock/util/type_limits.hxx>
 
-#include <thrust/execution_policy.h>
-#include <thrust/for_each.h>
-#include <thrust/iterator/counting_iterator.h>
-
 #include <gtest/gtest.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 
-// Functor to test type limits - defined outside test method to avoid lambda access issues
-struct test_type_limits_functor {
-  __device__ void operator()(int const& x) const {
-    auto y = gunrock::numeric_limits<float>::invalid();
-    bool v = gunrock::util::limits::is_valid(x);
-    bool inv = gunrock::util::limits::is_valid(y);
+#include <cmath>
+#include <limits>
 
-    printf("%f\n", y);
-    (void)v;
-    (void)inv;
-  }
-};
+__global__ void check_device_limits(int* result) {
+  result[0] = gunrock::util::limits::is_valid(7) ? 1 : 0;
+  result[1] =
+      gunrock::util::limits::is_valid(gunrock::numeric_limits<int>::invalid())
+          ? 1
+          : 0;
+  result[2] = gunrock::util::limits::is_valid(1.25f) ? 1 : 0;
+  result[3] =
+      gunrock::util::limits::is_valid(gunrock::numeric_limits<float>::invalid())
+          ? 1
+          : 0;
+}
 
-TEST(utils, type_limits) {
-  std::cout << "invalid = " << gunrock::numeric_limits<int>::invalid()
-            << " (is valid? " << std::boolalpha
-            << gunrock::util::limits::is_valid(
-                   gunrock::numeric_limits<int>::invalid())
-            << ")" << std::endl;
+TEST(utils, type_limits_identify_invalid_sentinels) {
+  EXPECT_EQ(gunrock::numeric_limits<int>::invalid(), -1);
+  EXPECT_EQ(gunrock::numeric_limits<unsigned int>::invalid(),
+            std::numeric_limits<unsigned int>::max());
+  EXPECT_TRUE(std::isnan(gunrock::numeric_limits<float>::invalid()));
+  EXPECT_TRUE(std::isnan(gunrock::numeric_limits<double>::invalid()));
 
-  std::cout << "invalid = " << gunrock::numeric_limits<float>::invalid()
-            << " (is valid? " << std::boolalpha
-            << gunrock::util::limits::is_valid(
-                   gunrock::numeric_limits<float>::invalid())
-            << ")" << std::endl;
+  EXPECT_TRUE(gunrock::util::limits::is_valid(0));
+  EXPECT_FALSE(gunrock::util::limits::is_valid(-1));
+  EXPECT_TRUE(gunrock::util::limits::is_valid(0.0f));
+  EXPECT_FALSE(gunrock::util::limits::is_valid(
+      gunrock::numeric_limits<float>::invalid()));
+}
 
-  std::cout << "invalid = " << gunrock::numeric_limits<double>::invalid()
-            << " (is valid? " << std::boolalpha
-            << gunrock::util::limits::is_valid(
-                   gunrock::numeric_limits<double>::invalid())
-            << ")" << std::endl;
+TEST(utils, type_limits_work_in_device_code) {
+  thrust::device_vector<int> result(4, -1);
+  check_device_limits<<<1, 1>>>(result.data().get());
+  ASSERT_EQ(hipGetLastError(), hipSuccess);
+  ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
 
-  std::cout << "invalid = " << gunrock::numeric_limits<unsigned int>::invalid()
-            << " (is valid? " << std::boolalpha
-            << gunrock::util::limits::is_valid(
-                   gunrock::numeric_limits<unsigned int>::invalid())
-            << ")" << std::endl;
-
-  // Use functor instead of lambda to avoid access issues with __device__ lambdas in test methods
-  test_type_limits_functor apply;
-  thrust::for_each(thrust::device,
-                   thrust::make_counting_iterator<int>(0),  // Begin: 0
-                   thrust::make_counting_iterator<int>(1),  // End: 1
-                   apply                                     // Functor instead of lambda
-  );
+  thrust::host_vector<int> host_result(result);
+  expect_values(host_result, {1, 0, 1, 0});
 }

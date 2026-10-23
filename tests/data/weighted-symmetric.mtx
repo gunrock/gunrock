@@ -1,0 +1,6 @@
+%%MatrixMarket matrix coordinate real symmetric
+% Includes a diagonal entry and two off-diagonal entries.
+3 3 3
+1 1 2.0
+1 2 3.5
+2 3 -1.0

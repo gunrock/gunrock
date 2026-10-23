@@ -1,155 +1,122 @@
-#include <gunrock/error.hxx>            // error checking
-#include <gunrock/graph/graph.hxx>      // graph class
-#include <gunrock/formats/formats.hxx>  // csr support
-#include <gunrock/compat/runtime_api.h>
+#include <gunrock/formats/formats.hxx>
+#include <gunrock/graph/graph.hxx>
 
 #include <gtest/gtest.h>
+#include <thrust/host_vector.h>
 
-using namespace gunrock;
-using namespace memory;
+#include <array>
+#include <cmath>
 
-template <typename graph_type>
-__host__ __device__ void use_graph(graph_type G) {
-  using vertex_t = typename graph_type::vertex_type;
-  using edge_t = typename graph_type::edge_type;
-  using weight_t = typename graph_type::weight_type;
+namespace {
 
-  using csr_view_t = typename graph_type::graph_csr_view_t;
-  using csc_view_t = typename graph_type::graph_csc_view_t;
-  using coo_view_t = typename graph_type::graph_coo_view_t;
+using graph_host_csr_t =
+    gunrock::format::csr_t<gunrock::memory_space_t::host, int, int, float>;
+using graph_device_csr_t =
+    gunrock::format::csr_t<gunrock::memory_space_t::device, int, int, float>;
 
-  using use_type_t = csr_view_t;
-
-  auto source = 2;
-  auto edge = 1;
-
-  auto num_vertices = G.get_number_of_vertices();
-  auto num_edges = G.get_number_of_edges();
-
-  // Both valid.
-  auto num_neighbors = G.template get_number_of_neighbors<use_type_t>(source);
-  auto source_vertex = G.template get_source_vertex<use_type_t>(edge);
-  auto destination_vertex = G.template get_destination_vertex<use_type_t>(edge);
-  auto edge_weight = G.template get_edge_weight<use_type_t>(edge);
-  auto starting_edge = G.template get_starting_edge<use_type_t>(source);
-  double average_degree = graph::get_average_degree(G);
-  double degree_std_dev = graph::get_degree_standard_deviation(G);
-
-  if constexpr (G.memory_space() == memory_space_t::host)
-    printf("__host__\n");
-  else
-    printf("__device__\n");
-
-  printf("\tNumber of vertices: %i\n", num_vertices);
-  printf("\tNumber of edges: %i\n", num_edges);
-  printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
-  printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
-  printf("\tDestination vertex: %i (edge = %i)\n", destination_vertex, edge);
-  printf("\tEdge weight: %f (edge = %i)\n", edge_weight, edge);
-  printf("\tStarting Edge: %i (vertex = %i)\n", starting_edge, source);
-  printf("\tAverage degree: %lf\n", average_degree);
-  printf("\tDegree std. deviation: %lf\n", degree_std_dev);
+graph_host_csr_t make_graph_csr() {
+  graph_host_csr_t csr(4, 4, 5);
+  csr.row_offsets = {0, 2, 3, 5, 5};
+  csr.column_indices = {1, 2, 2, 0, 3};
+  csr.nonzero_values = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+  return csr;
 }
 
-template <typename graph_type>
-__global__ void kernel(graph_type G) {
-  use_graph(G);
-}
-
-void test_graph() {
-  using vertex_t = int;
-  using edge_t = int;
-  using weight_t = float;
-
-  // Logical Matrix Representation
-  // r/c  0 1 2 3
-  //  0 [ 0 0 0 0 ]
-  //  1 [ 5 8 0 0 ]
-  //  2 [ 0 0 3 0 ]
-  //  3 [ 0 6 0 0 ]
-
-  // Logical Graph Representation
-  // (i, j) [w]
-  // (1, 0) [5]
-  // (1, 1) [8]
-  // (2, 2) [3]
-  // (3, 1) [6]
-
-  // CSR Matrix Representation
-  // V            = [ 5 8 3 6 ]
-  // COL_INDEX    = [ 0 1 2 1 ]
-  // ROW_OFFSETS  = [ 0 0 2 3 4 ]
-  vertex_t r = 4, c = 4;
-  edge_t nnz = 4;
-
-  // let's use thrust vector<type_t> for initial arrays
-  thrust::host_vector<edge_t> h_Ap(r + 1);
-  thrust::host_vector<vertex_t> h_J(nnz);
-  thrust::host_vector<weight_t> h_Ax(nnz);
-  thrust::host_vector<vertex_t> h_I(nnz);
-  thrust::host_vector<edge_t> h_Aj(c + 1);
-
-  auto Ap = h_Ap.data();
-  auto J = h_J.data();
-  auto Ax = h_Ax.data();
-
-  Ap[0] = 0;
-  Ap[1] = 0;
-  Ap[2] = 2;
-  Ap[3] = 3;
-  Ap[4] = 4;
-  J[0] = 0;
-  J[1] = 1;
-  J[2] = 2;
-  J[3] = 3;
-  Ax[0] = 5;
-  Ax[1] = 8;
-  Ax[2] = 3;
-  Ax[3] = 6;
-
-  // Create CSR format for host
-  format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t> csr(r, c, nnz);
-  for (int i = 0; i <= r; ++i) {
-    csr.row_offsets[i] = Ap[i];
+template <typename graph_t>
+__global__ void inspect_graph(graph_t graph,
+                              int* sources,
+                              int* destinations,
+                              int* degrees) {
+  auto index = static_cast<int>(threadIdx.x);
+  if (index < graph.get_number_of_edges()) {
+    sources[index] = graph.get_source_vertex(index);
+    destinations[index] = graph.get_destination_vertex(index);
   }
-  for (int i = 0; i < nnz; ++i) {
-    csr.column_indices[i] = J[i];
-    csr.nonzero_values[i] = Ax[i];
+  if (index < graph.get_number_of_vertices()) {
+    degrees[index] = graph.get_number_of_neighbors(index);
+  }
+}
+
+}  // namespace
+
+TEST(graph, properties_and_view_flags_are_composable) {
+  gunrock::graph::graph_properties_t properties;
+  EXPECT_FALSE(properties.directed);
+  EXPECT_TRUE(properties.symmetric);
+  EXPECT_TRUE(properties.weighted);
+
+  auto views = gunrock::graph::view_t::invalid;
+  views = gunrock::graph::set(views, gunrock::graph::view_t::csr);
+  views = views | gunrock::graph::view_t::coo;
+  EXPECT_TRUE(gunrock::graph::has(views, gunrock::graph::view_t::csr));
+  EXPECT_TRUE(gunrock::graph::has(views, gunrock::graph::view_t::coo));
+  EXPECT_FALSE(gunrock::graph::has(views, gunrock::graph::view_t::csc));
+
+  views = gunrock::graph::toggle(views, gunrock::graph::view_t::csc);
+  EXPECT_TRUE(gunrock::graph::has(views, gunrock::graph::view_t::csc));
+  views = gunrock::graph::unset(views, gunrock::graph::view_t::coo);
+  EXPECT_FALSE(gunrock::graph::has(views, gunrock::graph::view_t::coo));
+}
+
+TEST(graph, host_csr_representation_exposes_expected_edges) {
+  auto csr = make_graph_csr();
+  gunrock::graph::graph_properties_t properties;
+  properties.directed = true;
+  properties.symmetric = false;
+  properties.weighted = true;
+  auto graph =
+      gunrock::graph::build<gunrock::memory_space_t::host>(properties, csr);
+
+  using view_t = gunrock::graph::graph_csr_t<gunrock::memory_space_t::host, int,
+                                             int, float>;
+  EXPECT_EQ(graph.get_number_of_vertices(), 4);
+  EXPECT_EQ(graph.get_number_of_edges(), 5);
+  EXPECT_TRUE(graph.is_directed());
+  EXPECT_FALSE(graph.is_symmetric());
+  EXPECT_TRUE(graph.is_weighted());
+  EXPECT_EQ(graph.number_of_graph_representations(), 1);
+  EXPECT_TRUE(graph.template contains_representation<view_t>());
+
+  std::array<int, 4> expected_degrees{2, 1, 2, 0};
+  std::array<int, 5> expected_sources{0, 0, 1, 2, 2};
+  std::array<int, 5> expected_destinations{1, 2, 2, 0, 3};
+  std::array<float, 5> expected_weights{1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+
+  for (int vertex = 0; vertex < 4; ++vertex) {
+    EXPECT_EQ(graph.get_number_of_neighbors(vertex), expected_degrees[vertex]);
+  }
+  for (int edge = 0; edge < 5; ++edge) {
+    EXPECT_EQ(graph.get_source_vertex(edge), expected_sources[edge]);
+    EXPECT_EQ(graph.get_destination_vertex(edge), expected_destinations[edge]);
+    EXPECT_FLOAT_EQ(graph.get_edge_weight(edge), expected_weights[edge]);
+    auto endpoints = graph.get_source_and_destination_vertices(edge);
+    EXPECT_EQ(endpoints.source, expected_sources[edge]);
+    EXPECT_EQ(endpoints.destination, expected_destinations[edge]);
   }
 
-  auto G = graph::build<memory_space_t::host>({}, csr);
-
-  using csr_view_t = graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
-
-  use_graph(G);
-
-  // Compile-Time Constants (device && host)
-  std::cout << "\tNumber of Graph Representations = "
-            << G.number_of_graph_representations() << std::endl;
-  std::cout << "\tContains CSR Representation? " << std::boolalpha
-            << G.template contains_representation<csr_view_t>() << std::endl;
-
-  // wrap it with shared_ptr<csr_t> (memory_space_t::device)
-  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> d_csr(csr);
-
-  auto O = graph::build<memory_space_t::device>({}, d_csr);
-
-  // Device Output
-  hipDeviceSynchronize();
-  kernel<<<1, 1>>>(O);
-  hipDeviceSynchronize();
-  error::throw_if_exception(hipGetLastError());
-
-  // TODO: Revisit this test.
-  thrust::device_vector<vertex_t> histogram(sizeof(vertex_t) * 8 + 1);
-  gunrock::graph::build_degree_histogram(O, histogram.data().get());
-
-  std::cout << "Degree Histogram = ";
-  thrust::copy(histogram.begin(), histogram.end(),
-               std::ostream_iterator<vertex_t>(std::cout, " "));
-  std::cout << std::endl;
+  EXPECT_DOUBLE_EQ(gunrock::graph::get_average_degree(graph), 1.0);
+  EXPECT_NEAR(gunrock::graph::get_degree_standard_deviation(graph),
+              std::sqrt(0.75), 1.0e-12);
 }
 
-TEST(graph, graph) {
-  test_graph();
+TEST(graph, device_csr_accessors_match_host_reference) {
+  auto host_csr = make_graph_csr();
+  graph_device_csr_t device_csr(host_csr);
+  auto graph =
+      gunrock::graph::build<gunrock::memory_space_t::device>({}, device_csr);
+
+  thrust::device_vector<int> sources(5, -1);
+  thrust::device_vector<int> destinations(5, -1);
+  thrust::device_vector<int> degrees(4, -1);
+  inspect_graph<<<1, 5>>>(graph, sources.data().get(),
+                          destinations.data().get(), degrees.data().get());
+  ASSERT_EQ(hipGetLastError(), hipSuccess);
+  ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
+
+  thrust::host_vector<int> host_sources(sources);
+  thrust::host_vector<int> host_destinations(destinations);
+  thrust::host_vector<int> host_degrees(degrees);
+  expect_values(host_sources, {0, 0, 1, 2, 2});
+  expect_values(host_destinations, {1, 2, 2, 0, 3});
+  expect_values(host_degrees, {2, 1, 2, 0});
 }

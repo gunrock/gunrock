@@ -1,48 +1,71 @@
-# begin /* Add unit tests */
-# Include GoogleTest module for test discovery
 include(GoogleTest)
 
-set(UNITTEST_SOURCES
-  unittests.cu
-)
-
-foreach(SOURCE IN LISTS UNITTEST_SOURCES)
-  get_filename_component(TEST_NAME ${SOURCE} NAME_WLE)
-  add_executable(${TEST_NAME} ${SOURCE})
-  target_link_libraries(${TEST_NAME} 
-    PRIVATE essentials
-    PRIVATE gtest::main
+function(add_gunrock_test target source)
+  add_executable(${target} ${source})
+  target_link_libraries(${target} PRIVATE essentials gtest::main)
+  target_compile_definitions(
+    ${target}
+    PRIVATE GUNROCK_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data"
   )
-  
-  if(${ESSENTIALS_NVIDIA_BACKEND})
-    get_target_property(ESSENTIALS_ARCHITECTURES 
-      essentials CUDA_ARCHITECTURES
-    )
-    set_target_properties(${TEST_NAME} 
-      PROPERTIES 
-        CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES}
+
+  if(ESSENTIALS_NVIDIA_BACKEND)
+    set_target_properties(
+      ${target}
+      PROPERTIES CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
     )
   else()
-    # HIP_ARCHITECTURES is not a valid target property for executables
-    # Architecture is set globally via CMAKE_HIP_ARCHITECTURES
-    set_source_files_properties(${SOURCE}
-      PROPERTIES
-        LANGUAGE HIP
-    )
-    # Set rpath for AMD builds to find ROCm libraries at runtime
+    set_source_files_properties(${source} PROPERTIES LANGUAGE HIP)
     if(DEFINED ROCM_PATH)
-      set_target_properties(${TEST_NAME}
+      set_target_properties(${target}
         PROPERTIES
           INSTALL_RPATH "${ROCM_PATH}/lib"
           BUILD_WITH_INSTALL_RPATH TRUE
       )
     endif()
   endif()
-  
-  # Use gtest_discover_tests to register individual tests instead of add_test
-  # Note: gtest_discover_tests runs the executable during CMake configuration
-  # For AMD builds, LD_LIBRARY_PATH must be set before running CMake, not here
-  # The ENVIRONMENT property here is for test execution, not discovery
-  gtest_discover_tests(${TEST_NAME})
-endforeach()
-# end /* Add unit tests */
+
+endfunction()
+
+add_gunrock_test(gunrock_tests gunrock_tests.cu)
+add_gunrock_test(gunrock_architecture_smoke architecture_smoke.cu)
+
+gtest_discover_tests(
+  gunrock_tests
+  TEST_FILTER "-algorithm.tc*"
+  DISCOVERY_MODE PRE_TEST
+  DISCOVERY_TIMEOUT 60
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+  PROPERTIES LABELS "rocjitsu-full"
+)
+gtest_discover_tests(
+  gunrock_tests
+  TEST_FILTER "algorithm.tc*"
+  TEST_PREFIX "hardware."
+  DISCOVERY_MODE PRE_TEST
+  DISCOVERY_TIMEOUT 60
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+  PROPERTIES LABELS "hardware-required"
+)
+gtest_discover_tests(
+  gunrock_architecture_smoke
+  DISCOVERY_MODE PRE_TEST
+  DISCOVERY_TIMEOUT 60
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+  PROPERTIES LABELS "rocjitsu-architecture"
+)
+
+if(ESSENTIALS_ENABLE_COVERAGE)
+  if(NOT ESSENTIALS_AMD_BACKEND OR NOT CMAKE_HIP_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR
+      "ESSENTIALS_ENABLE_COVERAGE requires the Clang-based AMD/HIP backend")
+  endif()
+
+  target_compile_options(
+    gunrock_tests
+    PRIVATE
+      "SHELL:-Xarch_host -fprofile-instr-generate"
+      "SHELL:-Xarch_host -fcoverage-mapping"
+  )
+  target_link_options(
+    gunrock_tests PRIVATE "SHELL:-Xarch_host -fprofile-instr-generate")
+endif()
