@@ -1,0 +1,90 @@
+# Functional AMD GPU coverage on a CPU-only runner. See tests/rocjitsu/README.md.
+name: RocJITsu smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/rocjitsu.yml"
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "docker/rocjitsu/**"
+      - "examples/**"
+      - "include/**"
+      - "tests/rocjitsu/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rocjitsu.yml"
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "docker/rocjitsu/**"
+      - "examples/**"
+      - "include/**"
+      - "tests/rocjitsu/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rocjitsu-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: gfx942/gfx950 BFS correctness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Keep the new emulator job advisory while it establishes a baseline.
+    continue-on-error: true
+    env:
+      IMAGE: gunrock-rocjitsu
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Free disk for the emulator image
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL
+          docker system prune -af >/dev/null
+          df -h /
+
+      - name: Build RocJITsu image
+        run: docker build --pull -t "$IMAGE" docker/rocjitsu
+
+      - name: Build and validate BFS on simulated AMD GPUs
+        run: |
+          mkdir -p results/rocjitsu
+          for arch in gfx942 gfx950; do
+            mkdir -p "results/rocjitsu/$arch"
+            timeout --signal=TERM 25m \
+              docker run --rm --init --shm-size 4g \
+                --user "$(id -u):$(id -g)" \
+                -e HOME=/tmp/home \
+                -e RJ_THREADS=2 \
+                -e RJ_BUILD_JOBS=2 \
+                -v "$PWD:/work" \
+                -w /work \
+                "$IMAGE" \
+                rjsim "$arch" -- \
+                tests/rocjitsu/run-smoke.sh "results/rocjitsu/$arch" \
+              2>&1 | tee "results/rocjitsu/$arch/ci.log"
+            status=${PIPESTATUS[0]}
+            [[ $status -eq 0 ]] || exit "$status"
+          done
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rocjitsu-amd-smoke
+          path: results/rocjitsu/
+          retention-days: 14
