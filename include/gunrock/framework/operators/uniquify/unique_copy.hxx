@@ -11,6 +11,7 @@
 #pragma once
 
 #include <gunrock/framework/operators/configs.hxx>
+#include <thrust/distance.h>
 #include <thrust/unique.h>
 
 namespace gunrock {

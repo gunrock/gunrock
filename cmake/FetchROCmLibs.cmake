@@ -70,7 +70,7 @@ if(USE_SPARSE_CHECKOUT)
     git_checkout(
       "https://github.com/ROCm/rocm-libraries.git"
       DIRECTORY "${rocm_libraries_SOURCE_DIR}"
-      REF develop
+      REF 39d8d60365d2272a5366f76ccb3bfba24b219eaf # therock-10.1
       SPARSE_CHECKOUT
         projects/rocprim
         projects/rocthrust

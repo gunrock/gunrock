@@ -12,6 +12,9 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   BUILD_TYPE: Release
   
@@ -19,7 +22,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         backend: [nvidia, amd, amd-sparse]
         include:
           - backend: nvidia
@@ -52,73 +55,79 @@ jobs:
       - name: Install CUDA toolkit via apt
         if: matrix.backend == 'nvidia'
         run: |
-          # Clean up any existing CUDA installations
-          sudo apt-get remove --purge -y "cuda*" "nvidia-cuda-toolkit" "nvidia-*" 2>/dev/null || true
-          sudo rm -rf /usr/local/cuda* /etc/profile.d/cuda.sh
-          
-          # Add NVIDIA CUDA repository
-          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
-          sudo mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
-          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
-          sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/cuda-archive-keyring.gpg 3bf863cc.pub
-          echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /" | sudo tee /etc/apt/sources.list.d/cuda.list
+          curl --fail --location --silent --show-error \
+            --output cuda-keyring.deb \
+            https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          echo "d2a6b11c096396d868758b86dab1823b25e14d70333f1dfa74da5ddaf6a06dba  cuda-keyring.deb" \
+            | sha256sum --check -
+          sudo dpkg --install cuda-keyring.deb
           sudo apt-get update
-          
-          # Install CUDA toolkit (version 12.4)
-          sudo apt-get install -y cuda-toolkit-12-4
-          
-          # Find where CUDA was actually installed
-          CUDA_PATH=$(ls -d /usr/local/cuda-12.* 2>/dev/null | head -1)
-          if [ -z "$CUDA_PATH" ]; then
-            CUDA_PATH="/usr/local/cuda-12.4"
-          fi
-          
-          # Create symlink if it doesn't exist
-          if [ ! -L /usr/local/cuda ]; then
-            sudo ln -sf "$CUDA_PATH" /usr/local/cuda
-          fi
-          
-          # Set up PATH for subsequent steps (must use $GITHUB_PATH)
-          echo "$CUDA_PATH/bin" >> $GITHUB_PATH
-          echo "CUDA_HOME=$CUDA_PATH" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$CUDA_PATH/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          
-          # Verify installation in this step
-          "$CUDA_PATH/bin/nvcc" --version
+          sudo apt-get install --yes cuda-toolkit-13-4=13.4.3-1
+
+          echo "/usr/local/cuda-13.4/bin" >> "$GITHUB_PATH"
+          echo "CUDA_HOME=/usr/local/cuda-13.4" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-13.4/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+          /usr/local/cuda-13.4/bin/nvcc --version
 
       - name: Check nvcc version
         if: matrix.backend == 'nvidia'
         run: nvcc -V
 
-      # Install ROCm for AMD backend
-      - name: Install ROCm
-        if: matrix.backend == 'amd'
-        uses: loostrum/rocm-installer@c8475e5dc8cc37b9b58f314a3cba446b9dbef8d3 # v0.2
-        with:
-          version: "7.2.4"
-          packages: rocm-hip-runtime-dev rocprim-dev rocthrust-dev hipcub-dev hiprand-dev hipsparse-dev rocrand roctracer
+      - name: Install ROCm Core SDK
+        if: matrix.backend == 'amd' || matrix.backend == 'amd-sparse'
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          curl --fail --location --silent --show-error \
+            --output packages.gpg \
+            https://stable.repo.amd.com/rocm/gpg/packages.gpg
+          echo "090a4bf906822c5eb450ae8024b728b9281f2fccb0304641eb75018e4ec6a6dd  packages.gpg" \
+            | sha256sum --check -
+          sudo install --directory --mode 0755 /etc/apt/keyrings
+          gpg --dearmor --batch --yes --output amdrocm.gpg packages.gpg
+          sudo install --mode 0644 amdrocm.gpg /etc/apt/keyrings/amdrocm.gpg
+          printf '%s\n' \
+            'Types: deb' \
+            'URIs: https://stable.repo.amd.com/rocm/core/packages/ubuntu2404/' \
+            'Suites: stable' \
+            'Components: main' \
+            'Architectures: amd64' \
+            'Signed-By: /etc/apt/keyrings/amdrocm.gpg' \
+            | sudo tee /etc/apt/sources.list.d/amdrocm-stable.sources
+          sudo apt-get update
 
-      - name: Install ROCm (sparse)
-        if: matrix.backend == 'amd-sparse'
-        uses: loostrum/rocm-installer@c8475e5dc8cc37b9b58f314a3cba446b9dbef8d3 # v0.2
-        with:
-          version: "7.2.4"
-          packages: rocm-hip-runtime-dev hiprand-dev hipsparse-dev rocrand roctracer
+          packages=(
+            amdrocm-runtime-dev10.1=10.1.0-3
+            amdrocm-rand-dev10.1=10.1.0-3
+            amdrocm-rand10.1-gfx950=10.1.0-3
+            amdrocm-sparse-dev10.1=10.1.0-3
+            amdrocm-sparse10.1-gfx950=10.1.0-3
+          )
+          if [ "$BACKEND" = "amd" ]; then
+            packages+=(amdrocm-ccl-dev10.1=10.1.0-3)
+          fi
+          sudo apt-get install --yes "${packages[@]}"
+
+          echo "/opt/rocm/core-10.1/bin" >> "$GITHUB_PATH"
+          echo "ROCM_PATH=/opt/rocm/core-10.1" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/opt/rocm/core-10.1/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Check hipcc version
         if: matrix.backend == 'amd' || matrix.backend == 'amd-sparse'
         run: hipcc --version
         
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
         
       - name: Configure cmake
         if: matrix.backend == 'amd' || matrix.backend == 'amd-sparse'
         env:
-          LD_LIBRARY_PATH: /opt/rocm/lib
+          LD_LIBRARY_PATH: /opt/rocm/core-10.1/lib
         run: |
           cmake -B ${{github.workspace}}/build \
             -DESSENTIALS_BUILD_TESTS=ON \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DROCM_PATH="${ROCM_PATH}" \
             ${{matrix.cmake_backend_flag}} \
             ${{matrix.cmake_arch_flag}}
             

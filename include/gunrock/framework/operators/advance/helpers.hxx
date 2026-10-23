@@ -13,6 +13,7 @@
 
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>
+#include <thrust/distance.h>
 #include <thrust/transform_scan.h>
 #include <thrust/transform_reduce.h>
 

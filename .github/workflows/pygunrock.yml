@@ -12,6 +12,9 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   BUILD_TYPE: Release
   
@@ -21,12 +24,12 @@ jobs:
       matrix:
         include:
           - backend: nvidia
-            container: nvcr.io/nvidia/pytorch:25.06-py3
+            container: nvcr.io/nvidia/pytorch:26.09-py3@sha256:f71fd67f6d71f685e0bd08ce6c8df48807624cc5d48886370d3471bc4f89d81d
             architectures: "90"
             cmake_arch_flag: "-DCMAKE_CUDA_ARCHITECTURES=90"
             cmake_prefix_path: "/usr/local/cuda"
           - backend: amd
-            container: rocm/pytorch:rocm7.1_ubuntu24.04_py3.12_pytorch_release_2.8.0
+            container: rocm/pytorch:rocm10.1.0_ubuntu24.04_py3.12_pytorch_release_2.14.0@sha256:099f59a3bee9c436f5cc57db6bc6076fdeda579c57e9e22ae40f856d5905b3e4
             architectures: "gfx950"
             cmake_arch_flag: "-DCMAKE_HIP_ARCHITECTURES=gfx950"
             cmake_prefix_path: "/opt/rocm"
@@ -41,7 +44,7 @@ jobs:
       # ROCm PyTorch images are ~12GB, NVIDIA PyTorch images are ~8-10GB
       # Standard GitHub runners have ~14GB free, which is not enough
       - name: Free up disk space
-        uses: insightsengineering/disk-space-reclaimer@v1
+        uses: insightsengineering/disk-space-reclaimer@dae9fabcb8febe09f6585471948acf9dc9a57489 # v1.1.2
         with:
           tools-cache: true
           android: true
@@ -54,7 +57,7 @@ jobs:
       - name: Check available disk space (before)
         run: df -h
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
 
       # Pull the Docker image
       - name: Pull Docker image

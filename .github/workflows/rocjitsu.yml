@@ -36,13 +36,11 @@ jobs:
     name: gfx942/gfx950 BFS correctness
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    # Keep the new emulator job advisory while it establishes a baseline.
-    continue-on-error: true
     env:
       IMAGE: gunrock-rocjitsu
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
         with:
           persist-credentials: false
 
@@ -83,7 +81,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: rocjitsu-amd-smoke
           path: results/rocjitsu/

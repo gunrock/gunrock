@@ -17,6 +17,7 @@
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/framework/benchmark.hxx>
 
+#include <thrust/distance.h>
 #include <thrust/transform_scan.h>
 #include <thrust/iterator/discard_iterator.h>
 
