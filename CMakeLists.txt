@@ -80,13 +80,21 @@ if(${ESSENTIALS_NVIDIA_BACKEND})
     "If on, builds essentials with benchmarking support."
     OFF)
 else()
-  # Benchmarking and testing not supported w/ AMD.
   option(ESSENTIALS_BUILD_TESTS
     "If on, builds the unit tests."
     OFF)
   option(ESSENTIALS_BUILD_BENCHMARKS
     "If on, builds essentials with benchmarking support."
     OFF)
+endif()
+
+option(ESSENTIALS_ENABLE_COVERAGE
+  "Instrument the AMD unit-test host code for LLVM source coverage."
+  OFF)
+
+if(ESSENTIALS_ENABLE_COVERAGE AND NOT ESSENTIALS_BUILD_TESTS)
+  message(FATAL_ERROR
+    "ESSENTIALS_ENABLE_COVERAGE requires ESSENTIALS_BUILD_TESTS=ON")
 endif()
 
 if(${ESSENTIALS_NVIDIA_BACKEND})
@@ -491,7 +499,7 @@ endif(ESSENTIALS_BUILD_EXAMPLES)
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   enable_testing()
-  add_subdirectory(unittests)
+  add_subdirectory(tests/unit)
 endif(ESSENTIALS_BUILD_TESTS)
 
 ####################################################
