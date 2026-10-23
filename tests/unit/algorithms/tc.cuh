@@ -65,21 +65,34 @@ TEST(algorithm, tc) {
   graph::graph_properties_t properties;
   auto G = graph::build<memory_space_t::device>(properties, csr);
 
-  std::size_t total_triangles = 0;
-  thrust::device_vector<vertex_t> d_triangles_count(number_of_rows, 0);
-  tc::run(G, true, d_triangles_count.data().get(), &total_triangles);
+  const std::vector<operators::load_balance_t> load_balancers = {
+      operators::load_balance_t::thread_mapped,
+      operators::load_balance_t::block_mapped,
+      operators::load_balance_t::merge_path,
+      operators::load_balance_t::merge_path_v2};
 
-  thrust::host_vector<vertex_t> h_triangles_count(d_triangles_count);
+  for (auto load_balance : load_balancers) {
+    SCOPED_TRACE(::testing::Message()
+                 << "load balance: " << static_cast<int>(load_balance));
 
-  std::size_t reference_total_triangles = 6;
-  thrust::host_vector<vertex_t> reference_traingles_count =
-      std::vector{2, 1, 2, 1};
+    options_t options;
+    options.advance_load_balance = load_balance;
+    tc::param_t<vertex_t> param(true, options);
+    std::size_t total_triangles = 0;
+    thrust::device_vector<vertex_t> d_triangles_count(number_of_rows, 0);
+    tc::result_t<vertex_t> result(d_triangles_count.data().get(),
+                                  &total_triangles);
 
-  for (std::size_t v = 0; v < number_of_rows; v++) {
-    EXPECT_EQ(h_triangles_count[v], reference_traingles_count[v]);
+    tc::run(G, param, result);
+
+    thrust::host_vector<vertex_t> h_triangles_count(d_triangles_count);
+    const std::vector<vertex_t> reference_triangles_count = {2, 1, 2, 1};
+
+    for (std::size_t v = 0; v < number_of_rows; v++)
+      EXPECT_EQ(h_triangles_count[v], reference_triangles_count[v]);
+
+    EXPECT_EQ(total_triangles, 6);
   }
-
-  EXPECT_EQ(total_triangles, reference_total_triangles);
 }
 
 TEST(algorithm, tc_self_loop_vertex) {

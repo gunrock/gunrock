@@ -31,20 +31,10 @@ add_gunrock_test(gunrock_architecture_smoke architecture_smoke.cu)
 
 gtest_discover_tests(
   gunrock_tests
-  TEST_FILTER "-algorithm.tc:algorithm.tc_self_loop_vertex"
   DISCOVERY_MODE PRE_TEST
   DISCOVERY_TIMEOUT 60
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
   PROPERTIES LABELS "rocjitsu-full"
-)
-gtest_discover_tests(
-  gunrock_tests
-  TEST_FILTER "algorithm.tc:algorithm.tc_self_loop_vertex"
-  TEST_PREFIX "hardware."
-  DISCOVERY_MODE PRE_TEST
-  DISCOVERY_TIMEOUT 60
-  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-  PROPERTIES LABELS "hardware-required"
 )
 gtest_discover_tests(
   gunrock_architecture_smoke

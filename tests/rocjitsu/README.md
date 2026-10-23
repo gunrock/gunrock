@@ -71,12 +71,10 @@ rocjitsu executes the device code for correctness, but LLVM's host profile
 runtime cannot collect counters from emulated AMDGPU code objects. The reported
 percentage therefore does not claim device line coverage.
 
-Non-empty triangle-counting tests remain registered with the
-`hardware-required` CTest label. This rocjitsu release reports memory-wait
-hazards for their intersection kernel and returns zero counts, so the job
-excludes exactly those two tests. The empty-graph contract is covered in the
-enabled suite, while the hardware tests remain compiled and available on
-physical GPUs.
+The full-suite builds run all discovered unit tests, including the non-empty
+triangle-counting cases. rocjitsu may report memory-wait hazard warnings for
+their intersection kernel, but the tests remain enabled because those warnings
+do not imply incorrect results.
 
 ## Run locally
 
