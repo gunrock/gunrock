@@ -98,7 +98,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // Execute advance operator on the provided lambda using runtime dispatch
     auto advance_load_balance = P->param.options.advance_load_balance;
-    operators::advance::execute_runtime(G, E, intersect, advance_load_balance, context);
+    operators::advance::execute_runtime<operators::advance_direction_t::forward,
+                                        operators::advance_io_type_t::graph,
+                                        operators::advance_io_type_t::none>(
+        G, E, intersect, advance_load_balance, context);
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) override {
