@@ -14,6 +14,7 @@
 #include <gunrock/algorithms/algorithms.hxx>
 
 // Thrust includes (scan, reduce)
+#include <thrust/distance.h>
 #include <thrust/reduce.h>
 #include <thrust/scan.h>
 

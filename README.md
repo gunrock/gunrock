@@ -25,9 +25,9 @@ Before building Gunrock, ensure you have the following installed:
 - **Git** (for cloning the repository)
 
 > [!WARNING]
-> For AMD/ROCm builds, you may need to install additional ROCm packages:
-> `rocprim-dev`, `rocthrust-dev`, `hipcub-dev`, `hiprand-dev`, `hipsparse-dev`, `rocrand`, and `roctracer`.
-> These are typically installed with a full ROCm installation.
+> AMD builds require the ROCm development packages for HIP, rocThrust, rocPRIM,
+> hipCUB, hipRAND, and hipSPARSE. ROCm 10.1 provides these through the
+> `amdrocm-core-dev10.1` packages.
 
 ### Building Gunrock
 
@@ -203,4 +203,4 @@ Thank you for citing our work.
 Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/gunrock/blob/main/LICENSE).
 
 [^1]: This repository has been moved from https://github.com/gunrock/essentials and the previous history is preserved with tags and under `master` branch. Read more about gunrock and essentials in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
-[^2]: Recommended **CUDA v12.4 or higher** and **ROCm 6.4 or higher**.
+[^2]: Recommended **CUDA v12.4 or higher** and **ROCm 6.4 or higher**. CI currently tests **CUDA 13.4.3** and **ROCm 10.1.0**.

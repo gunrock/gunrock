@@ -12,6 +12,9 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   BUILD_TYPE: Release
   
@@ -32,21 +35,48 @@ jobs:
     name: Build (${{matrix.backend}})
 
     steps:
-      # Fetch CUDA toolkit using Jimver/cuda-toolkit
-      - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@master
-        id: cuda-toolkit
-        with:
-          cuda: '12.5.0'
-          linux-local-args: '["--toolkit"]'
+      - name: Install CUDA toolkit
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "cuda-installer.exe"
+          Invoke-WebRequest `
+            -Uri "https://developer.download.nvidia.com/compute/cuda/13.4.3/network_installers/cuda_13.4.3_windows_x86_64_network.exe" `
+            -OutFile $installer
+
+          $expectedHash = "C4F4DCDE14545E878CDFA5769BAC46D751D64AD9F1476CB83B59BBBEC12EBF29"
+          $actualHash = (Get-FileHash -Algorithm SHA256 $installer).Hash
+          if ($actualHash -ne $expectedHash) {
+            throw "CUDA installer checksum mismatch: $actualHash"
+          }
+
+          $arguments = @(
+            "-s",
+            "nvcc_13.4",
+            "crt_13.4",
+            "cudart_13.4",
+            "nvvm_13.4",
+            "curand_13.4",
+            "curand_dev_13.4",
+            "cusparse_13.4",
+            "cusparse_dev_13.4",
+            "visual_studio_integration_13.4"
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "CUDA installer failed with exit code $($process.ExitCode)"
+          }
+
+          $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4"
+          "$cudaPath\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "CUDA_PATH=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check nvcc version
         run: nvcc -V
         
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
       
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}
+        run: cmake -B ${{github.workspace}}/build -T "cuda=$env:CUDA_PATH" -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}
         
       - name: Build all applications
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

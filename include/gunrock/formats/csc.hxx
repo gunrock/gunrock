@@ -4,6 +4,7 @@
 #include <gunrock/memory.hxx>
 #include <thrust/sort.h>
 #include <thrust/execution_policy.h>
+#include <thrust/tuple.h>
 
 namespace gunrock {
 namespace format {

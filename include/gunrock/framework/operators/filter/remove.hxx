@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gunrock/framework/operators/configs.hxx>
+#include <thrust/distance.h>
 #include <thrust/remove.h>
 
 namespace gunrock {
