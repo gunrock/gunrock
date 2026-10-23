@@ -85,38 +85,81 @@ python3 "$repo_root/tests/rocjitsu/check-coverage.py" \
   --binary "$full_build/bin/gunrock_tests" \
   --profile "$profdata" \
   --source-root "$repo_root" \
-  --minimum 70 \
+  --minimum 90 \
   --output "$full_results/coverage.json" \
   2>&1 | tee "$full_results/coverage.log"
 
-compat_arch=gfx942
-compat_build="$build_root-$compat_arch"
-compat_results="$result_dir/$compat_arch"
-mkdir -p "$compat_results"
+cdna5_arch=gfx1250
+cdna5_build="$build_root-$cdna5_arch"
+cdna5_results="$result_dir/$cdna5_arch"
+mkdir -p "$cdna5_results"
 
 start=$SECONDS
-configure "$compat_build" "$compat_arch" Release OFF
-cmake --build "$compat_build" --target gunrock_architecture_smoke \
+configure "$cdna5_build" "$cdna5_arch" Release OFF
+cmake --build "$cdna5_build" \
+  --target gunrock_tests gunrock_architecture_smoke \
   --parallel "$build_jobs"
-compat_build_seconds=$((SECONDS - start))
+cdna5_build_seconds=$((SECONDS - start))
 
 start=$SECONDS
-timeout --signal=TERM 5m \
-  rjsim "$compat_arch" -- \
-  ctest --test-dir "$compat_build" \
+timeout --signal=TERM 15m \
+  rjsim "$cdna5_arch" -- \
+  ctest --test-dir "$cdna5_build" -N \
+    --label-regex '^(rocjitsu-full|rocjitsu-architecture)$' \
+  2>&1 | tee "$cdna5_results/discovery.log"
+
+timeout --signal=TERM 15m \
+  rjsim "$cdna5_arch" -- \
+  ctest --test-dir "$cdna5_build" \
     --output-on-failure \
     --no-tests=error \
     --parallel 1 \
-    --label-regex '^rocjitsu-architecture$' \
-    --output-junit "$compat_results/ctest.xml" \
-  2>&1 | tee "$compat_results/ctest.log"
-compat_test_seconds=$((SECONDS - start))
+    --label-regex '^(rocjitsu-full|rocjitsu-architecture)$' \
+    --output-junit "$cdna5_results/ctest.xml" \
+  2>&1 | tee "$cdna5_results/ctest.log"
+cdna5_test_seconds=$((SECONDS - start))
 
 printf '%s\n' \
   "gfx950_build_seconds=$full_build_seconds" \
   "gfx950_test_seconds=$full_test_seconds" \
-  "gfx942_build_seconds=$compat_build_seconds" \
-  "gfx942_test_seconds=$compat_test_seconds" \
+  "gfx1250_build_seconds=$cdna5_build_seconds" \
+  "gfx1250_test_seconds=$cdna5_test_seconds" \
   > "$result_dir/runtime.txt"
+
+run_architecture_smoke() {
+  local arch=$1
+  local build="$build_root-$arch"
+  local results="$result_dir/$arch"
+  local start
+  local build_seconds
+  local test_seconds
+  mkdir -p "$results"
+
+  start=$SECONDS
+  configure "$build" "$arch" Release OFF
+  cmake --build "$build" --target gunrock_architecture_smoke \
+    --parallel "$build_jobs"
+  build_seconds=$((SECONDS - start))
+
+  start=$SECONDS
+  timeout --signal=TERM 5m \
+    rjsim "$arch" -- \
+    ctest --test-dir "$build" \
+      --output-on-failure \
+      --no-tests=error \
+      --parallel 1 \
+      --label-regex '^rocjitsu-architecture$' \
+      --output-junit "$results/ctest.xml" \
+    2>&1 | tee "$results/ctest.log"
+  test_seconds=$((SECONDS - start))
+
+  printf '%s\n' \
+    "${arch}_build_seconds=$build_seconds" \
+    "${arch}_test_seconds=$test_seconds" \
+    >> "$result_dir/runtime.txt"
+}
+
+run_architecture_smoke gfx942
+run_architecture_smoke gfx1201
 
 echo "rocjitsu suite passed"
