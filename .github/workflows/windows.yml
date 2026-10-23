@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
       
       - name: Configure cmake
-        run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}
+        run: cmake -B ${{github.workspace}}/build -T "cuda=$env:CUDA_PATH" -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{matrix.cmake_backend_flag}} ${{matrix.cmake_arch_flag}}
         
       - name: Build all applications
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

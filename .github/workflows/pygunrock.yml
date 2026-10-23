@@ -98,11 +98,10 @@ jobs:
             ${{matrix.container}} \
             bash -c "
               set -e
-              python3 -m pip install --upgrade pip
-              python3 -m pip install nanobind scikit-build-core
+              python3 -m pip install --break-system-packages nanobind scikit-build-core
               NANOBIND_CMAKE=\$(python3 -c 'import nanobind; print(nanobind.cmake_dir())')
               echo \"nanobind CMake directory: \$NANOBIND_CMAKE\"
-              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE python3 -m pip install -e . -v
+              CMAKE_ARGS='${{matrix.cmake_arch_flag}} -DCMAKE_PREFIX_PATH=${{matrix.cmake_prefix_path}} -Dnanobind_DIR='\$NANOBIND_CMAKE python3 -m pip install --break-system-packages -e . -v
               echo \"=== Verifying PyGunrock installation ===\"
               python3 -c 'import gunrock; print(f\"PyGunrock version: {gunrock.__version__}\")'
             "
