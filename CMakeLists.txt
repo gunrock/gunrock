@@ -232,6 +232,10 @@ target_compile_definitions(essentials
     GIT_SHA1="${GIT_SHA1}"
 )
 
+if(MSVC)
+  target_compile_definitions(essentials INTERFACE WIN32_LEAN_AND_MEAN)
+endif()
+
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
 ####################################################
