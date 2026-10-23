@@ -28,13 +28,15 @@ jobs:
         
     # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
     if: "!contains(github.event.commits[0].message, '[skip windows]')"
-    runs-on: windows-latest
+    # CUDA 12.5 supports Visual Studio 2022, not the Visual Studio 2026
+    # toolset currently selected by windows-latest.
+    runs-on: windows-2022
     name: Build (${{matrix.backend}})
 
     steps:
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@master
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
         id: cuda-toolkit
         with:
           cuda: '12.5.0'
