@@ -1,6 +1,8 @@
 #include <gunrock/cuda/launch_box.hxx>
 
 #include <gtest/gtest.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 
 using namespace gunrock::gcuda::launch_box;
 
@@ -32,6 +34,13 @@ typedef launch_box_t<
 
 __global__ void dummy_kernel() {}
 
+struct write_launch_index {
+  int* output;
+  __device__ void operator()(int index, int) const {
+    output[index] = index + 1;
+  }
+};
+
 TEST(cuda, launch_box_occupancy) {
   EXPECT_GT(occupancy<launch_t>(dummy_kernel), 0.0f);
 }
@@ -62,4 +71,21 @@ TEST(cuda, launch_box_define) {
   EXPECT_EQ(conversion_test.y, block_dimensions.y);
   EXPECT_EQ(conversion_test.z, block_dimensions.z);
   EXPECT_LE(smem, 128);
+}
+
+TEST(cuda, blocked_launch_covers_partial_final_tile) {
+  using blocked_launch_t =
+      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<8>, 3>>;
+  constexpr int size = 17;
+  thrust::device_vector<int> output(size, 0);
+  write_launch_index write{output.data().get()};
+  gunrock::gcuda::standard_context_t context;
+
+  blocked_launch_t launch;
+  launch.launch_blocked(context, write, size);
+  context.synchronize();
+
+  thrust::host_vector<int> actual(output);
+  for (int index = 0; index < size; ++index)
+    EXPECT_EQ(actual[index], index + 1);
 }

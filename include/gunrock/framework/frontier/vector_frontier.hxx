@@ -204,6 +204,7 @@ class vector_frontier_t {
    */
   void push_back(type_t const& value) {
     p_storage.get()->push_back(value);
+    raw_ptr = p_storage.get()->data().get();
     num_elements++;
   }
 
@@ -267,6 +268,7 @@ class vector_frontier_t {
       std::size_t const& size,
       type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
     p_storage.get()->resize(size, default_value);
+    raw_ptr = p_storage.get()->data().get();
   }
 
   /**
@@ -278,6 +280,7 @@ class vector_frontier_t {
    */
   void reserve(std::size_t const& size) {
     p_storage.get()->reserve(size * resizing_factor);
+    raw_ptr = p_storage.get()->data().get();
   }
 
   /**

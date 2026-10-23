@@ -4,12 +4,15 @@
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
+#include <array>
+
 namespace {
 
-__global__ void write_indices(int* values, int size) {
+__global__ void write_indices(int* values, int size, int* completed) {
   auto index = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
   if (index < size) {
     values[index] = index + 1;
+    atomicAdd(completed, 1);
   }
 }
 
@@ -20,14 +23,32 @@ TEST(architecture, device_kernel_and_runtime) {
   ASSERT_EQ(hipGetDeviceCount(&device_count), hipSuccess);
   ASSERT_GE(device_count, 1);
 
-  constexpr int size = 8;
+  constexpr int size = 65;
   thrust::device_vector<int> device_values(size, 0);
-  write_indices<<<1, size>>>(device_values.data().get(), size);
-  ASSERT_EQ(hipGetLastError(), hipSuccess);
-  ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
+  thrust::device_vector<int> completed(1, 0);
+  hipStream_t stream = nullptr;
+  hipEvent_t event = nullptr;
+  ASSERT_EQ(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking),
+            hipSuccess);
+  ASSERT_EQ(hipEventCreate(&event), hipSuccess);
 
-  thrust::host_vector<int> host_values(device_values);
+  write_indices<<<2, 64, 0, stream>>>(device_values.data().get(), size,
+                                      completed.data().get());
+  ASSERT_EQ(hipGetLastError(), hipSuccess);
+  ASSERT_EQ(hipEventRecord(event, stream), hipSuccess);
+  ASSERT_EQ(hipEventSynchronize(event), hipSuccess);
+
+  std::array<int, size> host_values{};
+  ASSERT_EQ(hipMemcpyAsync(host_values.data(), device_values.data().get(),
+                           sizeof(host_values), hipMemcpyDeviceToHost, stream),
+            hipSuccess);
+  ASSERT_EQ(hipStreamSynchronize(stream), hipSuccess);
   for (int index = 0; index < size; ++index) {
     EXPECT_EQ(host_values[index], index + 1);
   }
+  thrust::host_vector<int> host_completed(completed);
+  ASSERT_EQ(host_completed[0], size);
+
+  EXPECT_EQ(hipEventDestroy(event), hipSuccess);
+  EXPECT_EQ(hipStreamDestroy(stream), hipSuccess);
 }

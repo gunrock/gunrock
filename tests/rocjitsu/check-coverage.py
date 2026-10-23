@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--binary", required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--source-root", required=True)
-    parser.add_argument("--minimum", type=float, default=70.0)
+    parser.add_argument("--minimum", type=float, default=90.0)
     parser.add_argument("--output")
     return parser.parse_args()
 
@@ -56,8 +56,8 @@ def in_host_scope(relative_path):
 
 def main():
     args = parse_args()
-    if args.minimum < 70.0:
-        print("coverage error: minimum cannot be lower than 70%", file=sys.stderr)
+    if args.minimum < 90.0:
+        print("coverage error: minimum cannot be lower than 90%", file=sys.stderr)
         return 2
     source_root = Path(args.source_root).resolve()
     command = [

@@ -22,12 +22,24 @@ struct compute_capability_t {
   unsigned major;
   unsigned minor;
   constexpr unsigned as_combined_number() const { return major * 10 + minor; }
-  constexpr bool operator==(int i) { return (int)as_combined_number() == i; }
-  constexpr bool operator!=(int i) { return (int)as_combined_number() != i; }
-  constexpr bool operator>(int i) { return (int)as_combined_number() > i; }
-  constexpr bool operator<(int i) { return (int)as_combined_number() < i; }
-  constexpr bool operator>=(int i) { return (int)as_combined_number() >= i; }
-  constexpr bool operator<=(int i) { return (int)as_combined_number() <= i; }
+  constexpr bool operator==(int i) const {
+    return (int)as_combined_number() == i;
+  }
+  constexpr bool operator!=(int i) const {
+    return (int)as_combined_number() != i;
+  }
+  constexpr bool operator>(int i) const {
+    return (int)as_combined_number() > i;
+  }
+  constexpr bool operator<(int i) const {
+    return (int)as_combined_number() < i;
+  }
+  constexpr bool operator>=(int i) const {
+    return (int)as_combined_number() >= i;
+  }
+  constexpr bool operator<=(int i) const {
+    return (int)as_combined_number() <= i;
+  }
 };
 
 /**
@@ -114,14 +126,15 @@ inline constexpr unsigned warp_max_threads() {
  * @brief Maximum number of resident blocks per SM/CU.
  * @param capability Compute capability from which to get the result
  * \return unsigned
- * 
+ *
  * NVIDIA: Maximum resident blocks per SM based on compute capability
  * AMD: Reasonable default for most architectures (can vary by gfx architecture)
  */
 inline constexpr unsigned sm_max_ctas(compute_capability_t capability) {
 #if defined(__HIP_PLATFORM_AMD__)
   // AMD: Return a reasonable default (typically higher than NVIDIA)
-  // Actual value depends on gfx architecture but is generally 32-40 for modern GPUs
+  // Actual value depends on gfx architecture but is generally 32-40 for modern
+  // GPUs
   return 32;
 #else
   // NVIDIA: Use compute capability-specific values
@@ -309,10 +322,11 @@ void print(device_properties_t& prop) {
   // CUDA 13.1+ removed clockRate and memoryClockRate from cudaDeviceProp
   int clock_rate_khz, memory_clock_rate_khz;
   hipDeviceGetAttribute(&clock_rate_khz, hipDeviceAttributeClockRate, ordinal);
-  hipDeviceGetAttribute(&memory_clock_rate_khz, hipDeviceAttributeMemoryClockRate, ordinal);
+  hipDeviceGetAttribute(&memory_clock_rate_khz,
+                        hipDeviceAttributeMemoryClockRate, ordinal);
   double memBandwidth =
       (memory_clock_rate_khz * 1000.0) * (prop.memoryBusWidth / 8 * 2) / 1.0e9;
-  
+
   std::cout << prop.name << " : " << clock_rate_khz / 1000.0 << " Mhz "
             << "(Ordinal " << ordinal << ")" << std::endl;
   std::cout << "FreeMem: " << (int)(freeMem / (1 << 20)) << " MB "

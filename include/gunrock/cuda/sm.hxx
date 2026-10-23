@@ -75,6 +75,7 @@ enum sm_flag_t : unsigned {
   sm_gfx1103 = 1 << 27,
   sm_gfx1200 = 1 << 28,
   sm_gfx1201 = 1 << 29,
+  sm_gfx1250 = 1 << 30,
 #endif
 };
 
