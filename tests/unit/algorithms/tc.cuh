@@ -14,8 +14,30 @@
 
 #include <gtest/gtest.h>
 
+#include <vector>
+
 using namespace gunrock;
 using namespace memory;
+
+TEST(algorithm, tc_empty_graph) {
+  using vertex_t = int;
+  using edge_t = int;
+  using weight_t = int;
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr(1, 1,
+                                                                        0);
+  csr.row_offsets = std::vector<edge_t>{0, 0};
+
+  auto graph =
+      graph::build<memory_space_t::device>(graph::graph_properties_t{}, csr);
+  thrust::device_vector<vertex_t> vertex_counts(1, 0);
+  std::size_t total_count = 0;
+
+  tc::run(graph, true, vertex_counts.data().get(), &total_count);
+
+  thrust::host_vector<vertex_t> host_counts(vertex_counts);
+  EXPECT_EQ(host_counts[0], 0);
+  EXPECT_EQ(total_count, 0);
+}
 
 TEST(algorithm, tc) {
   // CSR Matrix Representation

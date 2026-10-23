@@ -6,6 +6,8 @@
 
 #include <array>
 #include <cmath>
+#include <exception>
+#include <vector>
 
 namespace {
 
@@ -97,6 +99,33 @@ TEST(graph, host_csr_representation_exposes_expected_edges) {
   EXPECT_DOUBLE_EQ(gunrock::graph::get_average_degree(graph), 1.0);
   EXPECT_NEAR(gunrock::graph::get_degree_standard_deviation(graph),
               std::sqrt(0.75), 1.0e-12);
+  EXPECT_EQ(graph.memory_space(), gunrock::memory_space_t::host);
+  EXPECT_EQ(graph.get_starting_edge(2), 3);
+  EXPECT_EQ(graph.get_edge(2, 3), 4);
+  EXPECT_THROW(gunrock::graph::remove_self_loops(graph), std::exception);
+}
+
+TEST(graph, csr_intersections_handle_skew_empty_rows_and_self_loops) {
+  graph_host_csr_t csr(5, 5, 10);
+  csr.row_offsets = {0, 4, 6, 6, 9, 10};
+  csr.column_indices = {1, 2, 3, 4, 2, 3, 0, 2, 4, 4};
+  csr.nonzero_values = std::vector<float>(10, 1.0f);
+  auto graph = gunrock::graph::build<gunrock::memory_space_t::host>({}, csr);
+
+  std::vector<int> intersections;
+  auto record = [&](int vertex) { intersections.push_back(vertex); };
+
+  EXPECT_EQ(graph.get_intersection_count(0, 1, record), 2);
+  EXPECT_EQ(intersections, (std::vector<int>{2, 3}));
+
+  intersections.clear();
+  EXPECT_EQ(graph.get_intersection_count(3, 0, record), 2);
+  EXPECT_EQ(intersections, (std::vector<int>{2, 4}));
+
+  intersections.clear();
+  EXPECT_EQ(graph.get_intersection_count(1, 4, record), 0);
+  EXPECT_TRUE(intersections.empty());
+  EXPECT_EQ(graph.get_intersection_count(0, 2, record), 0);
 }
 
 TEST(graph, device_csr_accessors_match_host_reference) {

@@ -59,6 +59,7 @@ class standard_context_t : public context_t {
   gcuda::device_id_t _ordinal;
   gcuda::stream_t _stream;
   gcuda::event_t _event;
+  bool _owns_stream;
 
   /**
    * @todo Find out how to use a shared_ptr<> without printing the GPU debug
@@ -76,12 +77,16 @@ class standard_context_t : public context_t {
     gcuda::function_attributes_t attr = {};
     // error::error_t status = hipFuncGetAttributes(&attr, dummy_k<0>);
     // error::throw_if_exception(status);
-    // Note: attr.ptxVersion is uninitialized when hipFuncGetAttributes is commented out
-    // Using default value of 0, which will be handled by make_compute_capability
+    // Note: attr.ptxVersion is uninitialized when hipFuncGetAttributes is
+    // commented out Using default value of 0, which will be handled by
+    // make_compute_capability
     _ptx_version = gcuda::make_compute_capability(attr.ptxVersion);
 
     hipSetDevice(_ordinal);
-    hipStreamCreateWithFlags(&_stream, hipStreamNonBlocking);
+    if (_stream == nullptr) {
+      hipStreamCreateWithFlags(&_stream, hipStreamNonBlocking);
+      _owns_stream = true;
+    }
     hipEventCreateWithFlags(&_event, hipEventDisableTiming);
     hipGetDeviceProperties(&_props, _ordinal);
 
@@ -91,18 +96,30 @@ class standard_context_t : public context_t {
  public:
   standard_context_t(gcuda::device_id_t device = 0)
       //    : context_t(), _ordinal(device), _mgpu_context(nullptr) {
-      : context_t(), _ordinal(device) {
+      : context_t(),
+        _ordinal(device),
+        _stream(nullptr),
+        _event(nullptr),
+        _owns_stream(false) {
     init();
   }
 
   standard_context_t(hipStream_t stream, gcuda::device_id_t device = 0)
       // : context_t(), _ordinal(device), _mgpu_context(nullptr),
       // _stream(stream) {
-      : context_t(), _ordinal(device), _stream(stream) {
+      : context_t(),
+        _ordinal(device),
+        _stream(stream),
+        _event(nullptr),
+        _owns_stream(false) {
     init();
   }
 
-  ~standard_context_t() { hipEventDestroy(_event); }
+  ~standard_context_t() {
+    hipEventDestroy(_event);
+    if (_owns_stream)
+      hipStreamDestroy(_stream);
+  }
 
   virtual const gcuda::device_properties_t& props() const override {
     return _props;
@@ -149,6 +166,9 @@ class multi_context_t {
   thrust::host_vector<gcuda::device_id_t> devices;
   static constexpr std::size_t MAX_NUMBER_OF_GPUS = 1024;
 
+  multi_context_t(const multi_context_t&) = delete;
+  multi_context_t& operator=(const multi_context_t&) = delete;
+
   // Multiple devices.
   multi_context_t(thrust::host_vector<gcuda::device_id_t> _devices)
       : devices(_devices) {
@@ -186,7 +206,10 @@ class multi_context_t {
       contexts.push_back(device_context);
     }
   }
-  ~multi_context_t() {}
+  ~multi_context_t() {
+    for (auto* context : contexts)
+      delete context;
+  }
 
   auto get_context(gcuda::device_id_t device) {
     auto contexts_ptr = contexts.data();

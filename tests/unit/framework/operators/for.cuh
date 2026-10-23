@@ -28,6 +28,13 @@ struct mark_index {
   __device__ void operator()(int const& index) const { output[index] = 1; }
 };
 
+struct mark_weight {
+  int* output;
+  __device__ void operator()(float const& weight) const {
+    output[static_cast<int>(weight)] = 1;
+  }
+};
+
 TEST(operators, parallel_for_visits_graph_vertices_and_frontier_elements) {
   auto csr = gunrock::io::sample::csr();
   gunrock::graph::graph_properties_t properties;
@@ -47,6 +54,14 @@ TEST(operators, parallel_for_visits_graph_vertices_and_frontier_elements) {
   X.push_back(1);
   X.push_back(gunrock::numeric_limits<int>::invalid());
   X.push_back(3);
+  X.set_resizing_factor(1.5f);
+  X.reserve(8);
+  EXPECT_GE(X.get_capacity(), 8);
+  EXPECT_NE(X.get(), nullptr);
+  EXPECT_FLOAT_EQ(X.get_resizing_factor(), 1.5f);
+  auto X_copy = X;
+  EXPECT_EQ(X_copy.get(), X.get());
+  EXPECT_EQ(X_copy.get_number_of_elements(), 3);
   thrust::device_vector<int> frontier_output(4, 0);
   gunrock::operators::parallel_for::execute<
       gunrock::operators::parallel_for_each_t::element>(
@@ -54,4 +69,12 @@ TEST(operators, parallel_for_visits_graph_vertices_and_frontier_elements) {
   context.get_context(0)->synchronize();
   thrust::host_vector<int> host_frontier_output(frontier_output);
   expect_values(host_frontier_output, {0, 1, 0, 1});
+
+  thrust::device_vector<int> weight_output(9, 0);
+  gunrock::operators::parallel_for::execute<
+      gunrock::operators::parallel_for_each_t::weight>(
+      G, mark_weight{weight_output.data().get()}, context);
+  context.get_context(0)->synchronize();
+  thrust::host_vector<int> host_weight_output(weight_output);
+  expect_values(host_weight_output, {0, 0, 0, 1, 0, 1, 1, 0, 1});
 }
