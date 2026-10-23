@@ -43,7 +43,7 @@ jobs:
             -Uri "https://developer.download.nvidia.com/compute/cuda/13.4.3/network_installers/cuda_13.4.3_windows_x86_64_network.exe" `
             -OutFile $installer
 
-          $expectedHash = "C4F4DCDE14545E878CDFA5769BAC46D751D64AD9F1476CB83B59BBEC12EBF29"
+          $expectedHash = "C4F4DCDE14545E878CDFA5769BAC46D751D64AD9F1476CB83B59BBBEC12EBF29"
           $actualHash = (Get-FileHash -Algorithm SHA256 $installer).Hash
           if ($actualHash -ne $expectedHash) {
             throw "CUDA installer checksum mismatch: $actualHash"
