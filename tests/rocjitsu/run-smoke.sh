@@ -46,8 +46,8 @@ if [[ $status -ne 0 ]]; then
 fi
 
 if ! grep -Fq "Number of errors : 0" "$result_dir/bfs.log"; then
-  echo "RocJITsu smoke test: BFS did not match the CPU reference" >&2
+  echo "rocjitsu smoke test: BFS did not match the CPU reference" >&2
   exit 1
 fi
 
-echo "RocJITsu smoke test passed for $arch"
+echo "rocjitsu smoke test passed for $arch"

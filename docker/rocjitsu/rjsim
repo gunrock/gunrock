@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # rjsim <arch> -- <cmd...> runs a command on a CPU-emulated AMD GPU.
-# Supported aliases: gfx942 and gfx950. A RocJITsu config path also works.
+# Supported aliases: gfx942 and gfx950. A rocjitsu config path also works.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then

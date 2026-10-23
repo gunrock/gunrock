@@ -1,8 +1,8 @@
 # GPU-less AMD smoke test
 
 This test runs Gunrock HIP binaries on a CPU-emulated AMD GPU. Mirage loads
-RocJITsu (ROCm Just-in-Time Suite), which intercepts KFD/DRM calls and
-executes AMD GPU ISA on the CPU. RocJITsu is not HIPRTC or another HIP
+rocjitsu (ROCm Just-in-Time Suite), which intercepts KFD/DRM calls and
+executes AMD GPU ISA on the CPU. rocjitsu is not HIPRTC or another HIP
 runtime-compilation API.
 
 No `/dev/kfd`, `/dev/dri`, physical GPU, or privileged container is required.
@@ -15,7 +15,7 @@ CMake's AMD backend, HIP compilation and linking, device discovery, streams
 and events, device memory, Thrust/rocThrust, atomics, advance/filter kernels,
 and host-device copies.
 
-RocJITsu has no GPU timing model, so this test does not run benchmarks or
+rocjitsu has no GPU timing model, so this test does not run benchmarks or
 check timing. It also does not cover occupancy, cooperative launch, virtual
 memory, sparse libraries, asynchronous execution, or multi-GPU behavior.
 Those paths still require testing on AMD hardware.
@@ -35,14 +35,14 @@ docker run --rm --init --user "$(id -u):$(id -g)" \
   rjsim gfx950 -- tests/rocjitsu/run-smoke.sh results/rocjitsu
 ```
 
-`RJ_THREADS` controls RocJITsu's CPU thread budget. `RJ_BUILD_JOBS` controls
+`RJ_THREADS` controls rocjitsu's CPU thread budget. `RJ_BUILD_JOBS` controls
 the CMake build parallelism. Repeat with `rjsim gfx942 -- ...` to test both
 CI targets.
 
 ## Updating the image
 
 The workflow uses a digest-pinned Triton AMD CI image containing TheRock ROCm,
-Mirage, RocJITsu, and the `gfx942` and `gfx950` configurations.
+Mirage, rocjitsu, and the `gfx942` and `gfx950` configurations.
 
 When updating the base image, verify:
 

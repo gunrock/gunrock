@@ -1,5 +1,5 @@
 # Functional AMD GPU coverage on a CPU-only runner. See tests/rocjitsu/README.md.
-name: RocJITsu smoke
+name: rocjitsu smoke
 
 on:
   pull_request:
@@ -57,7 +57,7 @@ jobs:
           docker system prune -af >/dev/null
           df -h /
 
-      - name: Build RocJITsu image
+      - name: Build rocjitsu image
         run: docker build --pull -t "$IMAGE" docker/rocjitsu
 
       - name: Build and validate BFS on simulated AMD GPUs

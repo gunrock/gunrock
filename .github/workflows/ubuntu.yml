@@ -93,16 +93,16 @@ jobs:
       # Install ROCm for AMD backend
       - name: Install ROCm
         if: matrix.backend == 'amd'
-        uses: loostrum/rocm-installer@v0.2
+        uses: loostrum/rocm-installer@c8475e5dc8cc37b9b58f314a3cba446b9dbef8d3 # v0.2
         with:
-          version: latest
+          version: "7.2.4"
           packages: rocm-hip-runtime-dev rocprim-dev rocthrust-dev hipcub-dev hiprand-dev hipsparse-dev rocrand roctracer
 
       - name: Install ROCm (sparse)
         if: matrix.backend == 'amd-sparse'
-        uses: loostrum/rocm-installer@v0.2
+        uses: loostrum/rocm-installer@c8475e5dc8cc37b9b58f314a3cba446b9dbef8d3 # v0.2
         with:
-          version: latest
+          version: "7.2.4"
           packages: rocm-hip-runtime-dev hiprand-dev hipsparse-dev rocrand roctracer
 
       - name: Check hipcc version
