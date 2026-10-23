@@ -5,11 +5,23 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 result_dir=${1:-"$repo_root/results/rocjitsu"}
 build_root=${RJ_BUILD_ROOT:-/tmp/gunrock-rocjitsu-build}
 build_jobs=${RJ_BUILD_JOBS:-2}
+rjsim="$repo_root/tests/rocjitsu/rjsim"
 
 mkdir -p "$result_dir" "${HOME:-/tmp}/.cache"
 result_dir=$(cd "$result_dir" && pwd)
 
-rocm-sdk init >/dev/null 2>&1 || true
+for device in /dev/kfd /dev/dxg; do
+  if [[ -e $device ]]; then
+    echo "rocjitsu tests require no physical GPU device: found $device" >&2
+    exit 1
+  fi
+done
+if compgen -G '/dev/dri/renderD*' >/dev/null; then
+  echo "rocjitsu tests require no DRM render device" >&2
+  exit 1
+fi
+
+rocm-sdk init >/dev/null
 rocm_root=$(rocm-sdk path --root)
 export ROCM_PATH="$rocm_root"
 export HIP_PATH="$rocm_root"
@@ -45,20 +57,21 @@ mkdir -p "$profile_dir"
 
 start=$SECONDS
 configure "$full_build" "$full_arch" Debug ON
-cmake --build "$full_build" --target gunrock_tests \
+cmake --build "$full_build" \
+  --target gunrock_tests gunrock_architecture_smoke \
   --parallel "$build_jobs"
 full_build_seconds=$((SECONDS - start))
 
 start=$SECONDS
 timeout --signal=TERM 15m \
-  rjsim "$full_arch" -- \
+  "$rjsim" "$full_arch" -- \
   env LLVM_PROFILE_FILE="$profile_dir/gunrock-%p.profraw" \
   ctest --test-dir "$full_build" -N \
     --label-regex '^rocjitsu-full$' \
   2>&1 | tee "$full_results/discovery.log"
 
 timeout --signal=TERM 15m \
-  rjsim "$full_arch" -- \
+  "$rjsim" "$full_arch" -- \
   env LLVM_PROFILE_FILE="$profile_dir/gunrock-%p.profraw" \
   ctest --test-dir "$full_build" \
     --output-on-failure \
@@ -67,6 +80,16 @@ timeout --signal=TERM 15m \
     --label-regex '^rocjitsu-full$' \
     --output-junit "$full_results/ctest.xml" \
   2>&1 | tee "$full_results/ctest.log"
+
+timeout --signal=TERM 5m \
+  "$rjsim" "$full_arch" -- \
+  ctest --test-dir "$full_build" \
+    --output-on-failure \
+    --no-tests=error \
+    --parallel 1 \
+    --label-regex '^rocjitsu-architecture$' \
+    --output-junit "$full_results/architecture.xml" \
+  2>&1 | tee "$full_results/architecture.log"
 full_test_seconds=$((SECONDS - start))
 
 shopt -s nullglob
@@ -103,13 +126,13 @@ cdna5_build_seconds=$((SECONDS - start))
 
 start=$SECONDS
 timeout --signal=TERM 15m \
-  rjsim "$cdna5_arch" -- \
+  "$rjsim" "$cdna5_arch" -- \
   ctest --test-dir "$cdna5_build" -N \
     --label-regex '^(rocjitsu-full|rocjitsu-architecture)$' \
   2>&1 | tee "$cdna5_results/discovery.log"
 
 timeout --signal=TERM 15m \
-  rjsim "$cdna5_arch" -- \
+  "$rjsim" "$cdna5_arch" -- \
   ctest --test-dir "$cdna5_build" \
     --output-on-failure \
     --no-tests=error \
@@ -143,7 +166,7 @@ run_architecture_smoke() {
 
   start=$SECONDS
   timeout --signal=TERM 5m \
-    rjsim "$arch" -- \
+    "$rjsim" "$arch" -- \
     ctest --test-dir "$build" \
       --output-on-failure \
       --no-tests=error \

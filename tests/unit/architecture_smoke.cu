@@ -5,6 +5,8 @@
 #include <thrust/host_vector.h>
 
 #include <array>
+#include <cstdlib>
+#include <string>
 
 namespace {
 
@@ -22,6 +24,29 @@ TEST(architecture, device_kernel_and_runtime) {
   int device_count = 0;
   ASSERT_EQ(hipGetDeviceCount(&device_count), hipSuccess);
   ASSERT_GE(device_count, 1);
+
+  int device = -1;
+  ASSERT_EQ(hipGetDevice(&device), hipSuccess);
+  hipDeviceProp_t properties{};
+  ASSERT_EQ(hipGetDeviceProperties(&properties, device), hipSuccess);
+
+#if defined(__HIP_PLATFORM_AMD__)
+  const char* expected_arch_env = std::getenv("GUNROCK_EXPECT_ARCH");
+  const char* expected_wave_env = std::getenv("GUNROCK_EXPECT_WAVE_SIZE");
+  ASSERT_NE(expected_arch_env, nullptr);
+  ASSERT_NE(expected_wave_env, nullptr);
+
+  std::string actual_arch(properties.gcnArchName);
+  if (const auto feature = actual_arch.find(':');
+      feature != std::string::npos) {
+    actual_arch.resize(feature);
+  }
+  ASSERT_EQ(actual_arch, expected_arch_env);
+
+  const std::string expected_wave(expected_wave_env);
+  ASSERT_TRUE(expected_wave == "32" || expected_wave == "64");
+  ASSERT_EQ(properties.warpSize, std::stoi(expected_wave));
+#endif
 
   constexpr int size = 65;
   thrust::device_vector<int> device_values(size, 0);

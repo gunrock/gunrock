@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# rjsim <arch> -- <cmd...> runs a command on a CPU-emulated AMD GPU.
+# Supported aliases: gfx942, gfx950, gfx1201, and gfx1250.
+# A rocjitsu config path also works with RJ_EXPECT_ARCH and
+# RJ_EXPECT_WAVE_SIZE set by the caller when architecture assertions are used.
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+  sed -n '2,3p' "$0" | sed 's/^# //'
+  exit 2
+fi
+
+arch=$1
+shift
+[[ ${1:-} == -- ]] && shift
+[[ $# -gt 0 ]] || { echo "rjsim: no command specified" >&2; exit 2; }
+
+command -v rocm-sdk >/dev/null ||
+  { echo "rjsim: rocm-sdk is not on PATH" >&2; exit 1; }
+rocm-sdk init >/dev/null
+root=$(rocm-sdk path --root)
+
+expected_arch=${RJ_EXPECT_ARCH:-}
+expected_wave_size=${RJ_EXPECT_WAVE_SIZE:-}
+case "$arch" in
+  gfx942)
+    config=gfx942_cdna3_kmd.json
+    expected_arch=gfx942
+    expected_wave_size=64
+    ;;
+  gfx950)
+    config=gfx950_mi355x_kmd.json
+    expected_arch=gfx950
+    expected_wave_size=64
+    ;;
+  gfx1201)
+    config=gfx1201_r9700.json
+    expected_arch=gfx1201
+    expected_wave_size=32
+    ;;
+  gfx1250)
+    config=gfx1250_mi455x.json
+    expected_arch=gfx1250
+    expected_wave_size=32
+    ;;
+  *.json) config=$arch ;;
+  *) echo "rjsim: unsupported architecture '$arch'" >&2; exit 2 ;;
+esac
+
+config_dir=${ROCJITSU_CONFIG_DIR:-"$root/share/rocjitsu/configs"}
+[[ $config == /* || -f $config ]] || config="$config_dir/$config"
+[[ -f $config ]] || { echo "rjsim: missing config '$config'" >&2; exit 2; }
+
+simulator="$root/bin/mirage"
+if [[ ! -x $simulator ]]; then
+  simulator=$(command -v mirage || true)
+fi
+[[ -n $simulator && -x $simulator ]] ||
+  { echo "rjsim: cannot locate the Mirage executable" >&2; exit 1; }
+
+runtime_dir=$(mktemp -d "${TMPDIR:-/tmp}/gunrock-rocjitsu.XXXXXX")
+trap 'rm -rf "$runtime_dir"' EXIT
+
+export GUNROCK_EXPECT_ARCH="$expected_arch"
+export GUNROCK_EXPECT_WAVE_SIZE="$expected_wave_size"
+export ROCM_PATH="$root"
+export HIP_PATH="$root"
+export PATH="$root/bin:$PATH"
+export LD_LIBRARY_PATH="$root/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export MIRAGE_RUNTIME="$runtime_dir"
+export XDG_RUNTIME_DIR="$runtime_dir"
+
+"$simulator" run \
+  --in-process \
+  --config "$config" \
+  --cpu-thread-budget "${RJ_THREADS:-2}" \
+  -- "$@"
