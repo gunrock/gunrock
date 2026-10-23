@@ -3,12 +3,11 @@ name: rocjitsu tests
 
 on:
   pull_request:
-    branches: [main]
     paths:
       - ".github/workflows/rocjitsu.yml"
+      - ".github/requirements/rocjitsu-*.txt"
       - "CMakeLists.txt"
       - "cmake/**"
-      - "docker/rocjitsu/**"
       - "include/**"
       - "tests/data/**"
       - "tests/rocjitsu/**"
@@ -17,9 +16,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/rocjitsu.yml"
+      - ".github/requirements/rocjitsu-*.txt"
       - "CMakeLists.txt"
       - "cmake/**"
-      - "docker/rocjitsu/**"
       - "include/**"
       - "tests/data/**"
       - "tests/rocjitsu/**"
@@ -37,45 +36,110 @@ jobs:
   suite:
     name: gfx950 coverage and architecture compatibility
     runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:24.04@sha256:a4453623f2f8319cfff65c43da9be80fe83b1a7ce689579b475867d69495b782
+      options: --shm-size 4g
     timeout-minutes: 60
     env:
-      IMAGE: gunrock-rocjitsu
+      ROCM_NIGHTLY_INDEX: https://nightly.repo.amd.com/rocm/whl-next/
+      ROCM_SDK_VERSION: 10.3.0a20261023
 
     steps:
+      - name: Install system tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            cmake \
+            git \
+            ninja-build \
+            python3 \
+            python3-venv
+          rm -rf /var/lib/apt/lists/*
+
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Free disk for the emulator image
-        if: runner.environment == 'github-hosted'
+      - name: Install pinned nightly ROCm SDK
         run: |
-          sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /opt/hostedtoolcache/CodeQL
-          docker system prune -af >/dev/null
-          df -h /
+          set -euo pipefail
+          start=$SECONDS
+          venv="$RUNNER_TEMP/rocjitsu-sdk"
+          mkdir -p results/rocjitsu "$RUNNER_TEMP/home"
+          python3 -m venv "$venv"
+          "$venv/bin/pip" install \
+            --disable-pip-version-check \
+            --no-cache-dir \
+            --no-deps \
+            --only-binary=:all: \
+            --require-hashes \
+            -r .github/requirements/rocjitsu-bootstrap.txt
+          "$venv/bin/pip" install \
+            --disable-pip-version-check \
+            --index-url "$ROCM_NIGHTLY_INDEX" \
+            --no-build-isolation \
+            --no-cache-dir \
+            --no-deps \
+            --require-hashes \
+            -r .github/requirements/rocjitsu-sdk.txt
+          "$venv/bin/pip" check
+          "$venv/bin/rocm-sdk" init
 
-      - name: Build rocjitsu image
-        run: docker build --pull -t "$IMAGE" docker/rocjitsu
+          rocm_root=$("$venv/bin/rocm-sdk" path --root)
+          test -x "$rocm_root/bin/mirage"
+          for config in \
+            gfx942_cdna3_kmd.json \
+            gfx950_mi355x_kmd.json \
+            gfx1201_r9700.json \
+            gfx1250_mi455x.json; do
+            test -f "$rocm_root/share/rocjitsu/configs/$config"
+          done
+          test "$("$venv/bin/python" -c \
+            'from importlib.metadata import version; print(version("rocm"))')" \
+            = "$ROCM_SDK_VERSION"
+
+          {
+            echo "$venv/bin"
+            echo "$rocm_root/bin"
+          } >> "$GITHUB_PATH"
+          {
+            echo "ROCM_ROOT=$rocm_root"
+            echo "ROCM_PATH=$rocm_root"
+            echo "HIP_PATH=$rocm_root"
+            echo "CMAKE_PREFIX_PATH=$rocm_root"
+            echo "LD_LIBRARY_PATH=$rocm_root/lib"
+          } >> "$GITHUB_ENV"
+          {
+            echo "setup_seconds=$((SECONDS - start))"
+            echo "initialized_sdk_bytes=$(du -sb "$venv" | cut -f1)"
+          } > results/rocjitsu/setup.txt
+
+      - name: Assert no physical GPU passthrough
+        run: |
+          set -euo pipefail
+          for device in /dev/kfd /dev/dxg; do
+            if [[ -e "$device" ]]; then
+              echo "unexpected physical GPU device: $device" >&2
+              exit 1
+            fi
+          done
+          if compgen -G '/dev/dri/renderD*' >/dev/null; then
+            echo "unexpected DRM render device" >&2
+            exit 1
+          fi
 
       - name: Run tests and enforce host coverage
+        env:
+          HOME: ${{ runner.temp }}/home
+          RJ_BUILD_JOBS: "2"
+          RJ_THREADS: "2"
         run: |
-          mkdir -p results/rocjitsu
+          set -euo pipefail
           timeout --signal=TERM 30m \
-            docker run --rm --init --shm-size 4g \
-              --user "$(id -u):$(id -g)" \
-              -e HOME=/tmp/home \
-              -e RJ_THREADS=2 \
-              -e RJ_BUILD_JOBS=2 \
-              -v "$PWD:/work" \
-              -w /work \
-              "$IMAGE" \
-              tests/rocjitsu/run-tests.sh results/rocjitsu \
+            tests/rocjitsu/run-tests.sh results/rocjitsu \
             2>&1 | tee results/rocjitsu/ci.log
-          status=${PIPESTATUS[0]}
-          [[ $status -eq 0 ]] || exit "$status"
 
       - name: Upload logs
         if: always()

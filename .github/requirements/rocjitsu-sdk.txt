@@ -1,0 +1,9 @@
+# Pinned ROCm nightly alpha and every package selected by its libraries/devel extras.
+rocm[libraries,devel]==10.3.0a20261023 \
+    --hash=sha256:611fde02ca39fa33745a440f3e693336a6ec083d532210a41b54b10546f95f11
+rocm-sdk-core==10.3.0a20261023 \
+    --hash=sha256:33b394b6a450534c3637506c4289cc0e5f79cf530381949d7c32018b9be04782
+rocm-sdk-devel==10.3.0a20261023 \
+    --hash=sha256:6fa1ea41838a6f83723ec799c9c0859daa262138b0c71fcf04864527975f874a
+rocm-sdk-libraries==10.3.0a20261023 \
+    --hash=sha256:909e43581e16a08463fc3178c5cdaf005d8875541290acc7dfe7145df56326f0
