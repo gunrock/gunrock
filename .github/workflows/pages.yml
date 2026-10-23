@@ -5,29 +5,36 @@ on:
   push:
     branches: [ main ]
 
+  # Build documentation changes before they reach the default branch
+  pull_request:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/pages.yml"
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "docs/**"
+      - "include/**"
+      - "python/**"
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 env:
   BUILD_TYPE: Release
   ARCHITECTURES: 90
+  DOXYGEN_VERSION: 1.18.0
+  DOXYGEN_SHA256: 14fa81bdc34171edb5f1f02b1d60e74802f0439b77fa44e592565d517d72df90
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Build jobs only need to read the repository.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Allow one concurrent deployment
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}"
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-22.04
     steps:
       - name: Free up space
@@ -39,14 +46,18 @@ jobs:
           
       # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.16
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
         id: cuda-toolkit
         with:
           cuda: '12.5.0'
           linux-local-args: '["--toolkit"]'
+          # The installer falls back to NVIDIA; avoid coupling it to cache outages.
+          use-github-cache: false
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       
       - name: Configure cmake for Doxygen
         run: cmake -B ${{github.workspace}}/build -DESSENTIALS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DESSENTIALS_NVIDIA_BACKEND=ON -DESSENTIALS_AMD_BACKEND=OFF -DCMAKE_CUDA_ARCHITECTURES=${{env.ARCHITECTURES}}
@@ -57,7 +68,7 @@ jobs:
 
       # Testing with a different python
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.7'
         
@@ -65,9 +76,13 @@ jobs:
       # Note: doxygen is not visible in $PATH until the subsequent actions.
       - name: Install Doxygen
         run: |
-          wget https://www.doxygen.nl/files/doxygen-1.9.5.linux.bin.tar.gz
-          tar -xvf doxygen-1.9.5.linux.bin.tar.gz
-          echo "${{github.workspace}}/doxygen-1.9.5/bin" >> $GITHUB_PATH
+          archive="${RUNNER_TEMP}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "$archive" \
+            "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          echo "${DOXYGEN_SHA256}  ${archive}" | sha256sum --check -
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP"
+          echo "${RUNNER_TEMP}/doxygen-${DOXYGEN_VERSION}/bin" >> "$GITHUB_PATH"
         shell: bash
         
       - name: Install/Verify Requirements
@@ -75,24 +90,37 @@ jobs:
           python --version
           doxygen --version
           cd ${{github.workspace}}/docs/sphinx
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
       # Build Sphinx documentation
       - name: Build Documentation
         run: |
           cd ${{github.workspace}}/docs/sphinx
-          git clone https://github.com/gunrock/gunrock.wiki.git
+          git clone --depth 1 https://github.com/gunrock/gunrock.wiki.git
           make html
         
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           # Upload html directory
           path: './docs/sphinx/_build/html'
-          
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-22.04
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
