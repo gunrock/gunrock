@@ -54,6 +54,7 @@ jobs:
             "nvcc_13.4",
             "crt_13.4",
             "cudart_13.4",
+            "nvvm_13.4",
             "curand_13.4",
             "curand_dev_13.4",
             "cusparse_13.4",
