@@ -24,7 +24,8 @@ TEST(cuda, context_owns_stream_event_and_device) {
 
 TEST(cuda, context_preserves_caller_owned_stream) {
   hipStream_t stream = nullptr;
-  ASSERT_EQ(hipStreamCreate(&stream), hipSuccess);
+  ASSERT_EQ(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking),
+            hipSuccess);
   ASSERT_NE(stream, nullptr);
 
   thrust::host_vector<gunrock::gcuda::device_id_t> devices{0};
