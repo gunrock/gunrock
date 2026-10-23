@@ -36,6 +36,9 @@ jobs:
   suite:
     name: gfx950 coverage and architecture compatibility
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
     container:
       image: ubuntu:24.04@sha256:a4453623f2f8319cfff65c43da9be80fe83b1a7ce689579b475867d69495b782
       options: --shm-size 4g
