@@ -314,10 +314,6 @@ void execute(graph_t& G,
 
   dim3 grid(within_bounds, overflow, 1);
 
-  std::cout << "Input ";
-  input.sort();
-  input.print();
-
   // Launch kernel.
   merge_path_v2_kernel<items_per_thread, num_threads, merge_tile_size,
                        input_type, output_type>
@@ -325,10 +321,6 @@ void execute(graph_t& G,
           G, op, input, output, segments.data().get(), num_merge_tiles);
 
   context.synchronize();
-
-  std::cout << "Output ";
-  output.sort();
-  output.print();
 }
 }  // namespace merge_path_v2
 }  // namespace advance
