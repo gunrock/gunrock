@@ -322,6 +322,7 @@ set(CXX_FLAGS
   $<$<CXX_COMPILER_ID:MSVC>:
     /W4
     /wd4244
+    /Zc:preprocessor
   >
   $<$<CXX_COMPILER_ID:GNU>:
     -Wall 
@@ -353,6 +354,7 @@ set(CUDA_RELEASE_FLAGS
   $<$<CXX_COMPILER_ID:MSVC>:
     -Xcompiler=/bigobj
     -Xcompiler=/Zc:__cplusplus
+    -Xcompiler=/Zc:preprocessor
     -Xcompiler=/wd4244
   >
 )
@@ -366,6 +368,7 @@ set(CUDA_DEBUG_FLAGS
   $<$<CXX_COMPILER_ID:MSVC>:
     -Xcompiler=/bigobj
     -Xcompiler=/Zc:__cplusplus
+    -Xcompiler=/Zc:preprocessor
     -Xcompiler=/wd4244
   >
 )
