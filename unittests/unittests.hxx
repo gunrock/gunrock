@@ -45,4 +45,5 @@
 #include "io/smtx.cuh"
 // #include "io/mtxbin.cuh"
 
+#include "algorithms/bc.cuh"
 #include "algorithms/tc.cuh"
