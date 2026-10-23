@@ -159,8 +159,9 @@ __global__ void merge_path_v2_kernel(graph_t G,
   // Perf-sync, not required.
   __syncthreads();
 
-  // Early exit if out-of-bound.
-  if (thread_idx_start.x >= elements) {
+  // Early exit if out-of-bound. thread_idx_start.x is relative to this tile's
+  // first row (tile_idx_start.x), so offset it to compare against elements.
+  if (tile_idx_start.x + thread_idx_start.x >= elements) {
 #if 0
     printf("REACHED: (row,elements,nz) %d,%d,%d\n",  //
            thread_idx_start.x,                       //
@@ -175,10 +176,13 @@ __global__ void merge_path_v2_kernel(graph_t G,
   for (int ITEM = 0; ITEM < items_per_thread; ++ITEM) {
     if (tile_nonzeros[thread_idx_start.y] <
         tile_row_offsets_end[thread_idx_start.x]) {
+      // Global row (frontier position or vertex) this thread is processing.
+      offset_t row = tile_idx_start.x + thread_idx_start.x;
+
       // Find the actual vertex by queuing the frontier/graph.
       auto v = (input_type == advance_io_type_t::graph)
-                   ? type_t(thread_idx_start.x)
-                   : input.get_element_at(thread_idx_start.x);
+                   ? type_t(row)
+                   : input.get_element_at(row);
 
       // If vertex is invalid, exit. If we do this exit outside this
       // if-condition, we skip a very important aspect of incrementing the
@@ -198,9 +202,11 @@ __global__ void merge_path_v2_kernel(graph_t G,
       // for the whole graph, but for frontier with non-sorted subset of the
       // graph vertices, we have to do this.
       auto starting_edge = G.get_starting_edge(v);
+      // The first row of a tile has no previous entry in shared memory, so
+      // read it from global memory (it is 0 only for the very first row).
       offset_t offset_for_correct_edge_for_this_vertex =
           (thread_idx_start.x == 0)
-              ? 0
+              ? ((row == 0) ? 0 : row_end_offsets[row - 1])
               : tile_row_offsets_end[thread_idx_start.x - 1];
 
       // We compute the edge in the Graph by finding the offset of a
@@ -308,10 +314,6 @@ void execute(graph_t& G,
 
   dim3 grid(within_bounds, overflow, 1);
 
-  std::cout << "Input ";
-  input.sort();
-  input.print();
-
   // Launch kernel.
   merge_path_v2_kernel<items_per_thread, num_threads, merge_tile_size,
                        input_type, output_type>
@@ -319,10 +321,6 @@ void execute(graph_t& G,
           G, op, input, output, segments.data().get(), num_merge_tiles);
 
   context.synchronize();
-
-  std::cout << "Output ";
-  output.sort();
-  output.print();
 }
 }  // namespace merge_path_v2
 }  // namespace advance
