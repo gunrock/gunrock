@@ -192,9 +192,10 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/gunrock/__init__.py"
 enable_testing()
 
 # Run pytest tests
+set(PYGUNROCK_TEST_DIR "${PROJECT_SOURCE_DIR}/../tests/python")
 add_test(
     NAME "Python: test_bindings"
-    COMMAND ${Python_EXECUTABLE} -m pytest tests/ -v
+    COMMAND ${Python_EXECUTABLE} -m pytest "${PYGUNROCK_TEST_DIR}" -v
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

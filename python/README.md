@@ -110,14 +110,14 @@ pip install pytest
 
 # Run all tests
 cd python
-pytest tests/ -v
+pytest ../tests/python -v
 
 # Run specific test file
-pytest tests/test_sssp_simple.py -v
+pytest ../tests/python/test_algorithms.py -v
 
 # Run with coverage
 pip install pytest-cov
-pytest tests/ -v --cov=gunrock --cov-report=html
+pytest ../tests/python -v --cov=gunrock --cov-report=html
 ```
 
 ## Citation

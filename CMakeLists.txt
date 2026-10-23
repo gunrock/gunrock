@@ -491,7 +491,7 @@ endif(ESSENTIALS_BUILD_EXAMPLES)
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   enable_testing()
-  add_subdirectory(unittests)
+  add_subdirectory(tests/unit)
 endif(ESSENTIALS_BUILD_TESTS)
 
 ####################################################
