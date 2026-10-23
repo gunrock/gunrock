@@ -57,6 +57,7 @@
   #define hipGetLastError cudaGetLastError
   inline const char* hipGetErrorString(cudaError_t error) { return cudaGetErrorString(error); }
   #define hipMemcpy cudaMemcpy
+  #define hipMemcpyAsync cudaMemcpyAsync
   #define hipMalloc cudaMalloc
   #define hipFree cudaFree
   #define hipHostMalloc cudaMallocHost
