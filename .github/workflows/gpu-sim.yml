@@ -1,0 +1,66 @@
+name: GPU Simulator
+
+# Optional, non-required check. The hosted runners have no GPU, so this builds
+# the NVIDIA backend and runs the gtest unit tests on a simulated NVIDIA H100
+# (https://github.com/pantheongpu/pantheonsim). A simulator cannot reproduce
+# hardware-specific behavior or timing, so it complements real-GPU testing and
+# does not replace it.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "include/**"
+      - "tests/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/gpu-sim.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Unit tests (CUDA 13.0, simulated H100)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+
+      - name: Set up the simulated GPU and CUDA toolkit
+        uses: pantheongpu/setup-pantheonsim@dda0c8df8d72627c295edbae525354ba2bcb1687 # v0.1.4
+        with:
+          gpu: nvidia/h100
+          cuda-toolkit: "13.0"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build
+
+      # The simulator needs a shared CUDA runtime. Architecture 90 keeps the
+      # CMake default and the SM_TARGET definition working (a "90-virtual"
+      # value would break that macro); the simulator runs the embedded PTX.
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DESSENTIALS_NVIDIA_BACKEND=ON \
+            -DESSENTIALS_AMD_BACKEND=OFF \
+            -DESSENTIALS_BUILD_TESTS=ON \
+            -DCMAKE_CUDA_ARCHITECTURES=90 \
+            -DCMAKE_CUDA_RUNTIME_LIBRARY=Shared
+
+      - name: Build tests
+        run: cmake --build build -j3 --target gunrock_tests gunrock_architecture_smoke
+
+      # ctest runs the test binaries itself (and lists their cases first), so
+      # the whole ctest call goes through the simulator.
+      - name: Test
+        run: vgpu run ctest --test-dir build --output-on-failure
